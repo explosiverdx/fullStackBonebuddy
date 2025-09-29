@@ -37,7 +37,7 @@ function App() {
         <Route path="/admin/*" element={<AdminDashboard />} />
       </Routes>
       {!isAdminPage && <Footer />}
-  o    <SignIn isOpen={isSignInOpen} onClose={closeSignIn} />
+      <SignIn isOpen={isSignInOpen} onClose={closeSignIn} />
     </div>
   );
 }

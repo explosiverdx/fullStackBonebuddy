@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import * as XLSX from 'xlsx';
 
 const PatientRecord = () => {
   const [patients, setPatients] = useState([]);
@@ -189,6 +187,7 @@ const PatientRecord = () => {
 
   const handleExportPDF = async () => {
     try {
+      const { default: jsPDF } = await import('jspdf');
       const response = await fetch('/api/v1/admin/patients/export', {
         credentials: 'include'
       });
@@ -206,6 +205,7 @@ const PatientRecord = () => {
 
   const handleExportExcel = async () => {
     try {
+      const XLSX = await import('xlsx');
       const response = await fetch('/api/v1/admin/patients/export', {
         credentials: 'include'
       });

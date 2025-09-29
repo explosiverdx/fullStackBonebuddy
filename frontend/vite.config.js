@@ -14,4 +14,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          jspdf: ['jspdf'],
+          xlsx: ['xlsx'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
 })
