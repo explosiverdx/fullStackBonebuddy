@@ -10,8 +10,10 @@ import Pricing from './components/Pricing';
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import SignIn from './components/SignIn';
+import PatientSignup from './components/PatientSignup';
 import AdminProfile from './components/AdminProfile';
 import AdminDashboard from './components/AdminDashboard';
+import UserProfile from './components/UserProfile';
 
 function App() {
   const location = useLocation();
@@ -34,6 +36,8 @@ function App() {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/signIn" element={<Home />} />
+        <Route path="/patient-signup" element={<PatientSignup />} />
+        <Route path="/user" element={<UserProfile />} />
         <Route path="/admin/*" element={<AdminDashboard />} />
       </Routes>
       {!isAdminPage && <Footer />}
@@ -44,7 +48,7 @@ function App() {
 
 function AppWrapper() {
   return (
-    <Router>
+    <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
       <App />
     </Router>
   );

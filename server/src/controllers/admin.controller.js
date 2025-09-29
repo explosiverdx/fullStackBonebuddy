@@ -10,6 +10,7 @@ import { Physio } from "../models/physio.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import otpGenerator from "otp-generator";
 import twilio from "twilio";
+import fs from "fs";
 
 const sendAdminOTP = asyncHandler(async (req, res) => {
     let { phoneNumber } = req.body;
@@ -32,7 +33,9 @@ const sendAdminOTP = asyncHandler(async (req, res) => {
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
 
     // Query for existing user in possible formats, regardless of userType
+    console.log('Checking user for', normalizedPhone);
     let existingUser = await User.findOne({ mobile_number: { $in: [normalizedPhone, phoneDigits, `91${phoneDigits}`, phoneNumber] } });
+    console.log('Existing user:', existingUser ? existingUser.userType : 'none');
 
     if (existingUser) {
         if (existingUser.userType === 'admin') {
@@ -46,13 +49,8 @@ const sendAdminOTP = asyncHandler(async (req, res) => {
             throw new ApiError(409, "Phone number already registered as a non-admin user. Please use a different number for admin login.");
         }
     } else {
-        // Create new admin user
-        existingUser = await User.create({
-            mobile_number: normalizedPhone,
-            userType: 'admin',
-            username: defaultUsername,
-            email: defaultEmail
-        });
+        // Phone not registered as admin
+        throw new ApiError(403, "This phone number is not authorized to register as an admin.");
     }
 
     // Set OTP
@@ -61,7 +59,9 @@ const sendAdminOTP = asyncHandler(async (req, res) => {
     await existingUser.save({ validateBeforeSave: false });
 
     // For testing: Log OTP instead of sending via Twilio
-    console.log(`OTP for admin ${normalizedPhone}: ${otp}`);
+    console.error(`OTP for admin ${normalizedPhone}: ${otp}`);
+    console.log(`Admin OTP sent successfully for ${normalizedPhone}`);
+    fs.appendFileSync('../otp.log', `OTP for admin ${normalizedPhone}: ${otp} at ${new Date().toISOString()}\n`);
     return res.status(200).json(new ApiResponse(200, {}, "OTP sent successfully"));
 
     /*
@@ -153,27 +153,121 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 
 const getAllPatientsAdmin = asyncHandler(async (req, res) => {
-    const { search, age, condition, doctor, progress, page = 1, limit = 10 } = req.query;
+    const { search, age, condition, status, doctor, progress, page = 1, limit = 10 } = req.query;
 
-    let match = {};
+    const pipeline = [
+        {
+            $match: { userType: 'patient' }
+        },
+        {
+            $lookup: {
+                from: 'patients',
+                localField: '_id',
+                foreignField: 'userId',
+                as: 'patient'
+            }
+        },
+        {
+            $unwind: {
+                path: '$patient',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $addFields: {
+                isProfileComplete: { $ne: ['$patient', null] }
+            }
+        },
+        {
+            $match: {
+                ...(search && {
+                    $or: [
+                        { 'patient.name': { $regex: search, $options: 'i' } },
+                        { Fullname: { $regex: search, $options: 'i' } },
+                        { username: { $regex: search, $options: 'i' } }
+                    ]
+                }),
+                ...(age && { 'patient.age': parseInt(age) }),
+                ...(condition && { 'patient.diagnosedWith': { $regex: condition, $options: 'i' } }),
+                ...(status && { isProfileComplete: status === 'complete' ? true : (status === 'incomplete' ? false : { $exists: true }) })
+            }
+        },
+        {
+            $project: {
+                _id: 1,
+                name: { $ifNull: ['$patient.name', '$Fullname'] },
+                age: '$patient.age',
+                diagnosedWith: '$patient.diagnosedWith',
+                address: '$patient.address',
+                bloodGroup: '$patient.bloodGroup',
+                gender: '$patient.gender',
+                contactNumber: '$patient.contactNumber',
+                emergencyContactNumber: '$patient.emergencyContactNumber',
+                username: 1,
+                email: 1,
+                mobile_number: 1,
+                lastLogin: 1,
+                isProfileComplete: 1,
+                createdAt: 1
+            }
+        },
+        {
+            $sort: { createdAt: -1 }
+        },
+        {
+            $skip: (parseInt(page) - 1) * parseInt(limit)
+        },
+        {
+            $limit: parseInt(limit)
+        }
+    ];
 
-    if (search) {
-        match.name = { $regex: search, $options: 'i' };
-    }
+    const patients = await User.aggregate(pipeline);
 
-    if (age) {
-        match.age = parseInt(age);
-    }
+    const totalPipeline = [
+        {
+            $match: { userType: 'patient' }
+        },
+        {
+            $lookup: {
+                from: 'patients',
+                localField: '_id',
+                foreignField: 'userId',
+                as: 'patient'
+            }
+        },
+        {
+            $unwind: {
+                path: '$patient',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $addFields: {
+                isProfileComplete: { $ne: ['$patient', null] }
+            }
+        },
+        {
+            $match: {
+                ...(search && {
+                    $or: [
+                        { 'patient.name': { $regex: search, $options: 'i' } },
+                        { Fullname: { $regex: search, $options: 'i' } },
+                        { username: { $regex: search, $options: 'i' } }
+                    ]
+                }),
+                ...(age && { 'patient.age': parseInt(age) }),
+                ...(condition && { 'patient.diagnosedWith': { $regex: condition, $options: 'i' } }),
+                ...(status && { isProfileComplete: status === 'complete' ? true : (status === 'incomplete' ? false : { $exists: true }) })
+            }
+        },
+        {
+            $count: 'total'
+        }
+    ];
 
-    if (condition) {
-        match.diagnosedWith = { $regex: condition, $options: 'i' };
-    }
-
-    // For doctor and progress, can be added later with aggregation
-
-    const patients = await Patient.find(match).populate('userId', 'username email mobile_number').skip((page - 1) * limit).limit(parseInt(limit));
-
-    const total = await Patient.countDocuments(match);
+    const totalResult = await User.aggregate(totalPipeline);
+    const total = totalResult[0]?.total || 0;
 
     return res.status(200).json(new ApiResponse(200, { patients, total, page: parseInt(page), limit: parseInt(limit) }, "Patients retrieved successfully."));
 });
@@ -256,9 +350,65 @@ const getPatientDetailsAdmin = asyncHandler(async (req, res) => {
     }, "Patient details retrieved successfully."));
 });
 
+const getPatientsStats = asyncHandler(async (req, res) => {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const statsPipeline = [
+        {
+            $match: { userType: 'patient' }
+        },
+        {
+            $lookup: {
+                from: 'patients',
+                localField: '_id',
+                foreignField: 'userId',
+                as: 'patient'
+            }
+        },
+        {
+            $unwind: {
+                path: '$patient',
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: 1 },
+                incomplete: { $sum: { $cond: [{ $eq: ['$patient', null] }, 1, 0] } },
+                active: { $sum: { $cond: [{ $gte: ['$lastLogin', thirtyDaysAgo] }, 1, 0] } }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                total: 1,
+                incomplete: 1,
+                active: 1,
+                inactive: { $subtract: ['$total', '$active'] }
+            }
+        }
+    ];
+
+    const statsResult = await User.aggregate(statsPipeline);
+    const stats = statsResult[0] || { total: 0, incomplete: 0, active: 0, inactive: 0 };
+
+    return res.status(200).json(new ApiResponse(200, stats, "Patient stats retrieved successfully."));
+});
+
 const exportPatientsAdmin = asyncHandler(async (req, res) => {
     const patients = await Patient.find().populate('userId', 'username email mobile_number');
     return res.status(200).json(new ApiResponse(200, patients, "Patients data for export."));
 });
 
-export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin };
+const getUsersWithoutPatients = asyncHandler(async (req, res) => {
+    const users = await User.find({ userType: 'patient' }).select('_id Fullname username email mobile_number');
+
+    const usersWithPatients = await Patient.find().distinct('userId');
+
+    const availableUsers = users.filter(user => !usersWithPatients.includes(user._id));
+
+    return res.status(200).json(new ApiResponse(200, availableUsers, "Available users retrieved successfully."));
+});
+
+export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients };

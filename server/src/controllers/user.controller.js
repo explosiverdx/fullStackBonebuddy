@@ -1,6 +1,7 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js";
+import { Patient } from "../models/patient.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import otpGenerator from "otp-generator";
@@ -158,7 +159,12 @@ const verifyOTP = asyncHandler(async (req, res) => {
     // Clear OTP fields after successful verification
     user.otp = undefined;
     user.otpExpires = undefined;
+    user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
+
+    // Check if patient profile exists
+    const patientProfile = await Patient.findOne({ userId: user._id });
+    const needsProfile = !patientProfile;
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
@@ -179,10 +185,11 @@ const verifyOTP = asyncHandler(async (req, res) => {
                 200,
                 {
                     user: loggedInUser,
+                    needsProfile,
                     accessToken,
                     refreshToken
                 },
-                "User logged in successfully"
+                needsProfile ? "OTP verified. Please complete your profile." : "User logged in successfully"
             )
         );
 });
@@ -207,6 +214,9 @@ const loginUser = asyncHandler(async (req, res) => {
     if (!isPasswordValid) {
         throw new ApiError(401, "Invalid user credentials");
     }
+
+    user.lastLogin = new Date();
+    await user.save({ validateBeforeSave: false });
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
