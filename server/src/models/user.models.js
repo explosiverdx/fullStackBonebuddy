@@ -23,9 +23,36 @@ const userSchema=new mongoose.Schema({
     },
     Fullname:{
         type:String,
-        required:false,
+        required: [true, "Full name is required"],
         trim:true,
         index:true
+    },
+    gender: {
+        type: String,
+        enum: ['Male', 'Female', 'Other'],
+        required: [true, "Gender is required"]
+    },
+    dateOfBirth: {
+        type: Date,
+        required: [true, "Date of birth is required"]
+    },
+    age: {
+        type: Number,
+        required: [true, "Age is required"]
+    },
+    address: {
+        city: {
+            type: String,
+            required: [true, "City is required"]
+        },
+        state: {
+            type: String,
+            required: [true, "State is required"]
+        },
+        pincode: {
+            type: String,
+            required: [true, "Pincode is required"]
+        }
     },
     avatar:{
         type:String,      //cloudinary url
@@ -52,6 +79,10 @@ const userSchema=new mongoose.Schema({
     },
     otpExpires: {
         type: Date,
+    },
+    lastLogin: {
+        type: Date,
+        default: null,
     },
 },{timestamps:true})
 

@@ -25,13 +25,16 @@ const PatientRecord = () => {
   });
   const [stats, setStats] = useState({ total: 0, incomplete: 0, active: 0, inactive: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('all'); // complete, incomplete, all
+  const [availableUsers, setAvailableUsers] = useState([]);
 
   useEffect(() => {
     fetchPatients();
-  }, [search, filters, page]);
+  }, [search, filters, statusFilter, page]);
 
   useEffect(() => {
     fetchStats();
+    fetchAvailableUsers();
   }, []);
 
   const fetchStats = async () => {
@@ -61,12 +64,29 @@ const PatientRecord = () => {
     }
   };
 
+  const fetchAvailableUsers = async () => {
+    try {
+      const response = await fetch('/api/v1/admin/users-without-patients', {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableUsers(data.data);
+      } else {
+        console.error('Failed to fetch available users');
+      }
+    } catch (err) {
+      console.error('Error fetching available users:', err);
+    }
+  };
+
   const fetchPatients = async () => {
     setLoading(true);
     try {
       const query = new URLSearchParams({
         search,
         ...filters,
+        status: statusFilter === 'all' ? '' : statusFilter,
         page,
         limit
       });
@@ -274,7 +294,15 @@ const PatientRecord = () => {
           onChange={handleFilterChange}
           className="px-3 py-2 border border-gray-300 rounded-md"
         />
-        {/* Add more filters if needed */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-md"
+        >
+          <option value="all">All Profiles</option>
+          <option value="complete">Complete Profiles</option>
+          <option value="incomplete">Incomplete Profiles</option>
+        </select>
       </div>
 
       {/* Actions */}
@@ -295,16 +323,24 @@ const PatientRecord = () => {
               <th className="border border-gray-300 px-4 py-2">Age</th>
               <th className="border border-gray-300 px-4 py-2">Condition</th>
               <th className="border border-gray-300 px-4 py-2">Contact</th>
+              <th className="border border-gray-300 px-4 py-2">Last Login</th>
+              <th className="border border-gray-300 px-4 py-2">Status</th>
               <th className="border border-gray-300 px-4 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
             {patients.map((patient) => (
-              <tr key={patient._id}>
+              <tr key={patient._id} className={!patient.isProfileComplete ? 'bg-yellow-50' : ''}>
                 <td className="border border-gray-300 px-4 py-2">{patient.name}</td>
-                <td className="border border-gray-300 px-4 py-2">{patient.age}</td>
-                <td className="border border-gray-300 px-4 py-2">{patient.diagnosedWith}</td>
-                <td className="border border-gray-300 px-4 py-2">{patient.contactNumber}</td>
+                <td className="border border-gray-300 px-4 py-2">{patient.age || 'N/A'}</td>
+                <td className="border border-gray-300 px-4 py-2">{patient.diagnosedWith || 'N/A'}</td>
+                <td className="border border-gray-300 px-4 py-2">{patient.contactNumber || 'N/A'}</td>
+                <td className="border border-gray-300 px-4 py-2">{patient.lastLogin ? new Date(patient.lastLogin).toLocaleDateString() : 'Never'}</td>
+                <td className="border border-gray-300 px-4 py-2">
+                  <span className={`px-2 py-1 rounded text-xs ${patient.isProfileComplete ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
+                    {patient.isProfileComplete ? 'Complete' : 'Incomplete'}
+                  </span>
+                </td>
                 <td className="border border-gray-300 px-4 py-2">
                   <button onClick={() => handleViewDetails(patient._id)} className="text-blue-500 mr-2">View</button>
                   <button onClick={() => handleEdit(patient)} className="text-yellow-500 mr-2">Edit</button>
@@ -343,6 +379,8 @@ const PatientRecord = () => {
             <p><strong>Name:</strong> {selectedPatient.patient.name}</p>
             <p><strong>Age:</strong> {selectedPatient.patient.age}</p>
             <p><strong>Condition:</strong> {selectedPatient.patient.diagnosedWith}</p>
+            <p><strong>Last Login:</strong> {selectedPatient.patient.lastLogin ? new Date(selectedPatient.patient.lastLogin).toLocaleDateString() : 'Never'}</p>
+            <p><strong>Profile Status:</strong> {selectedPatient.patient.isProfileComplete ? 'Complete' : 'Incomplete'}</p>
             <p><strong>Recovery %:</strong> {selectedPatient.recoveryPercent}%</p>
             <div className="mt-4">
               <h4 className="font-bold">Medical History</h4>
@@ -438,14 +476,38 @@ const PatientRecord = () => {
               required
               className="w-full mb-2 px-3 py-2 border border-gray-300 rounded"
             />
-            <input
-              type="text"
-              placeholder="User ID"
-              value={formData.userId}
-              onChange={(e) => setFormData({ ...formData, userId: e.target.value })}
-              required
-              className="w-full mb-2 px-3 py-2 border border-gray-300 rounded"
-            />
+            {modalMode === 'add' && (
+              <select
+                value={formData.userId}
+                onChange={(e) => {
+                  const selectedUser = availableUsers.find(user => user._id === e.target.value);
+                  setFormData({
+                    ...formData,
+                    userId: e.target.value,
+                    name: selectedUser ? selectedUser.Fullname : '',
+                    contactNumber: selectedUser ? selectedUser.mobile_number : ''
+                  });
+                }}
+                required
+                className="w-full mb-2 px-3 py-2 border border-gray-300 rounded"
+              >
+                <option value="">Select User</option>
+                {availableUsers.map(user => (
+                  <option key={user._id} value={user._id}>
+                    {user.Fullname} ({user.mobile_number})
+                  </option>
+                ))}
+              </select>
+            )}
+            {modalMode === 'edit' && (
+              <input
+                type="text"
+                placeholder="User ID"
+                value={formData.userId}
+                readOnly
+                className="w-full mb-2 px-3 py-2 border border-gray-300 rounded bg-gray-100"
+              />
+            )}
             <div className="flex gap-4 mt-4">
               <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">Save</button>
               <button type="button" onClick={() => setShowModal(false)} className="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const SignIn = ({ isOpen, onClose }) => {
+  const navigate = useNavigate();
   // Mode can be 'user' or 'admin'
   const [mode, setMode] = useState('user');
 
@@ -50,9 +51,17 @@ const SignIn = ({ isOpen, onClose }) => {
       });
       const data = await response.json();
       if (response.ok) {
-        console.log('User login successful, token:', data.token);
-        alert('User login successful!');
-        handleClose();
+        console.log('OTP verified:', data);
+        if (data.data.needsProfile) {
+          // Navigate to patient sign-up form
+          handleClose();
+          setTimeout(() => navigate('/patient-signup', { state: { phoneNumber: `+91${phoneNumber}` } }), 100);
+        } else {
+          alert('User login successful!');
+          handleClose();
+          // Navigate to home or dashboard
+          navigate('/');
+        }
       } else {
         alert(`Error: ${data.message}`);
       }
@@ -207,12 +216,22 @@ const SignIn = ({ isOpen, onClose }) => {
                         <label htmlFor="otp" className="text-sm text-gray-600">One Time Password</label>
                         <input type="text" id="otp" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 outline-none" required />
                       </div>
-                      <div className="mt-auto">
-                        <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors">Login</button>
-                      </div>
-                    </form>
-                  </>
-                )}
+                    <div className="mt-auto flex flex-col space-y-3">
+                      <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors">Login</button>
+                      <button
+                        type="button"
+                        className="w-full border border-teal-500 text-teal-500 py-3 rounded-lg font-semibold hover:bg-teal-100 transition-colors"
+                        onClick={() => {
+                          onClose();
+                          navigate('/patient-signup');
+                        }}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
             </>
           )}
 
