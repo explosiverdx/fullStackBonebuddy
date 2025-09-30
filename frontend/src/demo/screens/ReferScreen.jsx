@@ -11,7 +11,7 @@ const ReferScreen = () => {
     <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow mt-6">
       <h2 className="text-2xl font-bold mb-4">Patient Referral to Physiotherapy</h2>
       <p className="mb-4">
-        This page shows that the doctor is referring the patient to a physiotherapist for further treatment and rehabilitation.
+        Referring the patient to a physiotherapist for further treatment and rehabilitation.
       </p>
       <h3 className="text-xl font-semibold mb-3">Available Physiotherapists</h3>
       <ul className="space-y-3">
