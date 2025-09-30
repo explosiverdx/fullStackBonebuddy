@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Helmet } from 'react-helmet-async';
 
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -22,13 +23,63 @@ const Home = () => {
   }, []);
 
   return (
-    <main className="main-content">
+    <>
+      <Helmet>
+        <title>BoneBuddy - Expert Physiotherapy Services</title>
+        <meta name="description" content="Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services. Book your appointment today." />
+        <meta name="keywords" content="physiotherapy, rehabilitation, sports injury, orthopaedic, post-surgery recovery, physiotherapy clinic, bone health, muscle recovery" />
+        <meta property="og:title" content="BoneBuddy - Expert Physiotherapy Services" />
+        <meta property="og:description" content="Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services." />
+        <meta property="og:image" content="/assets/BoneBuddy_Logo-modified.webp" />
+        <meta property="og:url" content="https://bonebuddy.com" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="BoneBuddy - Expert Physiotherapy Services" />
+        <meta name="twitter:description" content="Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services." />
+        <meta name="twitter:image" content="/assets/BoneBuddy_Logo-modified.webp" />
+        <link rel="canonical" href="https://bonebuddy.com" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "MedicalBusiness",
+            "name": "BoneBuddy",
+            "description": "Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services.",
+            "url": "https://bonebuddy.com",
+            "logo": "https://bonebuddy.com/assets/BoneBuddy_Logo-modified.webp",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "Your Street Address",
+              "addressLocality": "Your City",
+              "addressRegion": "Your State",
+              "postalCode": "Your Postal Code",
+              "addressCountry": "Your Country"
+            },
+            "telephone": "+1-XXX-XXX-XXXX",
+            "email": "info@bonebuddy.com",
+            "sameAs": [
+              "https://www.facebook.com/bonebuddy",
+              "https://www.instagram.com/bonebuddy",
+              "https://www.linkedin.com/company/bonebuddy"
+            ],
+            "serviceType": [
+              "Physiotherapy",
+              "Rehabilitation",
+              "Sports Injury Treatment",
+              "Orthopaedic Physiotherapy",
+              "Post-Surgery Recovery"
+            ],
+            "areaServed": "Your Service Area",
+            "priceRange": "$$"
+          })}
+        </script>
+      </Helmet>
+      <main className="main-content">
       {/* Image Slider */}
       <div className="slider-container">
         <div className="slider">
           {slides.map((slide, index) => (
             <div key={index} className={`slide ${index === currentSlide ? 'active' : ''}`}>
-              <img src={slide.src} alt={slide.alt} />
+              <img src={slide.src} alt={slide.alt} loading="lazy" />
               <div className="overlay"><h2 className="text-overlay">{slide.text}</h2></div>
             </div>
           ))}
@@ -42,21 +93,21 @@ const Home = () => {
         <h2 className="section-title">Treatments and Services</h2>
         <div className="card-grid">
           <div className="card">
-            <img src="/assets/carousel1.png" alt="Physiotherapy for Musculoskeletal Pain" />
+            <img src="/assets/carousel1.png" alt="Physiotherapy for Musculoskeletal Pain" loading="lazy" />
             <div className="card-body">
               <h3>Post Surgery Physiotherapy</h3>
               <p>Fast recovery, pain relief, and restored mobility after surgical procedures.</p>
             </div>
           </div>
           <div className="card">
-            <img src="/assets/Treatments and Services_2.png" alt="Sports Injury Rehabilitation" />
+            <img src="/assets/Treatments and Services_2.png" alt="Sports Injury Rehabilitation" loading="lazy" />
             <div className="card-body">
               <h3>Sports Injury Rehabilitation</h3>
               <p>Recover faster and return to your sport stronger than ever.</p>
             </div>
           </div>
           <div className="card">
-            <img src="/assets/Treatments and Services_3.png" alt="Pre-Surgical Rehab" />
+            <img src="/assets/Treatments and Services_3.png" alt="Pre-Surgical Rehab" loading="lazy" />
             <div className="card-body">
               <h3>Pre-Surgical Rehab</h3>
               <p>Expert guidance through pre-operative recovery and regaining function.</p>
@@ -64,7 +115,7 @@ const Home = () => {
           </div>
 
           <div className="card">
-            <img src="/assets/Treatments and Services_4.jpg" alt="Orthopaedic Physiotherapy" />
+            <img src="/assets/Treatments and Services_4.jpg" alt="Orthopaedic Physiotherapy" loading="lazy" />
             <div className="card-body">
               <h3>Orthopaedic Physiotherapy</h3>
               <p>Pain relief, mobility improvement, and strength restoration for bones, joints, and muscles.</p>
@@ -89,7 +140,7 @@ const Home = () => {
         </div>
 
         <div className="expert-image">
-          <img src="/assets/Expert.jpg" alt="Expert Physiotherapists" />
+          <img src="/assets/Expert.jpg" alt="Expert Physiotherapists" loading="lazy" />
         </div>
       </section>
 
@@ -98,7 +149,7 @@ const Home = () => {
         <h2>Quick & Efficient Recovery</h2>
         <div className="quick-grid">
           <div className="quick-card">
-            <img src="/assets/Recovery1.png" alt="Recovery Made Simple" />
+            <img src="/assets/Recovery1.png" alt="Recovery Made Simple" loading="lazy" />
             <div className="quick-card-body">
               <h3>Recovery Made Simple</h3>
               <p>
@@ -107,7 +158,7 @@ const Home = () => {
             </div>
           </div>
           <div className="quick-card">
-            <img src="/assets/Recovery2.png" alt="Healing with Care & Speed" />
+            <img src="/assets/Recovery2.png" alt="Healing with Care & Speed" loading="lazy" />
             <div className="quick-card-body">
               <h3>Healing with Care & Speed</h3>
               <p>
@@ -117,6 +168,7 @@ const Home = () => {
         </div>
       </section>
     </main>
+    </>
   );
 };
 

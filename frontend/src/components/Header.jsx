@@ -58,7 +58,7 @@ const Header = () => {
         {/* Book Appointment */}
         <div className="desktop-cta">
           <Link to="/appointment" className="btn-appointment">Book Appointment</Link>
-          <Link to="/signIn" className="btn-signin">SignIn/SignUp</Link>
+          <Link to="/signIn" className="btn-signin">SignUp</Link>
         </div>
 
         {/* Mobile Menu Button */}
