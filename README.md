@@ -1,1 +1,1 @@
-https://bonebuddy.cloud/
+deployment link -   https://bonebuddy.cloud/
