@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import './index.css'; // Import the main CSS file
 import Header from './components/Header';
 import Home from './components/Home';
@@ -48,9 +49,11 @@ function App() {
 
 function AppWrapper() {
   return (
-    <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      <App />
-    </Router>
+    <HelmetProvider>
+      <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <App />
+      </Router>
+    </HelmetProvider>
   );
 }
 
