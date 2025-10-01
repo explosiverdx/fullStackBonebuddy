@@ -4,10 +4,21 @@ import cookieParser from 'cookie-parser'
 
 const app=express()
 
+// Remove duplicate import of cors
+// import cors from 'cors'
+
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
     credentials: true
 }))
+
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    next();
+});
 
 app.use(express.json({limit:"16kb"}))
 app.use(express.urlencoded({extended:true ,limit:"16kb"}))

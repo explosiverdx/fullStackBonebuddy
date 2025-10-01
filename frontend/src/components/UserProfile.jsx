@@ -1,16 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const UserProfile = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [doctors, setDoctors] = useState([]);
+
+  useEffect(() => {
+    if (!Array.isArray(doctors)) {
+      setDoctors([]);
+    }
+  }, [doctors]);
   const [physios, setPhysios] = useState([]);
   const [medicalReports, setMedicalReports] = useState([]);
 
   useEffect(() => {
+    if (user && user.profileCompleted === false) {
+      navigate('/patient-signup', { state: { phoneNumber: user.mobile_number } });
+      return;
+    }
+
     // Fetch user profile data from backend API
     const fetchProfile = async () => {
       try {
@@ -33,41 +46,41 @@ const UserProfile = () => {
     };
 
     // Fetch doctors list
-    const fetchDoctors = async () => {
-      try {
-        const response = await fetch('/api/v1/doctor', {
-          method: 'GET',
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setDoctors(data.data || []);
-        }
-      } catch (error) {
-        console.error('Error fetching doctors:', error);
-      }
-    };
+        const fetchDoctors = async () => {
+          try {
+            const response = await fetch('/api/v1/doctors/getAllDoctors', {
+              method: 'GET',
+              credentials: 'include',
+            });
+            if (response.ok) {
+              const data = await response.json();
+              setDoctors(data.data || []);
+            }
+          } catch (error) {
+            console.error('Error fetching doctors:', error);
+          }
+        };
 
-    // Fetch physios list
-    const fetchPhysios = async () => {
-      try {
-        const response = await fetch('/api/v1/physio', {
-          method: 'GET',
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setPhysios(data.data || []);
-        }
-      } catch (error) {
-        console.error('Error fetching physios:', error);
-      }
-    };
+        // Fetch physios list
+        const fetchPhysios = async () => {
+          try {
+            const response = await fetch('/api/v1/physios/getAllPhysios', {
+              method: 'GET',
+              credentials: 'include',
+            });
+            if (response.ok) {
+              const data = await response.json();
+              setPhysios(data.data || []);
+            }
+          } catch (error) {
+            console.error('Error fetching physios:', error);
+          }
+        };
 
     fetchProfile();
     fetchDoctors();
     fetchPhysios();
-  }, []);
+  }, [navigate, user]);
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
@@ -400,7 +413,7 @@ const UserProfile = () => {
               className="w-full border rounded px-3 py-2 bg-white hover:bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 transition-colors"
             >
               <option value="">Select Doctor</option>
-              {doctors.map((doc) => (
+              {Array.isArray(doctors) && doctors.map((doc) => (
                 <option key={doc._id} value={doc._id}>{doc.Fullname}</option>
               ))}
             </select>
@@ -414,7 +427,7 @@ const UserProfile = () => {
               className="w-full border rounded px-3 py-2 bg-white hover:bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 transition-colors"
             >
               <option value="">Select Physiotherapist</option>
-              {physios.map((phy) => (
+              {Array.isArray(physios) && physios.map((phy) => (
                 <option key={phy._id} value={phy._id}>{phy.Fullname}</option>
               ))}
             </select>

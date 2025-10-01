@@ -42,7 +42,7 @@ const patientSchema = new mongoose.Schema(
         type: String,
         required: true,
       },
-      pincode: {
+      country: {
         type: String,
         required: true,
       },
@@ -83,6 +83,10 @@ const patientSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    medicalInsurance: {
+      type: String,
+      required: false,
+    }
   },
   { timestamps: true }
 );

@@ -99,12 +99,26 @@ const sendOTP = asyncHandler(async (req, res) => {
         }
     } else {
         // Create new user
-        user = await User.create({
-            mobile_number: normalizedPhone,
-            userType: 'patient',
-            username: defaultUsername,
-            email: defaultEmail
-        });
+        try {
+            user = await User.create({
+                mobile_number: normalizedPhone,
+                userType: 'patient',
+                username: defaultUsername,
+                email: defaultEmail,
+                Fullname: defaultUsername,
+                gender: 'Other',
+                dateOfBirth: new Date('2000-01-01'),
+                age: 24,
+                address: {
+                    city: 'Unknown',
+                    state: 'Unknown',
+                    pincode: '000000'
+                }
+            });
+        } catch (error) {
+            console.error("Error creating new user:", error);
+            throw new ApiError(500, "Failed to create new user");
+        }
     }
 
     // Set OTP
@@ -148,7 +162,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User not found");
     }
 
-    if (user.otp !== otp) {
+    if (user.otp !== otp.trim()) {
         throw new ApiError(401, "Invalid OTP");
     }
 
@@ -162,9 +176,8 @@ const verifyOTP = asyncHandler(async (req, res) => {
     user.lastLogin = new Date();
     await user.save({ validateBeforeSave: false });
 
-    // Check if patient profile exists
-    const patientProfile = await Patient.findOne({ userId: user._id });
-    const needsProfile = !patientProfile;
+    // Check if profile is completed
+    const needsProfile = !user.profileCompleted;
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
@@ -350,14 +363,53 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, user, "Avatar image updated successfully"));
 });
 
-export { 
-    registerUser, 
-    loginUser, 
-    logoutUser, 
-    getCurrentUser, 
-    changeCurrentPassword, 
-    updateUserAccount, 
+const updateProfile = asyncHandler(async (req, res) => {
+    const { name, email, dob, gender } = req.body;
+
+    const user = await User.findById(req.user?._id);
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    // Update fields if provided
+    if (name) user.Fullname = name;
+    if (email) user.email = email;
+    if (dob) user.dateOfBirth = new Date(dob);
+    if (gender) user.gender = gender;
+
+    // Calculate age if dob is provided
+    if (dob) {
+        const birthDate = new Date(dob);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        user.age = age;
+    }
+
+    user.profileCompleted = true;
+
+    await user.save({ validateBeforeSave: false });
+
+    const updatedUser = await User.findById(user._id).select("-password -refreshToken");
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+});
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    getCurrentUser,
+    changeCurrentPassword,
+    updateUserAccount,
     updateUserAvatar,
+    updateProfile,
     sendOTP,
     verifyOTP
 };

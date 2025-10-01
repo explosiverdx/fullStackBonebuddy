@@ -1,12 +1,13 @@
 import { Router } from "express";
-import { 
-    registerUser, 
-    loginUser, 
-    logoutUser, 
+import {
+    registerUser,
+    loginUser,
+    logoutUser,
     getCurrentUser,
     changeCurrentPassword,
     updateUserAccount,
     updateUserAvatar,
+    updateProfile,
     sendOTP,
     verifyOTP
 } from "../controllers/user.controller.js";
@@ -35,6 +36,7 @@ router.route("/me").get(verifyJWT, getCurrentUser);
 router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 router.route("/me").patch(verifyJWT, updateUserAccount);
 router.route("/avatar").patch(verifyJWT, upload.single("avatar"), updateUserAvatar);
+router.route("/profile").post(verifyJWT, updateProfile);
 
 
 export default router;

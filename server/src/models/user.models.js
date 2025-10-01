@@ -80,6 +80,10 @@ const userSchema=new mongoose.Schema({
     otpExpires: {
         type: Date,
     },
+    profileCompleted: {
+        type: Boolean,
+        default: false,
+    },
     lastLogin: {
         type: Date,
         default: null,

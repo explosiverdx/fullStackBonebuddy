@@ -22,23 +22,18 @@ const generateAccessAndRefreshTokens = async (userId) => {
 
 const createPatientProfile = asyncHandler(async (req, res) => {
     const {
-        name,
-        gender,
+        fullName,
+        email,
         dateOfBirth,
         age,
-        email,
+        gender,
         city,
         state,
-        pincode,
-        surgeryType,
-        surgeryDate,
-        hospitalName,
-        doctorName,
-        currentCondition,
-        medicalHistory,
+        country,
         allergies,
         emergencyContactNumber,
-        bloodGroup
+        bloodGroup,
+        medicalInsurance
     } = req.body;
     const userId = req.user._id;
 
@@ -52,7 +47,7 @@ const createPatientProfile = asyncHandler(async (req, res) => {
     }
 
     // Required fields validation
-    if ([name, gender, dateOfBirth, age, city, state, pincode, surgeryType, surgeryDate, hospitalName, doctorName, currentCondition, emergencyContactNumber].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
+    if ([fullName, email, dateOfBirth, age, gender, city, state, country, emergencyContactNumber].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
         throw new ApiError(400, "All required fields must be filled out.");
     }
 
@@ -61,12 +56,12 @@ const createPatientProfile = asyncHandler(async (req, res) => {
         userId,
         {
             $set: {
-                Fullname: name,
+                Fullname: fullName,
                 gender,
                 dateOfBirth: new Date(dateOfBirth),
                 age,
                 email,
-                address: { city, state, pincode }
+                address: { city, state, country }
             }
         },
         { new: true, runValidators: true }
@@ -77,25 +72,27 @@ const createPatientProfile = asyncHandler(async (req, res) => {
     }
 
     // Create Patient profile with medical details
-    const patient = await Patient.create({
+    const patientData = {
         userId,
-        name,
+        name: fullName,
         gender,
         dateOfBirth: new Date(dateOfBirth),
         age,
         mobileNumber: user.mobile_number,
         email,
-        address: { city, state, pincode },
-        surgeryType,
-        surgeryDate: new Date(surgeryDate),
-        hospitalName,
-        doctorName,
-        currentCondition,
-        medicalHistory,
+        address: { city, state, country },
         allergies,
         bloodGroup,
         emergencyContactNumber
-    });
+    };
+
+    // Handle medicalInsurance file if provided
+    if (medicalInsurance) {
+        // Assuming medicalInsurance is a file path or URL after upload
+        patientData.medicalInsurance = medicalInsurance;
+    }
+
+    const patient = await Patient.create(patientData);
 
     // Generate tokens and log in
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(userId);

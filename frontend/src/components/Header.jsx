@@ -58,7 +58,7 @@ const Header = () => {
         {/* Book Appointment */}
         <div className="desktop-cta">
           <Link to="/appointment" className="btn-appointment">Book Appointment</Link>
-          <Link to="/signIn" className="btn-signin">SignIn/SignUp</Link>
+          <Link to="/login" className="btn-signin">SignUp</Link>
         </div>
 
         {/* Mobile Menu Button */}
@@ -88,7 +88,7 @@ const Header = () => {
           <Link to="/pricing" className="mobile-link" onClick={handleMobileLinkClick}>Pricing</Link>
           <Link to="/contact" className="mobile-link" onClick={handleMobileLinkClick}>Contact</Link>
           <Link to="/appointment" className="mobile-btn" onClick={handleMobileLinkClick}>Book Appointment</Link>
-          <Link to="/signIn" className="mobile-btn" onClick={handleMobileLinkClick}>SignIn/SignUp</Link>
+          <Link to="/login" className="mobile-btn" onClick={handleMobileLinkClick}>SignIn/SignUp</Link>
         </div>
       </div>
     </header>

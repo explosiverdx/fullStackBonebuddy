@@ -12,11 +12,8 @@ export const verifyPermission = (requiredPermissions) => {
       throw new ApiError(403, "Role not found for this user.");
     }
 
-    const hasAllPermissions = requiredPermissions.every((p) =>
-      role.permissions.includes(p)
-    );
-
-    if (!hasAllPermissions) {
+    // Check if user has the required role
+    if (!requiredPermissions.includes(userRole)) {
       throw new ApiError(403, "You do not have the required permissions to perform this action.");
     }
 

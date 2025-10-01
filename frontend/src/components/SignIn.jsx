@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const SignIn = ({ isOpen, onClose }) => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   // Mode can be 'user' or 'admin'
   const [mode, setMode] = useState('user');
 
@@ -19,13 +21,20 @@ const SignIn = ({ isOpen, onClose }) => {
     console.log('Sending OTP to', phoneNumber);
     // Backend Integration: Send OTP
     try {
-            const response = await fetch('/api/v1/users/send-otp', {
+      const response = await fetch('/api/v1/users/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ phoneNumber: `+91${phoneNumber}` }),
       });
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError);
+        alert('Server returned an invalid response. Please try again later.');
+        return;
+      }
       if (response.ok) {
         setStep('otp');
         console.log('OTP sent successfully');
@@ -50,21 +59,15 @@ const SignIn = ({ isOpen, onClose }) => {
         body: JSON.stringify({ phoneNumber: `+91${phoneNumber}`, otp }),
       });
       const data = await response.json();
-      if (response.ok) {
-        console.log('OTP verified:', data);
-        if (data.data.needsProfile) {
-          // Navigate to patient sign-up form
+        if (response.ok) {
+          console.log('OTP verified:', data);
+          login(data.data.user);
           handleClose();
-          setTimeout(() => navigate('/patient-signup', { state: { phoneNumber: `+91${phoneNumber}` } }), 100);
+          navigate('/user');
+          window.location.reload(); // Force reload to ensure UserProfile fetches fresh user data
         } else {
-          alert('User login successful!');
-          handleClose();
-          // Navigate to home or dashboard
-          navigate('/');
+          alert(`Error: ${data.message}`);
         }
-      } else {
-        alert(`Error: ${data.message}`);
-      }
     } catch (error) {
       console.error('Failed to verify OTP:', error);
       alert('Failed to verify OTP. Please try again later.');
@@ -111,8 +114,8 @@ const SignIn = ({ isOpen, onClose }) => {
       if (response.ok) {
         console.log('Admin login successful, token:', data.token);
         alert('Admin login successful! Redirecting to admin dashboard...');
-        // Redirect to admin profile form
-        window.location.href = '/admin';
+        login({role: 'admin'});
+        navigate('/admin');
       } else {
         if (data.message === 'Admin not found') {
           alert('You are not authorized as an admin.');
@@ -155,20 +158,20 @@ const SignIn = ({ isOpen, onClose }) => {
       onClick={handleClose}
     >
       <div
-        className={`fixed top-0 right-0 h-full bg-white w-full max-w-sm shadow-lg transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        className={`fixed top-0 right-0 h-full bg-slate-300 w-full max-w-sm shadow-lg transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-6 flex flex-col h-full">
+        <div className="p-6 flex flex-col h-full bg-slate-300 rounded-l-lg">
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             {(mode === 'user' && step === 'otp') || mode === 'admin' ? (
-              <button onClick={mode === 'user' ? handleBack : () => switchMode('user')} className="text-2xl font-bold text-gray-600">
+              <button onClick={mode === 'user' ? handleBack : () => switchMode('user')} className="text-2xl font-bold text-gray-600 hover:text-teal-500 transition-colors">
                 &#x2190;
               </button>
             ) : (
               <div/> /* Placeholder for spacing */
             )}
-            <button onClick={handleClose} className="text-2xl font-bold text-gray-600">
+            <button onClick={handleClose} className="text-2xl font-bold text-gray-600 hover:text-red-500 transition-colors">
               &#x2715;
             </button>
           </div>
@@ -185,7 +188,7 @@ const SignIn = ({ isOpen, onClose }) => {
                       <label htmlFor="phone" className="text-sm text-gray-600">Phone Number</label>
                       <div className="relative">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-600">+91 </span>
-                        <input type="tel" id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 outline-none" placeholder=" " required />
+                        <input type="tel" id="phone" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors" placeholder=" " required />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">OTP will be sent to this number by SMS</p>
                     </div>
@@ -197,7 +200,7 @@ const SignIn = ({ isOpen, onClose }) => {
                     {/* Bottom Section */}
                     <div className="mt-auto">
                       <p className="text-xs text-gray-500 mb-4">By clicking Continue, you agree to our <a href="#" className="text-teal-500 font-bold">Privacy Policy</a> & <a href="#" className="text-teal-500 font-bold">Terms and Conditions</a></p>
-                      <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors">Continue</button>
+                      <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all">Continue</button>
                       <p className="text-center text-sm mt-4">
                         Login to your <button type="button" onClick={() => switchMode('admin')} className="text-teal-500 font-bold">Admin account here</button>
                       </p>
@@ -214,21 +217,11 @@ const SignIn = ({ isOpen, onClose }) => {
                       {/* OTP Input */}
                       <div className="mb-4">
                         <label htmlFor="otp" className="text-sm text-gray-600">One Time Password</label>
-                        <input type="text" id="otp" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 outline-none" required />
+                        <input type="text" id="otp" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors" required />
                       </div>
-                    <div className="mt-auto flex flex-col space-y-3">
-                      <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors">Login</button>
-                      <button
-                        type="button"
-                        className="w-full border border-teal-500 text-teal-500 py-3 rounded-lg font-semibold hover:bg-teal-100 transition-colors"
-                        onClick={() => {
-                          onClose();
-                          navigate('/patient-signup');
-                        }}
-                      >
-                        Skip
-                      </button>
-                    </div>
+                  <div className="mt-auto">
+                    <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all">Login</button>
+                  </div>
                   </form>
                 </>
               )}
@@ -247,12 +240,12 @@ const SignIn = ({ isOpen, onClose }) => {
                         <label htmlFor="admin-mobile" className="text-sm text-gray-600">Mobile Number</label>
                         <div className="relative">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-600">+91 </span>
-                        <input type="tel" id="admin-mobile" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 outline-none" placeholder=" " required />
+                        <input type="tel" id="admin-mobile" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors" placeholder=" " required />
                         </div>
                       </div>
                       {/* Bottom Section */}
                       <div className="mt-auto">
-                        <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors">Send OTP</button>
+                        <button type="submit" className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all">Send OTP</button>
                         <p className="text-center text-sm mt-4">
                           Not an admin? <button type="button" onClick={() => switchMode('user')} className="text-teal-500 font-bold">Login as a user</button>
                         </p>
@@ -264,7 +257,7 @@ const SignIn = ({ isOpen, onClose }) => {
                   {/* OTP Input */}
                   <div className="mb-4">
                     <label htmlFor="admin-otp" className="text-sm text-gray-600">One Time Password</label>
-                    <input type="text" id="admin-otp" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 outline-none" required />
+                    <input type="text" id="admin-otp" value={otp} onChange={(e) => setOtp(e.target.value)} className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors" required />
                   </div>
                   {/* Bottom Section */}
                   <div className="mt-auto">

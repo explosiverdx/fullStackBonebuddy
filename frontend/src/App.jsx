@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import './index.css'; // Import the main CSS file
 import Header from './components/Header';
 import Home from './components/Home';
@@ -14,11 +14,13 @@ import PatientSignup from './components/PatientSignup';
 import AdminProfile from './components/AdminProfile';
 import AdminDashboard from './components/AdminDashboard';
 import UserProfile from './components/UserProfile';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isSignInOpen = location.pathname === '/signIn';
+  const isSignInOpen = location.pathname === '/login';
   const isAdminPage = location.pathname.startsWith('/admin');
 
   const closeSignIn = () => {
@@ -35,10 +37,11 @@ function App() {
         <Route path="/appointment" element={<Appointment />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/contact" element={<Contact />} />
-        <Route path="/signIn" element={<Home />} />
-        <Route path="/patient-signup" element={<PatientSignup />} />
-        <Route path="/user" element={<UserProfile />} />
-        <Route path="/admin/*" element={<AdminDashboard />} />
+        <Route path="/login" element={<Home />} />
+        <Route path="/patient-signup" element={<ProtectedRoute allowedRoles={['patient']}><PatientSignup /></ProtectedRoute>} />
+        <Route path="/user-profile" element={<Navigate to="/user" replace />} />
+        <Route path="/user" element={<ProtectedRoute allowedRoles={['patient', 'admin', 'user']}><UserProfile /></ProtectedRoute>} />
+        <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
       </Routes>
       {!isAdminPage && <Footer />}
       <SignIn isOpen={isSignInOpen} onClose={closeSignIn} />
@@ -48,9 +51,11 @@ function App() {
 
 function AppWrapper() {
   return (
-    <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-      <App />
-    </Router>
+    <AuthProvider>
+      <Router future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <App />
+      </Router>
+    </AuthProvider>
   );
 }
 

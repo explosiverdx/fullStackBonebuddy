@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { User } from '../models/user.models.js';
 import { DB_NAME } from '../constants.js';
 import dotenv from 'dotenv';
-dotenv.config({path:'./env'});
+dotenv.config({path:'.env'});
 
 async function seedAdmin() {
   try {
