@@ -10,16 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-<<<<<<< HEAD
-    "axios": "^1.12.2",
-=======
     "@mantine/carousel": "^8.3.1",
     "@mantine/core": "^8.3.1",
     "@mantine/hooks": "^8.3.1",
     "axios": "^1.12.2",
     "chart.js": "^4.5.0",
     "embla-carousel-autoplay": "^8.6.0",
->>>>>>> ac41f2888ab595bc1d6d09e0ce6c7df8ad58f7d9
     "jspdf": "^3.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

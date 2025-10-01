@@ -84,18 +84,22 @@ const sendAdminOTP = asyncHandler(async (req, res) => {
 });
 
 const verifyAdminOTP = asyncHandler(async (req, res) => {
-    const { phoneNumber, otp } = req.body;
+    let { phoneNumber, otp } = req.body;
 
     if (!phoneNumber || !otp) {
         throw new ApiError(400, "Phone number and OTP are required");
     }
 
+    otp = otp.trim();
+
+    console.log('Verifying OTP for phoneNumber:', phoneNumber, 'OTP:', otp);
     const admin = await User.findOne({ mobile_number: phoneNumber, userType: "admin" });
 
     if (!admin) {
         throw new ApiError(404, "Admin not found");
     }
 
+    console.log('Admin found:', admin._id, 'Stored OTP:', admin.otp, 'Entered OTP:', otp, 'Expires:', admin.otpExpires);
     if (admin.otp !== otp) {
         throw new ApiError(401, "Invalid OTP");
     }
