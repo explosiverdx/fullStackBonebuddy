@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+Sitemap: https://bonebuddy.com/sitemap.xml

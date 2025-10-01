@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 const Contact = () => {
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
+    phone: '',
     subject: '',
     message: ''
   });
@@ -30,27 +30,27 @@ const Contact = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.name.trim()) {
       newErrors.name = 'Name is required';
     }
-    
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone is required';
+    } else if (!/^\+?[\d\s\-()]+$/.test(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
     }
-    
+
     if (!formData.subject.trim()) {
       newErrors.subject = 'Subject is required';
     }
-    
+
     if (!formData.message.trim()) {
       newErrors.message = 'Message is required';
     } else if (formData.message.trim().length < 10) {
       newErrors.message = 'Message must be at least 10 characters long';
     }
-    
+
     return newErrors;
   };
 
@@ -73,12 +73,12 @@ const Contact = () => {
       setSubmitStatus('success');
       setFormData({
         name: '',
-        email: '',
+        phone: '',
         subject: '',
         message: ''
       });
       setErrors({});
-    } catch (error) {
+    } catch {
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
@@ -100,7 +100,7 @@ const Contact = () => {
         {/* Contact Form */}
         <div className="form-container">
           <form className="appointment-form" onSubmit={handleSubmit}>
-            {/* Name and Email Row */}
+            {/* Name and Phone Row */}
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="name">
@@ -121,20 +121,20 @@ const Contact = () => {
               </div>
 
               <div className="form-group">
-                <label htmlFor="email">
-                  Email Address <span style={{ color: '#ef4444' }}>*</span>
+                <label htmlFor="phone">
+                  Phone Number <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
+                  type="tel"
+                  id="phone"
+                  name="phone"
+                  value={formData.phone}
                   onChange={handleChange}
-                  placeholder="Enter your email address"
-                  className={errors.email ? 'error' : ''}
+                  placeholder="Enter your phone number"
+                  className={errors.phone ? 'error' : ''}
                 />
-                {errors.email && (
-                  <span className="error-message">{errors.email}</span>
+                {errors.phone && (
+                  <span className="error-message">{errors.phone}</span>
                 )}
               </div>
             </div>
@@ -216,10 +216,10 @@ const Contact = () => {
         {/* Contact Information */}
         <div className="contact-box">
           <h2>Other Ways to Reach Us</h2>
-          <p><strong>Phone:</strong> (555) 123-4567</p>
-          <p><strong>Email:</strong> info @yourcompany.com</p>
-          <p><strong>Address:</strong> 123 Main Street, City, State 12345</p>
-          <p><strong>Business Hours:</strong> Monday - Friday, 9:00 AM - 6:00 PM</p>
+          <p><strong>Phone:</strong> +91 8881119890</p>
+          <p><strong>Email:</strong> info@bonebuddy.com</p>
+          <p><strong>Address:</strong> Plot No.44, A-Block, Indira Nagar, Lucknow, 226010</p>
+          <p><strong>Business Hours:</strong> Mon-Sat: 8AM-6PM</p>
         </div>
       </main>
     </div>

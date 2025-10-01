@@ -55,24 +55,31 @@ const Header = () => {
           <Link to="/contact" className="nav-link">Contact</Link>
         </nav>
 
-        {/* Book Appointment */}
+        {/* Demo */}
         <div className="desktop-cta">
+<<<<<<< HEAD
           <Link to="/appointment" className="btn-appointment">Book Appointment</Link>
           <Link to="/login" className="btn-signin">SignUp</Link>
+=======
+          <Link to="/demo" className="btn-appointment">Demo</Link>
+          <Link to="/signIn" className="btn-signin">SignUp</Link>
+>>>>>>> ac41f2888ab595bc1d6d09e0ce6c7df8ad58f7d9
         </div>
 
         {/* Mobile Menu Button */}
-        <button
-          id="mobile-menu-button"
-          className="mobile-menu-btn"
-          onClick={toggleMobileMenu}
-          ref={menuButtonRef}
-        >
-          <svg className="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
-                  d="M4 6h16M4 12h16M4 18h16"></path>
-          </svg>
-        </button>
+        {!window.location.pathname.startsWith('/demo') && (
+          <button
+            id="mobile-menu-button"
+            className="mobile-menu-btn"
+            onClick={toggleMobileMenu}
+            ref={menuButtonRef}
+          >
+            <svg className="menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                    d="M4 6h16M4 12h16M4 18h16"></path>
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Mobile Navigation */}
@@ -87,8 +94,13 @@ const Header = () => {
           <Link to="/about" className="mobile-link" onClick={handleMobileLinkClick}>About</Link>
           <Link to="/pricing" className="mobile-link" onClick={handleMobileLinkClick}>Pricing</Link>
           <Link to="/contact" className="mobile-link" onClick={handleMobileLinkClick}>Contact</Link>
+<<<<<<< HEAD
           <Link to="/appointment" className="mobile-btn" onClick={handleMobileLinkClick}>Book Appointment</Link>
           <Link to="/login" className="mobile-btn" onClick={handleMobileLinkClick}>SignIn/SignUp</Link>
+=======
+          <Link to="/demo" className="mobile-btn" onClick={handleMobileLinkClick}>Demo</Link>
+          <Link to="/signIn" className="mobile-btn" onClick={handleMobileLinkClick}>SignIn/SignUp</Link>
+>>>>>>> ac41f2888ab595bc1d6d09e0ce6c7df8ad58f7d9
         </div>
       </div>
     </header>
