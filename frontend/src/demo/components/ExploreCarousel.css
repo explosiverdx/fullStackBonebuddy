@@ -1,6 +1,6 @@
 .carousel-control {
-  /* Use a semi-transparent background and place it on top of the image */
-  background-color: rgba(255, 255, 255, 0.4);
+  /* Remove background */
+  background-color: transparent;
   /* Remove the default Mantine border */
   border: none;
   /* Make it a circle */
@@ -9,7 +9,7 @@
   color: black;
   /* Hide controls by default and show on carousel hover */
   opacity: 0;
-  transition: opacity 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  transition: opacity 0.2s ease-in-out;
 }
 
 /* The user's component has a `relative` class on the wrapper */
@@ -18,7 +18,7 @@
 }
 
 .carousel-control:hover {
-  background-color: rgba(255, 255, 255, 0.8);
+  /* No background on hover */
 }
 
 /* Style the SVG icon inside the control */
