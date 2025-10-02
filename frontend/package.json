@@ -19,10 +19,7 @@
     "jspdf": "^3.0.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-<<<<<<< HEAD
-=======
     "react-helmet-async": "^2.0.5",
->>>>>>> 62d8ea7 (Error resolved)
     "react-router-dom": "^7.9.1",
     "xlsx": "^0.18.5"
   },
