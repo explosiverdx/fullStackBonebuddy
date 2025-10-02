@@ -184,8 +184,12 @@ const verifyOTP = asyncHandler(async (req, res) => {
 
     const options = {
         httpOnly: true,
+<<<<<<< HEAD
         secure: false,
         sameSite: 'none'
+=======
+        sameSite: 'lax'
+>>>>>>> 62d8ea7 (Error resolved)
     };
 
     return res
@@ -232,12 +236,18 @@ const loginUser = asyncHandler(async (req, res) => {
 
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
+<<<<<<< HEAD
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
     const options = {
         httpOnly: true,
         secure: false,
         sameSite: 'none'
+=======
+    const options = {
+        httpOnly: true,
+        sameSite: 'lax'
+>>>>>>> 62d8ea7 (Error resolved)
     };
 
     return res
@@ -272,8 +282,12 @@ const logoutUser = asyncHandler(async (req, res) => {
 
     const options = {
         httpOnly: true,
+<<<<<<< HEAD
         secure: false,
         sameSite: 'none'
+=======
+        sameSite: 'lax'
+>>>>>>> 62d8ea7 (Error resolved)
     };
 
     return res

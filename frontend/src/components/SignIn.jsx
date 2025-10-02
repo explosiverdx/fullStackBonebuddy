@@ -62,9 +62,13 @@ const SignIn = ({ isOpen, onClose }) => {
         if (response.ok) {
           console.log('OTP verified:', data);
           login(data.data.user);
+<<<<<<< HEAD
           handleClose();
           navigate('/user');
           window.location.reload(); // Force reload to ensure UserProfile fetches fresh user data
+=======
+          navigate('/user', { state: { user: data.data.user } });
+>>>>>>> 62d8ea7 (Error resolved)
         } else {
           alert(`Error: ${data.message}`);
         }
