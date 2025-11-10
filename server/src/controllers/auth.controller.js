@@ -3,7 +3,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
-// In-memory storage for OTPs (for demo purposes, use Redis/DB in production)
+// In-memory storage for OTPs
 const otpStore = new Map();
 
 export const sendOtp = asyncHandler(async (req, res) => {

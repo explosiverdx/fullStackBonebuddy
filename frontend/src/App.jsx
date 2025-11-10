@@ -32,7 +32,6 @@ import PatientProfile from './components/PatientProfile';
 import DoctorProfile from './components/DoctorProfile';
 import PhysiotherapistProfile from './components/PhysiotherapistProfile';
 import Appointment from './components/Appointment';
-import Demo from './components/Demo';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginRedirector from './components/LoginRedirector';
@@ -44,7 +43,6 @@ function App() {
   const navigate = useNavigate();
   const isSignInOpen = location.pathname === '/signUp';
   const isAdminPage = location.pathname.startsWith('/admin');
-  const isDemoPage = location.pathname.startsWith('/demo');
 
   const closeSignIn = () => {
     navigate(-1);
@@ -53,8 +51,8 @@ function App() {
   return (
     <div className={`App flex flex-col min-h-screen ${isSignInOpen ? 'overflow-hidden' : ''}`}>
       <ScrollToTop />
-      {!isAdminPage && !isDemoPage && <Header />}
-      <main className={`flex-grow ${!isAdminPage && !isDemoPage ? 'pt-20' : ''}`}>
+      {!isAdminPage && <Header />}
+      <main className={`flex-grow ${!isAdminPage ? 'pt-20' : ''}`}>
         <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
@@ -73,7 +71,6 @@ function App() {
 
         <Route path="/contact" element={<Contact />} />
         <Route path="/signUp" element={<Home />} />
-        <Route path="/demo/*" element={<Demo />} />
         <Route path="/login-success" element={<ProtectedRoute><LoginRedirector /></ProtectedRoute>} />
         <Route path="/userForm" element={<ProtectedRoute allowedRoles={['patient', 'doctor', 'physiotherapist']}><PatientSignup /></ProtectedRoute>} />
           <Route path="/blog" element={<Blog />} />
@@ -86,8 +83,8 @@ function App() {
         <Route path="/admin/*" element={<AdminLoginGate><AdminDashboard /></AdminLoginGate>} />
       </Routes>
       </main>
-      {!isAdminPage && !isDemoPage && <Footer />}
-      {!isAdminPage && !isDemoPage && <FloatingWhatsAppButton />}
+      {!isAdminPage && <Footer />}
+      {!isAdminPage && <FloatingWhatsAppButton />}
       <SignIn isOpen={isSignInOpen} onClose={closeSignIn} />
     </div>
   );

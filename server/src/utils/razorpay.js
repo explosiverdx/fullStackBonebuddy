@@ -1,11 +1,19 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-// Initialize Razorpay instance
-const razorpayInstance = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Initialize Razorpay instance only if credentials are present
+let razorpayInstance = null;
+
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+  razorpayInstance = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+  console.log('✅ Razorpay configured successfully');
+} else {
+  console.warn('⚠️  Razorpay credentials not found. Payment features will be disabled.');
+  console.warn('⚠️  Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file.');
+}
 
 /**
  * Create a Razorpay order
@@ -16,6 +24,10 @@ const razorpayInstance = new Razorpay({
  * @returns {Promise<Object>} - Razorpay order object
  */
 export const createRazorpayOrder = async (amount, currency = 'INR', receipt, notes = {}) => {
+  if (!razorpayInstance) {
+    throw new Error('Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file.');
+  }
+
   try {
     const options = {
       amount: Math.round(amount * 100), // Convert to paise (smallest currency unit)
@@ -60,6 +72,10 @@ export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
  * @returns {Promise<Object>} - Payment details
  */
 export const fetchPaymentDetails = async (paymentId) => {
+  if (!razorpayInstance) {
+    throw new Error('Razorpay is not configured.');
+  }
+
   try {
     const payment = await razorpayInstance.payments.fetch(paymentId);
     return payment;
@@ -76,6 +92,10 @@ export const fetchPaymentDetails = async (paymentId) => {
  * @returns {Promise<Object>} - Refund details
  */
 export const initiateRefund = async (paymentId, amount = null) => {
+  if (!razorpayInstance) {
+    throw new Error('Razorpay is not configured.');
+  }
+
   try {
     const options = amount ? { amount: Math.round(amount * 100) } : {};
     const refund = await razorpayInstance.payments.refund(paymentId, options);

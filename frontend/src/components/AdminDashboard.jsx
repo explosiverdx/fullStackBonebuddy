@@ -134,7 +134,6 @@ const RouteWrapper = ({ component, componentProps }) => {
   return <Component {...componentProps} />;
 };
 
-// Mock components for pages not provided in the original code
 const PendingSessions = ({ authHeaders }) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +144,6 @@ const PendingSessions = ({ authHeaders }) => {
   }, []);
 
   const fetchPendingAppointments = async () => {
-    // Mocking API call for demonstration, use actual API in production
     try {
       // Replace with your actual API endpoint
       const response = await fetch('/api/v1/appointments/admin/pending', { 
@@ -153,48 +151,14 @@ const PendingSessions = ({ authHeaders }) => {
       });
       if (response.ok) {
         const responseData = await response.json();
-        // Use actual data
         setAppointments(responseData.data?.docs || responseData.data || []);
       } else {
-        // Fallback to mock data for layout testing
-        const mockData = [
-          {
-            _id: 'appt1',
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-            patient: { name: 'John Doe The Patient', _id: 'p1' },
-            physio: { name: 'Dr. Alice The Physiotherapist', _id: 'ph1' },
-            appointmentDate: new Date(Date.now() + 3600000).toISOString(), // Upcoming in 1 hour
-            sessionType: 'Knee Rehab Protocol 1',
-            status: 'pending'
-          },
-          {
-            _id: 'appt2',
-            createdAt: new Date(Date.now() - 172800000).toISOString(),
-            patient: { name: 'Jane Smith', _id: 'p2' },
-            physio: { name: 'Dr. Bob', _id: 'ph2' },
-            appointmentDate: new Date(Date.now() + 86400000 * 2).toISOString(), // Upcoming in 2 days
-            sessionType: 'Shoulder Therapy',
-            status: 'pending'
-          },
-        ];
-        setAppointments(mockData.filter(a => a.status === 'pending')); 
-        setError('Failed to fetch real appointments, showing mock data.');
+        setAppointments([]);
+        setError('Failed to fetch appointments. Please try again later.');
       }
     } catch (err) {
-      // Error handling with mock fallback
-      const mockData = [
-        {
-          _id: 'appt1',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-          patient: { name: 'John Doe', _id: 'p1' },
-          physio: { name: 'Dr. Alice', _id: 'ph1' },
-          appointmentDate: new Date(Date.now() + 3600000).toISOString(),
-          sessionType: 'Knee Rehab',
-          status: 'pending'
-        },
-      ];
-      setAppointments(mockData);
-      setError(`Error fetching appointments: ${err.message}. Showing mock data.`);
+      setAppointments([]);
+      setError(`Error fetching appointments: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -1964,7 +1928,7 @@ const AdminDashboard = () => {
   };
 
   if (loading) return <div className="flex items-center justify-center h-screen">Loading profile...</div>;
-  const avatarSrc = currentAvatar ? currentAvatar : 'https://dummyimage.com/80x80/6B7280/FFFFFF&text=Admin';
+  const avatarSrc = currentAvatar;
 
   const renderAdminProfile = () => {
     return (
@@ -2041,7 +2005,7 @@ const AdminDashboard = () => {
               <label className="block text-gray-700 text-sm font-bold mb-2">Your Photo</label>
               <div className="flex justify-center items-center gap-4 mb-3">
                 {/* Current Avatar */}
-                {avatarSrc && avatarSrc !== 'https://dummyimage.com/80x80/6B7280/FFFFFF&text=Admin' ? (
+                {avatarSrc ? (
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Current:</p>
                     <img

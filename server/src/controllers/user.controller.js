@@ -427,10 +427,11 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
         const { accessToken, refreshToken: newRefreshToken } = await generateAccessAndRefreshTokens(user._id);
 
+        const isProduction = process.env.NODE_ENV === 'production';
         const options = {
             httpOnly: true,
-            sameSite: 'lax',
-            secure: false
+            sameSite: isProduction ? 'none' : 'lax',
+            secure: isProduction
         };
 
         return res
@@ -860,10 +861,11 @@ const updateProfile = asyncHandler(async (req, res) => {
     // Generate new tokens with updated user data
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
+    const isProduction = process.env.NODE_ENV === 'production';
     const options = {
         httpOnly: true,
-        sameSite: 'lax',
-        secure: false
+        sameSite: isProduction ? 'none' : 'lax',
+        secure: isProduction
     };
 
     return res
