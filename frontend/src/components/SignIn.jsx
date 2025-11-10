@@ -1,56 +1,58 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom'; // Note: Link is not used, can be removed if not needed elsewhere.
+import { useAuth } from '../hooks/useAuth';
+import { sendAdminOtp, verifyAdminOtp } from '../api/auth.js';
 
-const SignIn = ({ isOpen, onClose }) => {
+const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
   const navigate = useNavigate();
   const { login } = useAuth();
   // Mode can be 'user' or 'admin'
-  const [mode, setMode] = useState('user');
+  const [mode, setMode] = useState(initialMode);
 
-  // State for User OTP login
-  const [step, setStep] = useState('phone'); // 'phone' or 'otp'
+  // State for User login/signup
+  const [step, setStep] = useState('phone'); // 'phone', 'otp', 'forgot-password-phone', 'forgot-password-reset'
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [authMode, setAuthMode] = useState('password'); // 'otp' or 'password'
   const [shareOnWhatsApp, setShareOnWhatsApp] = useState(true);
 
-  // No email/password for admin, OTP only
+  // --- User Flow Handlers ---
 
-  const handleUserContinue = async (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault();
-    console.log('Sending OTP to', phoneNumber);
-    // Backend Integration: Send OTP
+    if (password !== confirmPassword) {
+      alert("Passwords do not match.");
+      return;
+    }
+    if (password.length < 6) {
+      alert("Password must be at least 6 characters long.");
+      return;
+    }
     try {
-      const response = await fetch('/api/v1/users/send-otp', {
+      const response = await fetch('/api/v1/users/register-with-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ phoneNumber: `+91${phoneNumber}` }),
+        body: JSON.stringify({ phoneNumber: `+91${phoneNumber}`, password }),
       });
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error('Failed to parse JSON response:', jsonError);
-        alert('Server returned an invalid response. Please try again later.');
-        return;
-      }
+      const data = await response.json();
       if (response.ok) {
         setStep('otp');
-        console.log('OTP sent successfully');
+        console.log('Registration with password successful, OTP sent');
       } else {
-        console.error('Failed to send OTP:', data.message);
+        console.error('Failed to register:', data.message);
         alert(`Error: ${data.message}`);
       }
     } catch (error) {
-      console.error('Failed to send OTP:', error);
-      alert(`An error occurred: ${error.message}`);
+      console.error('Failed to register:', error);
+      alert('Failed to register. Please try again.');
     }
   };
 
-  const handleUserLogin = async (e) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
-    // Backend Integration: Verify OTP
     try {
       const response = await fetch('/api/v1/users/verify-otp', {
         method: 'POST',
@@ -61,69 +63,124 @@ const SignIn = ({ isOpen, onClose }) => {
       const data = await response.json();
       if (response.ok) {
         console.log('OTP verified:', data);
-        login(data.data.user);
-        navigate('/user', { state: { user: data.data.user } });
+        login(data.data.user, data.data.accessToken, data.data.refreshToken);
+        navigate('/login-success', { replace: true });
+      } else {
+        alert(`Error: ${data.message || 'Invalid OTP'}`);
+      }
+    } catch (error) {
+      console.error('Failed to verify OTP:', error);
+      alert('Failed to verify OTP. Please try again.');
+    }
+  };
+
+
+  const handlePasswordLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/v1/users/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mobile_number: `+91${phoneNumber}`, password }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        console.log('Logged in with password:', data);
+        login(data.data.user, data.data.accessToken, data.data.refreshToken);
+        navigate('/login-success', { replace: true });
       } else {
         alert(`Error: ${data.message}`);
       }
     } catch (error) {
-      console.error('Failed to verify OTP:', error);
-      alert('Failed to verify OTP. Please try again later.');
+      console.error('Failed to login with password:', error);
+      alert('Failed to login. Please try again.');
     }
   };
 
-  const handleAdminOtp = async (e) => {
+  const handleForgotPasswordRequest = async (e) => {
     e.preventDefault();
-    // Backend Integration: Send OTP to admin
     try {
-      const response = await fetch('/api/v1/admin/send-otp', {
+      const response = await fetch('/api/v1/users/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify({ phoneNumber: `+91${phoneNumber}` }),
       });
       const data = await response.json();
       if (response.ok) {
-        setStep('otp');
+        alert('An OTP has been sent to your phone number.');
+        setStep('forgot-password-reset');
       } else {
-        if (data.message === 'Admin not found') {
-          alert('You are not authorized as an admin.');
-        } else {
-          alert(`Error: ${data.message}`);
-        }
+        alert(`Error: ${data.message}`);
       }
     } catch (error) {
-      console.error('Failed to send OTP to admin:', error);
-      alert('Failed to send OTP to admin. Please try again later.');
+      console.error('Forgot password request failed:', error);
+      alert('Failed to send reset OTP. Please try again.');
+    }
+  };
+
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (password !== confirmPassword) {
+      alert("Passwords do not match.");
+      return;
+    }
+    try {
+      const response = await fetch('/api/v1/users/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: `+91${phoneNumber}`, otp, newPassword: password }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        alert('Password has been reset successfully. Please log in with your new password.');
+        setStep('phone');
+        setAuthMode('password');
+        setPassword('');
+        setConfirmPassword('');
+        setOtp('');
+      } else {
+        alert(`Error: ${data.message}`);
+      }
+    } catch (error) {
+      console.error('Password reset failed:', error);
+      alert('Failed to reset password. Please try again.');
+    }
+  };
+
+  // --- Admin Flow Handlers ---
+
+  const handleAdminOtp = async (e) => {
+    e.preventDefault();
+    try {
+      await sendAdminOtp(`+91${phoneNumber}`);
+      setStep('otp');
+    } catch (error) {
+      if (error.message === 'Admin not found') {
+        alert('You are not authorized as an admin.');
+      } else {
+        alert(`Error: ${error.message}`);
+      }
     }
   };
 
   const handleAdminLogin = async (e) => {
     e.preventDefault();
-    // Backend Integration: Verify admin OTP
     try {
-      const response = await fetch('/api/v1/admin/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ phoneNumber: `+91${phoneNumber}`, otp }),
-      });
-      const data = await response.json();
-      if (response.ok) {
-        console.log('Admin login successful, token:', data.token);
-        alert('Admin login successful! Redirecting to admin dashboard...');
-        login({ role: 'admin' });
-        navigate('/admin');
-      } else {
-        if (data.message === 'Admin not found') {
-          alert('You are not authorized as an admin.');
-        } else {
-          alert(`Error: ${data.message}`);
-        }
-      }
+      // verifyAdminOtp returns response.data, which has structure: { statusCode, data: { user, accessToken, refreshToken }, message, success }
+      const response = await verifyAdminOtp(`+91${phoneNumber}`, otp);
+      const { user, accessToken, refreshToken } = response.data;
+      console.log('Admin login successful, token:', accessToken);
+      login(user, accessToken, refreshToken);
+      navigate('/admin', { state: { user: user } });
     } catch (error) {
-      console.error('Failed to verify admin OTP:', error);
-      alert('Failed to verify admin OTP. Please try again later.');
+      // Handle axios error response
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to verify OTP. Please try again.';
+      if (errorMessage.includes('Admin not found') || errorMessage.includes('not authorized')) {
+        alert('You are not authorized as an admin.');
+      } else {
+        alert(`Error: ${errorMessage}`);
+      }
     }
   };
 
@@ -131,44 +188,49 @@ const SignIn = ({ isOpen, onClose }) => {
     setStep('phone');
     setOtp('');
   };
-
   // Reset state when the slider is closed or mode changes
   const handleClose = () => {
     setMode('user');
     setStep('phone');
     setPhoneNumber('');
     setOtp('');
+    setPassword('');
+    setConfirmPassword('');
+    setAuthMode('password');
     onClose();
   };
 
   const switchMode = (newMode) => {
-    setMode(newMode);
     // Reset states to ensure clean forms
     setStep('phone');
     setPhoneNumber('');
     setOtp('');
+    setPassword('');
+    setConfirmPassword('');
+    setMode(newMode); // Keep this to switch between user/admin
   };
 
   return (
     <div
-      className={`fixed inset-0 bg-black bg-opacity-50 z-50 transition-opacity duration-300 ${
+      className={`fixed inset-0 bg-black bg-opacity-60 z-50 transition-opacity duration-300 flex items-center justify-center ${
         isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
       onClick={handleClose}
     >
       <div
-        className={`fixed top-0 right-0 h-full bg-slate-300 w-full max-w-sm shadow-lg transform transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`bg-slate-300 w-full h-full sm:max-w-md sm:h-auto sm:rounded-lg shadow-xl transform transition-all duration-300 ${
+          isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 flex flex-col h-full bg-slate-300 rounded-l-lg">
+        {/* Use max-h-[90vh] on larger screens to ensure it fits and is scrollable */}
+        <div className="p-4 sm:p-6 flex flex-col max-h-screen sm:max-h-[90vh] overflow-y-auto bg-slate-300 sm:rounded-lg">
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            {(mode === 'user' && step === 'otp') || mode === 'admin' ? (
-              <button
+          <div className="flex items-center justify-between mb-6 sm:mb-8">
+            {(mode === 'user' && step !== 'phone') || mode === 'admin' ? (
+              <button // Back button for user OTP/password steps and all admin steps
                 onClick={mode === 'user' ? handleBack : () => switchMode('user')}
-                className="text-2xl font-bold text-gray-600 hover:text-teal-500 transition-colors"
+                className="text-xl sm:text-2xl font-bold text-gray-600 hover:text-teal-500 transition-colors flex-shrink-0"
               >
                 &#x2190;
               </button>
@@ -177,7 +239,7 @@ const SignIn = ({ isOpen, onClose }) => {
             )}
             <button
               onClick={handleClose}
-              className="text-2xl font-bold text-gray-600 hover:text-red-500 transition-colors"
+              className="text-xl sm:text-2xl font-bold text-gray-600 hover:text-red-500 transition-colors flex-shrink-0"
             >
               &#x2715;
             </button>
@@ -186,16 +248,16 @@ const SignIn = ({ isOpen, onClose }) => {
           {/* User Login Flow */}
           {mode === 'user' && (
             <>
-              {step === 'phone' && (
+              {step === 'phone' && authMode === 'otp' && ( // OTP Signup/Login
                 <>
-                  <h2 className="text-2xl font-bold mb-4 text-teal-500">SignIn/SignUp</h2>
-                  <form onSubmit={handleUserContinue} className="flex-grow flex flex-col">
+                  <h2 className="text-xl sm:text-2xl font-bold mb-4 text-teal-500">Sign Up</h2>
+                  <form onSubmit={handleSendOtp} className="flex flex-col space-y-4">
                     {/* Phone Number Input */}
                     <div className="mb-4">
                       <label htmlFor="phone" className="text-sm text-gray-600">
                         Phone Number
                       </label>
-                      <div className="relative">
+                      <div className="relative mt-1">
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-600">
                           +91{' '}
                         </span>
@@ -205,11 +267,34 @@ const SignIn = ({ isOpen, onClose }) => {
                           value={phoneNumber}
                           onChange={(e) => setPhoneNumber(e.target.value)}
                           className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
-                          placeholder=" "
+                          placeholder="Mobile Number"
                           required
                         />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">OTP will be sent to this number by SMS</p>
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="password" className="text-sm text-gray-600">Password</label>
+                      <input
+                        type="password"
+                        id="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        placeholder="At least 6 characters"
+                        required
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="confirm-password" className="text-sm text-gray-600">Confirm Password</label>
+                      <input
+                        type="password"
+                        id="confirm-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        required
+                      />
                     </div>
                     {/* WhatsApp Checkbox */}
                     <div className="flex items-start my-6">
@@ -219,7 +304,7 @@ const SignIn = ({ isOpen, onClose }) => {
                         checked={shareOnWhatsApp}
                         onChange={() => setShareOnWhatsApp(!shareOnWhatsApp)}
                         className="h-5 w-5 text-teal-500 border-gray-300 rounded focus:ring-teal-500"
-                      />
+                      /> 
                       <label htmlFor="whatsapp" className="ml-3 text-sm text-gray-700">
                         Share health tips, appointment details and offers with me on{' '}
                         <span className="font-bold">Whatsapp</span>
@@ -239,18 +324,90 @@ const SignIn = ({ isOpen, onClose }) => {
                       </p>
                       <button
                         type="submit"
-                        className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
+                        className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
                       >
                         Continue
                       </button>
-                      <p className="text-center text-sm mt-4">
-                        Login to your{' '}
+                      <p className="text-center text-sm mt-4">Already registered with a password?
                         <button
                           type="button"
-                          onClick={() => switchMode('admin')}
-                          className="text-teal-500 font-bold"
+                          onClick={() => setAuthMode('password')}
+                          className="text-teal-500 font-bold ml-1"
                         >
-                          Admin account here
+                          Sign In
+                        </button>
+                      </p>
+                    </div>
+                  </form>
+                </>
+              )}
+              {step === 'phone' && authMode === 'password' && ( // Password Login
+                <>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-4 text-teal-500">Sign In / Sign Up</h2>
+                  <form onSubmit={handlePasswordLogin} className="flex flex-col space-y-4" noValidate>
+                    <div className="mb-4">
+                      <label htmlFor="phone-password" className="text-sm text-gray-600">Phone Number</label>
+                      <div className="relative mt-1">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-600">+91 </span>
+                        <input
+                          type="tel"
+                          id="phone-password"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                          placeholder="Mobile Number"
+                          required
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">For existing users, enter password to sign in.</p>
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="password-login" className="text-sm text-gray-600 mt-1">Password</label>
+                      <input
+                        type="password"
+                        id="password-login"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        placeholder="Enter your password"
+                        required
+                      />
+                      <div className="text-right mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setStep('forgot-password-phone')}
+                          className="text-xs text-teal-500 font-semibold hover:text-teal-600"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-start my-6">
+                      <input
+                        type="checkbox"
+                        id="whatsapp"
+                        checked={shareOnWhatsApp}
+                        onChange={() => setShareOnWhatsApp(!shareOnWhatsApp)}
+                        className="h-5 w-5 text-teal-500 border-gray-300 rounded focus:ring-teal-500"
+                      />
+                      <label htmlFor="whatsapp" className="ml-3 text-sm text-gray-700">
+                        Share health tips, appointment details and offers with me on{' '}
+                        <span className="font-bold">Whatsapp</span>
+                      </label>
+                    </div>
+                    <div className="mt-auto">
+                      <p className="text-xs text-gray-500 mb-4">
+                        By clicking Sign In, you agree to our{' '}
+                        <a href="#" className="text-teal-500 font-bold">Privacy Policy</a>{' '}
+                        &{' '}
+                        <a href="#" className="text-teal-500 font-bold">Terms and Conditions</a>
+                      </p>
+                      <button type="submit" className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all">
+                        Sign In
+                      </button>
+                      <p className="text-center text-sm mt-4">New user or no password set?
+                        <button type="button" onClick={() => setAuthMode('otp')} className="text-teal-500 font-bold ml-1">
+                          Sign Up / Login with OTP
                         </button>
                       </p>
                     </div>
@@ -259,13 +416,13 @@ const SignIn = ({ isOpen, onClose }) => {
               )}
               {step === 'otp' && (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-teal-500">Enter OTP</h2>
-                  <p className="text-sm text-gray-600 mb-6">An OTP has been sent to +91 {phoneNumber}.</p>
-                  <form onSubmit={handleUserLogin} className="flex-grow flex flex-col">
+                  <h2 className="text-xl sm:text-2xl font-bold mb-2 text-teal-500">Enter OTP</h2>
+                  <p className="text-sm text-gray-600 mb-4 sm:mb-6">An OTP has been sent to +91 {phoneNumber}.</p>
+                  <form onSubmit={handleVerifyOtp} className="flex flex-col space-y-4">
                     {/* OTP Input */}
                     <div className="mb-4">
                       <label htmlFor="otp" className="text-sm text-gray-600">
-                        One Time Password
+                        One-Time Password
                       </label>
                       <input
                         type="text"
@@ -279,9 +436,137 @@ const SignIn = ({ isOpen, onClose }) => {
                     <div className="mt-auto">
                       <button
                         type="submit"
-                        className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
+                        className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
                       >
-                        Login
+                        Verify OTP
+                      </button>
+                    </div>
+                  </form>
+                </>
+              )}
+              {step === 'create-password' && (
+                <>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-4 text-teal-500">Create Password</h2>
+                  <form onSubmit={handleSetPassword} className="flex flex-col space-y-4">
+                    <div className="mb-4">
+                      <label htmlFor="password-create" className="text-sm text-gray-600">Password</label>
+                      <input
+                        type="password"
+                        id="password-create"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        required
+                        placeholder="At least 6 characters"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="confirm-password" className="text-sm text-gray-600">Confirm Password</label>
+                      <input
+                        type="password"
+                        id="confirm-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        required
+                      />
+                    </div>
+                    <div className="mt-auto">
+                      <button
+                        type="submit"
+                        className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
+                      >
+                        Set Password and Login
+                      </button>
+                      <p className="text-center text-sm mt-4">
+                        <button
+                          type="button"
+                          onClick={handleBack}
+                          className="text-teal-500 font-bold"
+                        >
+                          Back
+                        </button>
+                      </p>
+                    </div>
+                  </form>
+                </>
+              )}
+              {step === 'forgot-password-phone' && (
+                <>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-4 text-teal-500">Forgot Password</h2>
+                  <p className="text-sm text-gray-600 mb-4 sm:mb-6">Enter your phone number to receive a password reset OTP.</p>
+                  <form onSubmit={handleForgotPasswordRequest} className="flex flex-col space-y-4">
+                    <div className="mb-4">
+                      <label htmlFor="forgot-phone" className="text-sm text-gray-600">Phone Number</label>
+                      <div className="relative mt-1">
+                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-600">+91 </span>
+                        <input
+                          type="tel"
+                          id="forgot-phone"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                          placeholder="Mobile Number"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-auto">
+                      <button type="submit" className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600">
+                        Send Reset OTP
+                      </button>
+                      <p className="text-center text-sm mt-4">
+                        <button type="button" onClick={handleBack} className="text-teal-500 font-bold">
+                          Back to Sign In
+                        </button>
+                      </p>
+                    </div>
+                  </form>
+                </>
+              )}
+              {step === 'forgot-password-reset' && (
+                <>
+                  <h2 className="text-xl sm:text-2xl font-bold mb-4 text-teal-500">Reset Your Password</h2>
+                  <form onSubmit={handleResetPasswordSubmit} className="flex flex-col space-y-4">
+                    <div className="mb-4">
+                      <label htmlFor="reset-otp" className="text-sm text-gray-600">Reset OTP</label>
+                      <input
+                        type="text"
+                        id="reset-otp"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        required
+                        placeholder="Enter the OTP from SMS"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="new-password" className="text-sm text-gray-600">New Password</label>
+                      <input
+                        type="password"
+                        id="new-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        required
+                        placeholder="Enter new password"
+                      />
+                    </div>
+                    <div className="mb-4">
+                      <label htmlFor="confirm-new-password" className="text-sm text-gray-600">Confirm New Password</label>
+                      <input
+                        type="password"
+                        id="confirm-new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full p-2 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
+                        required
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <div className="mt-auto">
+                      <button type="submit" className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600">
+                        Reset Password
                       </button>
                     </div>
                   </form>
@@ -293,15 +578,14 @@ const SignIn = ({ isOpen, onClose }) => {
           {/* Admin Login Flow */}
           {mode === 'admin' && (
             <>
-              <h2 className="text-2xl font-bold mb-4 text-teal-500">Admin Sign In</h2>
-              <p className="text-sm text-gray-600 mb-6">
-                Enter your registered admin mobile number to sign in. Only pre-registered admin numbers
-                can access the admin portal.
+              <h2 className="text-xl sm:text-2xl font-bold mb-4 text-teal-500">Admin Sign In</h2>
+              <p className="text-sm text-gray-600 mb-4 sm:mb-6">
+                Enter your registered admin mobile number to sign in.
               </p>
               {step === 'phone' && (
-                <form onSubmit={handleAdminOtp} className="flex-grow flex flex-col">
+                <form onSubmit={handleAdminOtp} className="flex flex-col space-y-4">
                   {/* Mobile Number Input */}
-                  <div className="mb-4">
+                  <div className="mb-4 mt-1">
                     <label htmlFor="admin-mobile" className="text-sm text-gray-600">
                       Mobile Number
                     </label>
@@ -315,7 +599,7 @@ const SignIn = ({ isOpen, onClose }) => {
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
                         className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
-                        placeholder=" "
+                        placeholder="Admin Mobile Number"
                         required
                       />
                     </div>
@@ -324,7 +608,7 @@ const SignIn = ({ isOpen, onClose }) => {
                   <div className="mt-auto">
                     <button
                       type="submit"
-                      className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
+                      className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600 hover:scale-105 transition-all"
                     >
                       Send OTP
                     </button>
@@ -342,11 +626,11 @@ const SignIn = ({ isOpen, onClose }) => {
                 </form>
               )}
               {step === 'otp' && (
-                <form onSubmit={handleAdminLogin} className="flex-grow flex flex-col">
+                <form onSubmit={handleAdminLogin} className="flex flex-col space-y-4">
                   {/* OTP Input */}
                   <div className="mb-4">
                     <label htmlFor="admin-otp" className="text-sm text-gray-600">
-                      One Time Password
+                      One-Time Password
                     </label>
                     <input
                       type="text"
@@ -361,7 +645,7 @@ const SignIn = ({ isOpen, onClose }) => {
                   <div className="mt-auto">
                     <button
                       type="submit"
-                      className="w-full bg-teal-500 text-white py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors"
+                      className="w-full bg-teal-500 text-white py-2.5 sm:py-3 rounded-lg font-semibold hover:bg-teal-600 transition-colors"
                     >
                       Login as Admin
                     </button>

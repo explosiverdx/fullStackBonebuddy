@@ -26,6 +26,10 @@ const sessionSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    durationMinutes: {
+      type: Number,
+      default: 60,
+    },
     totalSessions: {
       type: Number,
       required: true,
@@ -34,10 +38,57 @@ const sessionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    sessionDate: {
+      type: Date,
+      required: true,
+    },
     status: {
       type: String,
-      enum: ['ongoing', 'completed'],
-      default: 'ongoing',
+      enum: ['ongoing', 'completed', 'scheduled', 'in-progress', 'cancelled'],
+      default: 'scheduled',
+    },
+    startTime: {
+      type: Date,
+      required: false,
+    },
+    endTime: {
+      type: Date,
+      required: false,
+    },
+    actualDuration: {
+      type: Number, // Actual duration in minutes
+      required: false,
+    },
+    sessionVideo: {
+      url: {
+        type: String,
+        required: false,
+      },
+      publicId: {
+        type: String,
+        required: false,
+      },
+      uploadedAt: {
+        type: Date,
+        required: false,
+      },
+      uploadedBy: {
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        required: false,
+      },
+      title: {
+        type: String,
+        required: false,
+      },
+      description: {
+        type: String,
+        required: false,
+      },
+    },
+    notes: {
+      type: String,
+      required: false,
     },
   },
   { timestamps: true }

@@ -5,10 +5,13 @@ const AdminProfile = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: '',
+    username: '',
+    email: '',
     phoneNumber: '',
     userType: 'admin',
     avatar: null
   });
+  const [currentAvatar, setCurrentAvatar] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -26,11 +29,13 @@ const AdminProfile = () => {
         const data = await response.json();
         setFormData({
           fullName: data.data.Fullname || '',
-          phoneNumber: data.data.mobile_number || '',
+          username: data.data.username || '',
           email: data.data.email || `${data.data.username}@default.com`,
+          phoneNumber: data.data.mobile_number || '',
           userType: data.data.userType || 'admin',
-          avatar: data.data.avatar || null
+          avatar: null
         });
+        setCurrentAvatar(data.data.avatar || null);
       } else {
         setError('Failed to fetch profile');
       }
@@ -63,6 +68,7 @@ const AdminProfile = () => {
         credentials: 'include',
         body: JSON.stringify({
           Fullname: formData.fullName,
+          username: formData.username,
           email: formData.email
         })
       });
@@ -89,9 +95,9 @@ const AdminProfile = () => {
         }
       }
 
-      setSuccess('Profile updated successfully!');
-      fetchUserProfile(); // Refresh
-      navigate('/admin');
+      setSuccess('✅ Profile updated successfully!');
+      await fetchUserProfile(); // Refresh
+      setFormData(prev => ({ ...prev, avatar: null })); // Clear file input
     } catch (err) {
       setError(err.message);
     }
@@ -104,62 +110,102 @@ const AdminProfile = () => {
   if (loading) return <div>Loading profile...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 pt-20">
-      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+    <div className="min-h-screen bg-gray-100 py-8 pt-20 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full mx-auto bg-white rounded-lg shadow-md p-6 sm:p-8">
         <h2 className="text-2xl font-bold mb-6 text-center">Personal Information</h2>
         <form onSubmit={handleSave}>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Full Name</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Full Name *</label>
             <input
               type="text"
               name="fullName"
               value={formData.fullName}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-              placeholder="e.g., bone buddy"
+              placeholder="e.g., Rohit Kumar"
               required
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Phone Number</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Username *</label>
             <input
-              type="tel"
-              value={formData.phoneNumber}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
-              readOnly
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleInputChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+              placeholder="e.g., admin_123456"
+              required
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Email</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2">Email *</label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-              placeholder="e.g., admin@default.com"
+              placeholder="e.g., admin@bonebuddy.in"
               required
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">User Type</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Phone Number <span className="text-gray-500 text-xs">(Read-only)</span>
+            </label>
+            <input
+              type="tel"
+              value={formData.phoneNumber}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
+              readOnly
+              title="Phone number cannot be changed"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              User Type <span className="text-gray-500 text-xs">(Read-only)</span>
+            </label>
             <input
               type="text"
               value={formData.userType}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
               readOnly
+              title="User type cannot be changed"
             />
           </div>
 
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-bold mb-2">Your Photo</label>
-            <p className="text-xs text-gray-500 mb-2">Note: Image must be 512x250 pixels (2.05:1 ratio, landscape)</p>
-            {formData.avatar && (
-              <img src={URL.createObjectURL(formData.avatar)} alt="Preview" className="w-32 h-16 object-cover mb-2 rounded" />
-            )}
+            <div className="flex items-center gap-4 mb-3">
+              {/* Current Avatar */}
+              {currentAvatar ? (
+                <img 
+                  src={currentAvatar} 
+                  alt="Current Avatar" 
+                  className="w-20 h-20 rounded-full object-cover border-2 border-teal-500"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-teal-600 flex items-center justify-center text-white text-2xl font-bold">
+                  {formData.fullName?.charAt(0) || 'A'}
+                </div>
+              )}
+              {/* New Avatar Preview */}
+              {formData.avatar && (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">New photo:</p>
+                  <img 
+                    src={URL.createObjectURL(formData.avatar)} 
+                    alt="New Preview" 
+                    className="w-20 h-20 rounded-full object-cover border-2 border-green-500" 
+                  />
+                </div>
+              )}
+            </div>
             <input
               type="file"
               name="avatar"
@@ -167,6 +213,7 @@ const AdminProfile = () => {
               accept="image/*"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
+            <p className="text-xs text-gray-500 mt-1">Recommended: Square image (e.g., 512x512 pixels)</p>
           </div>
 
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}

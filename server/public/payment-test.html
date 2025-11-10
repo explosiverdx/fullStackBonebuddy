@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Payment Test</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .note {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            color: #856404;
+            font-size: 14px;
+        }
+        .payment-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .payment-info h3 {
+            margin-top: 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Razorpay Payment Test</h1>
+        <p class="subtitle">Test your Razorpay integration</p>
+
+        <div class="note">
+            <strong>📝 Note:</strong> Make sure you have a valid authentication token. You can get one by logging in as a patient user.
+        </div>
+
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="authToken">Authentication Token *</label>
+                <textarea 
+                    id="authToken" 
+                    rows="3" 
+                    placeholder="Paste your Bearer token here (from login response)"
+                    required
+                ></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="amount">Amount (₹) *</label>
+                <input 
+                    type="number" 
+                    id="amount" 
+                    placeholder="500" 
+                    value="500"
+                    min="1"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description *</label>
+                <input 
+                    type="text" 
+                    id="description" 
+                    placeholder="Payment for consultation"
+                    value="Payment for consultation"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="paymentType">Payment Type</label>
+                <select id="paymentType">
+                    <option value="session">Session</option>
+                    <option value="consultation" selected>Consultation</option>
+                    <option value="report">Report</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="appointmentId">Appointment ID (Optional)</label>
+                <input 
+                    type="text" 
+                    id="appointmentId" 
+                    placeholder="Leave empty if not applicable"
+                >
+            </div>
+
+            <button type="submit" id="payButton">
+                💳 Pay Now
+            </button>
+        </form>
+
+        <div id="status" class="status"></div>
+
+        <div class="payment-info">
+            <h3>💡 Test Payment Information</h3>
+            <p><strong>Test Cards:</strong></p>
+            <ul>
+                <li>Card: 4111 1111 1111 1111</li>
+                <li>CVV: Any 3 digits</li>
+                <li>Expiry: Any future date</li>
+                <li>OTP: 0000 (for success)</li>
+            </ul>
+            <p><strong>Test UPI:</strong> success@razorpay</p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/v1'; // Change this to your API URL
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+        }
+
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+
+        async function createOrder(orderData, token) {
+            const response = await fetch(`${API_BASE_URL}/payments/razorpay/order`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(orderData)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Failed to create order');
+            }
+
+            const data = await response.json();
+            return data.data;
+        }
+
+        async function verifyPayment(verifyData, token) {
+            const response = await fetch(`${API_BASE_URL}/payments/razorpay/verify`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(verifyData)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Payment verification failed');
+            }
+
+            const data = await response.json();
+            return data.data;
+        }
+
+        document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideStatus();
+
+            const payButton = document.getElementById('payButton');
+            const originalText = payButton.textContent;
+            payButton.disabled = true;
+            payButton.textContent = '⏳ Processing...';
+
+            try {
+                const token = document.getElementById('authToken').value.trim();
+                const amount = parseFloat(document.getElementById('amount').value);
+                const description = document.getElementById('description').value;
+                const paymentType = document.getElementById('paymentType').value;
+                const appointmentId = document.getElementById('appointmentId').value || undefined;
+
+                if (!token) {
+                    throw new Error('Please provide an authentication token');
+                }
+
+                showStatus('Creating payment order...', 'info');
+
+                // Create order
+                const orderData = {
+                    amount,
+                    description,
+                    paymentType,
+                    ...(appointmentId && { appointmentId })
+                };
+
+                const order = await createOrder(orderData, token);
+
+                showStatus('Opening Razorpay payment gateway...', 'info');
+
+                // Initialize Razorpay
+                const options = {
+                    key: order.key,
+                    amount: order.amount,
+                    currency: order.currency,
+                    name: 'Your App Name',
+                    description: description,
+                    order_id: order.orderId,
+                    handler: async function (response) {
+                        try {
+                            showStatus('Verifying payment...', 'info');
+
+                            const verifyData = {
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                paymentId: order.paymentId
+                            };
+
+                            const result = await verifyPayment(verifyData, token);
+
+                            showStatus(
+                                `✅ Payment successful! Transaction ID: ${result.payment.transactionId}`,
+                                'success'
+                            );
+                            
+                            console.log('Payment details:', result);
+                        } catch (error) {
+                            showStatus(`❌ Verification failed: ${error.message}`, 'error');
+                            console.error('Verification error:', error);
+                        } finally {
+                            payButton.disabled = false;
+                            payButton.textContent = originalText;
+                        }
+                    },
+                    prefill: {
+                        name: 'Test User',
+                        email: 'test@example.com',
+                        contact: '9999999999'
+                    },
+                    theme: {
+                        color: '#667eea'
+                    }
+                };
+
+                const razorpay = new Razorpay(options);
+                
+                razorpay.on('payment.failed', function (response) {
+                    showStatus(
+                        `❌ Payment failed: ${response.error.description}`,
+                        'error'
+                    );
+                    console.error('Payment failed:', response.error);
+                    payButton.disabled = false;
+                    payButton.textContent = originalText;
+                });
+
+                razorpay.open();
+
+            } catch (error) {
+                showStatus(`❌ Error: ${error.message}`, 'error');
+                console.error('Payment error:', error);
+                payButton.disabled = false;
+                payButton.textContent = originalText;
+            }
+        });
+
+        // Show initial message
+        showStatus('👋 Fill in the form and click "Pay Now" to test the payment flow', 'info');
+    </script>
+</body>
+</html>
+

@@ -4,6 +4,12 @@ import { Payment } from "../models/payments.models.js";
 import { Patient } from "../models/patient.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import crypto from "crypto";
+import {
+    createRazorpayOrder,
+    verifyRazorpaySignature,
+    fetchPaymentDetails,
+    initiateRefund
+} from "../utils/razorpay.js";
 
 const createPayment = asyncHandler(async (req, res) => {
     const { appointmentId, amount } = req.body;
@@ -90,4 +96,215 @@ const getAllPayments = asyncHandler(async (req, res) => {
     );
 });
 
-export { createPayment, getPatientPaymentHistory, getAllPayments };
+// Razorpay Integration Controllers
+
+/**
+ * Create Razorpay order for payment
+ */
+const createRazorpayOrderController = asyncHandler(async (req, res) => {
+    const { appointmentId, sessionId, amount, description, paymentType, existingPaymentId } = req.body;
+    const userId = req.user._id;
+
+    if (req.user.userType !== 'patient') {
+        throw new ApiError(403, "Only users with the 'patient' role can create payment orders.");
+    }
+
+    const patient = await Patient.findOne({ userId });
+    if (!patient) {
+        throw new ApiError(404, "Patient profile not found. Please create a patient profile first.");
+    }
+
+    if (!amount || !description) {
+        throw new ApiError(400, "Amount and description are required.");
+    }
+
+    let payment;
+
+    // Check if this is a retry of an existing payment
+    if (existingPaymentId) {
+        payment = await Payment.findById(existingPaymentId);
+        
+        if (!payment) {
+            throw new ApiError(404, "Existing payment not found.");
+        }
+
+        // Verify the payment belongs to the user
+        if (payment.userId.toString() !== userId.toString()) {
+            throw new ApiError(403, "Unauthorized to retry this payment.");
+        }
+
+        // Only allow retry if payment is pending or failed
+        if (!['pending', 'failed'].includes(payment.status)) {
+            throw new ApiError(400, "Cannot retry a completed or cancelled payment.");
+        }
+
+        // Reset payment status to pending for retry
+        payment.status = 'pending';
+        payment.razorpayOrderId = null; // Clear old order ID
+        payment.razorpayPaymentId = null;
+        payment.razorpaySignature = null;
+    } else {
+        // Create new payment record
+        payment = await Payment.create({
+            patientId: patient._id,
+            userId,
+            appointmentId: appointmentId || null,
+            sessionId: sessionId || null,
+            amount,
+            description,
+            status: 'pending',
+            paymentType: paymentType || 'other',
+            paymentGateway: 'razorpay',
+        });
+    }
+
+    // Create Razorpay order
+    const receipt = `payment_${payment._id}`;
+    const notes = {
+        paymentId: payment._id.toString(),
+        patientId: patient._id.toString(),
+        appointmentId: appointmentId || '',
+        sessionId: sessionId || '',
+    };
+
+    try {
+        const razorpayOrder = await createRazorpayOrder(amount, 'INR', receipt, notes);
+
+        // Update payment with Razorpay order ID
+        payment.razorpayOrderId = razorpayOrder.id;
+        await payment.save();
+
+        return res.status(201).json(
+            new ApiResponse(201, {
+                orderId: razorpayOrder.id,
+                amount: razorpayOrder.amount,
+                currency: razorpayOrder.currency,
+                paymentId: payment._id,
+                key: process.env.RAZORPAY_KEY_ID,
+            }, "Razorpay order created successfully.")
+        );
+    } catch (error) {
+        // Only delete if it's a new payment, not a retry
+        if (!existingPaymentId) {
+            await Payment.findByIdAndDelete(payment._id);
+        }
+        throw new ApiError(500, "Failed to create Razorpay order: " + error.message);
+    }
+});
+
+/**
+ * Verify Razorpay payment and update payment status
+ */
+const verifyRazorpayPayment = asyncHandler(async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, paymentId } = req.body;
+    const userId = req.user._id;
+
+    if (req.user.userType !== 'patient') {
+        throw new ApiError(403, "Only users with the 'patient' role can verify payments.");
+    }
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !paymentId) {
+        throw new ApiError(400, "All Razorpay parameters and payment ID are required.");
+    }
+
+    // Find the payment record
+    const payment = await Payment.findById(paymentId);
+    if (!payment) {
+        throw new ApiError(404, "Payment record not found.");
+    }
+
+    // Verify the payment belongs to the user
+    if (payment.userId.toString() !== userId.toString()) {
+        throw new ApiError(403, "Unauthorized to verify this payment.");
+    }
+
+    // Verify Razorpay signature
+    const isValid = verifyRazorpaySignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+
+    if (!isValid) {
+        payment.status = 'failed';
+        await payment.save();
+        throw new ApiError(400, "Invalid payment signature. Payment verification failed.");
+    }
+
+    try {
+        // Fetch payment details from Razorpay
+        const paymentDetails = await fetchPaymentDetails(razorpay_payment_id);
+
+        // Update payment record
+        payment.razorpayPaymentId = razorpay_payment_id;
+        payment.razorpaySignature = razorpay_signature;
+        payment.transactionId = razorpay_payment_id;
+        payment.status = paymentDetails.status === 'captured' ? 'completed' : 'failed';
+        payment.paidAt = new Date();
+        await payment.save();
+
+        return res.status(200).json(
+            new ApiResponse(200, payment, "Payment verified successfully.")
+        );
+    } catch (error) {
+        payment.status = 'failed';
+        await payment.save();
+        throw new ApiError(500, "Failed to verify payment: " + error.message);
+    }
+});
+
+/**
+ * Get Razorpay key for frontend
+ */
+const getRazorpayKey = asyncHandler(async (req, res) => {
+    return res.status(200).json(
+        new ApiResponse(200, { key: process.env.RAZORPAY_KEY_ID }, "Razorpay key retrieved successfully.")
+    );
+});
+
+/**
+ * Refund a payment
+ */
+const refundPayment = asyncHandler(async (req, res) => {
+    const { paymentId, amount } = req.body;
+
+    if (!['doctor', 'admin'].includes(req.user.userType)) {
+        throw new ApiError(403, "Only doctors and admins can initiate refunds.");
+    }
+
+    const payment = await Payment.findById(paymentId);
+    if (!payment) {
+        throw new ApiError(404, "Payment not found.");
+    }
+
+    if (payment.status !== 'completed') {
+        throw new ApiError(400, "Only completed payments can be refunded.");
+    }
+
+    if (!payment.razorpayPaymentId) {
+        throw new ApiError(400, "This payment was not processed through Razorpay and cannot be refunded.");
+    }
+
+    try {
+        const refund = await initiateRefund(payment.razorpayPaymentId, amount);
+
+        // Update payment status
+        payment.status = 'cancelled';
+        payment.notes = payment.notes 
+            ? `${payment.notes}\nRefund initiated: ${refund.id}` 
+            : `Refund initiated: ${refund.id}`;
+        await payment.save();
+
+        return res.status(200).json(
+            new ApiResponse(200, { payment, refund }, "Refund initiated successfully.")
+        );
+    } catch (error) {
+        throw new ApiError(500, "Failed to initiate refund: " + error.message);
+    }
+});
+
+export { 
+    createPayment, 
+    getPatientPaymentHistory, 
+    getAllPayments,
+    createRazorpayOrderController,
+    verifyRazorpayPayment,
+    getRazorpayKey,
+    refundPayment
+};

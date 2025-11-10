@@ -4,15 +4,11 @@ import cookieParser from 'cookie-parser'
 
 const app=express()
 
-// Remove duplicate import of cors
-// import cors from 'cors'
-
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174'],
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174','https://bonebuddy.cloud',"http://bonebuddy.cloud"],
     credentials: true
 }))
 
-<<<<<<< HEAD
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Origin', req.headers.origin);
@@ -20,17 +16,14 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     next();
 });
-=======
 
->>>>>>> 62d8ea7 (Error resolved)
-
-app.use(express.json({limit:"16kb"}))
-app.use(express.urlencoded({extended:true ,limit:"16kb"}))
+app.use(express.json({limit:"50mb"})) // Increased for video metadata
+app.use(express.urlencoded({extended:true, limit:"50mb"})) // Increased for video uploads
 app.use(express.static("public"))
 app.use(cookieParser())
 
-
 // routes import
+import healthRouter from './routes/health.routes.js'
 import userRouter from './routes/user.routes.js'
 import doctorRouter from './routes/doctor.routes.js'
 import patientRouter from './routes/patient.routes.js'
@@ -45,11 +38,16 @@ import rbacRouter from './routes/rbac.routes.js'
 import sessionRouter from './routes/session.routes.js'
 import dashboardRouter from './routes/dashboard.routes.js'
 import adminRouter from './routes/admin.routes.js'
-
+import authRouter from './routes/auth.routes.js'
+import reportRouter from './routes/report.routes.js'
+import notificationRouter from './routes/notification.routes.js'
+import blogRouter from './routes/blog.routes.js'
+import { createContactSubmission } from './controllers/user.controller.js'
 
 import { errorHandler } from './utils/errorHandler.js';
 
 // routes declaration
+app.use("/api/v1", healthRouter)
 app.use("/api/v1/users", userRouter)
 app.use("/api/v1/doctors", doctorRouter)
 app.use("/api/v1/patients", patientRouter)
@@ -64,9 +62,19 @@ app.use("/api/v1/rbac", rbacRouter)
 app.use("/api/v1/sessions", sessionRouter)
 app.use("/api/v1/dashboard", dashboardRouter)
 app.use("/api/v1/admin", adminRouter)
+app.use("/api/auth", authRouter)
+app.use("/api/v1/reports", reportRouter)
+app.use("/api/v1/notifications", notificationRouter)
+app.use("/api/v1/blogs", blogRouter)
 
+// Direct contact route for frontend
+app.post("/api/v1/contact", createContactSubmission);
 
 app.use(errorHandler);
 
+// Add a simple root route
+app.get('/', (req, res) => {
+  res.send('Backend API is running ✅');
+});
 
-export {app}
+export { app };

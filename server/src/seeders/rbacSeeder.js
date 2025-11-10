@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Role } from '../models/role.models.js';
 import { Permission } from '../models/permission.models.js';
 import connectDB from '../db/index.js';
+import { User } from '../models/user.models.js';
 import { DB_NAME } from '../constants.js';
 
 const seedRBAC = async () => {
@@ -12,6 +13,7 @@ const seedRBAC = async () => {
     // Clear existing roles and permissions
     await Role.deleteMany({});
     await Permission.deleteMany({});
+    // Note: You might want to be careful about deleting all users in production.
 
     // Create permissions (common ones for admin)
     const permissions = [
@@ -50,10 +52,22 @@ const seedRBAC = async () => {
       name: 'physio',
       permissions: ['read:patient', 'create:progress_report', 'update:progress_report', 'read:session']
     });
-    const userRole = await Role.create({
-      name: 'user',
-      permissions: ['read:appointment', 'create:appointment']
-    });
+
+    // Create a default admin user
+    // IMPORTANT: Change these credentials in a real environment
+    const adminPhoneNumber = '+919876543210';
+    const adminExists = await User.findOne({ mobile_number: adminPhoneNumber });
+
+    if (!adminExists) {
+      await User.create({
+        Fullname: 'Default Admin',
+        username: 'admin',
+        email: 'admin@bonebuddy.com',
+        mobile_number: adminPhoneNumber,
+        userType: 'admin',
+      });
+      console.log(`Default admin created with phone number: ${adminPhoneNumber}`);
+    }
 
     console.log('Seeding completed successfully');
     process.exit(0);

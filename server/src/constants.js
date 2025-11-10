@@ -1,2 +1,2 @@
-export const DB_NAME="Backend"
+export const DB_NAME="bonebuddy"
 

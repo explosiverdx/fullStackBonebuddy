@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    subject: '',
-    message: ''
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    message: '',
   });
-  
+
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState('');
@@ -28,57 +29,50 @@ const Contact = () => {
     }
   };
 
-  const validateForm = () => {
-    const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    }
-
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone is required';
-    } else if (!/^\+?[\d\s\-()]+$/.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid phone number';
-    }
-
-    if (!formData.subject.trim()) {
-      newErrors.subject = 'Subject is required';
-    }
-
-    if (!formData.message.trim()) {
-      newErrors.message = 'Message is required';
-    } else if (formData.message.trim().length < 10) {
-      newErrors.message = 'Message must be at least 10 characters long';
-    }
-
-    return newErrors;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const newErrors = validateForm();
+
+    const newErrors = {};
+    if (!formData.firstName) newErrors.firstName = "First name is required.";
+    if (!formData.lastName) newErrors.lastName = "Last name is required.";
+    if (!formData.email) newErrors.email = "Email is required.";
+    if (!formData.phoneNumber) {
+      newErrors.phoneNumber = "Phone number is required.";
+    } else if (!/^\d{10}$/.test(formData.phoneNumber)) {
+      newErrors.phoneNumber = "Phone number must be 10 digits.";
+    }
+    if (!formData.message) newErrors.message = "Message is required.";
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
     }
-    
+
     setIsSubmitting(true);
     setSubmitStatus('');
-    
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const response = await fetch('/api/v1/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) throw new Error('Failed to submit form');
+
       setSubmitStatus('success');
       setFormData({
-        name: '',
-        phone: '',
-        subject: '',
-        message: ''
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        message: '',
       });
       setErrors({});
-    } catch {
+    } catch (error) {
+      console.error("Contact form submission error:", error);
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
@@ -86,140 +80,118 @@ const Contact = () => {
   };
 
   return (
-    <div className="body-bg">
-      <main className="main-content form-page">
+    <div className="body-bg min-h-screen py-8 sm:py-12 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
+      <main className="w-full">
         {/* Header Section */}
-        <div className="form-header">
-          <h1>Contact Us</h1>
-          <p>
-            Have a question or need assistance? We'd love to hear from you. 
+        <div className="form-header text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">Contact Us</h1>
+          <p className="text-sm sm:text-base md:text-lg text-gray-600">
+            Have a question or need assistance? We'd love to hear from you.
             Send us a message and we'll respond as soon as possible.
           </p>
         </div>
 
         {/* Contact Form */}
-        <div className="form-container">
-          <form className="appointment-form" onSubmit={handleSubmit}>
-            {/* Name and Phone Row */}
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="name">
-                  Full Name <span style={{ color: '#ef4444' }}>*</span>
-                </label>
+        <div className="form-container bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-lg mb-6 sm:mb-8">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex-1">
                 <input
                   type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
+                  name="firstName"
+                  placeholder="First name"
+                  value={formData.firstName}
                   onChange={handleChange}
-                  placeholder="Enter your full name"
-                  className={errors.name ? 'error' : ''}
+                  required
+                  className="w-full p-3 sm:p-4 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800 text-sm sm:text-base"
                 />
-                {errors.name && (
-                  <span className="error-message">{errors.name}</span>
-                )}
+                {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
               </div>
-
-              <div className="form-group">
-                <label htmlFor="phone">
-                  Phone Number <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="Enter your phone number"
-                  className={errors.phone ? 'error' : ''}
-                />
-                {errors.phone && (
-                  <span className="error-message">{errors.phone}</span>
-                )}
-              </div>
-            </div>
-
-            {/* Subject Row */}
-            <div className="form-row">
-              <div className="form-group full-width">
-                <label htmlFor="subject">
-                  Subject <span style={{ color: '#ef4444' }}>*</span>
-                </label>
+              <div className="flex-1">
                 <input
                   type="text"
-                  id="subject"
-                  name="subject"
-                  value={formData.subject}
+                  name="lastName"
+                  placeholder="Last name"
+                  value={formData.lastName}
                   onChange={handleChange}
-                  placeholder="What is this regarding?"
-                  className={errors.subject ? 'error' : ''}
+                  required
+                  className="w-full p-3 sm:p-4 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800 text-sm sm:text-base"
                 />
-                {errors.subject && (
-                  <span className="error-message">{errors.subject}</span>
-                )}
+                {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
               </div>
             </div>
-
-            {/* Message Row */}
-            <div className="form-row">
-              <div className="form-group full-width">
-                <label htmlFor="message">
-                  Message <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <textarea
-                  id="message"
-                  name="message"
-                  value={formData.message}
-                  onChange={handleChange}
-                  placeholder="Please provide details about your inquiry..."
-                  rows="6"
-                  className={errors.message ? 'error' : ''}
-                />
-                {errors.message && (
-                  <span className="error-message">{errors.message}</span>
-                )}
-              </div>
+            <div>
+              <input
+                type="email"
+                name="email"
+                placeholder="Email address"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className="w-full p-3 sm:p-4 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800 text-sm sm:text-base"
+              />
+              {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
             </div>
+            <div>
+              <input
+                type="tel"
+                name="phoneNumber"
+                placeholder="Phone number (10 digits)"
+                value={formData.phoneNumber}
+                onChange={handleChange}
+                required
+                maxLength="10"
+                pattern="\d{10}"
+                className="w-full p-3 sm:p-4 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800 text-sm sm:text-base"
+              />
+              {errors.phoneNumber && <p className="text-red-500 text-xs mt-1">{errors.phoneNumber}</p>}
+            </div>
+            <textarea
+              name="message"
+              rows="4"
+              placeholder="Your message"
+              value={formData.message}
+              onChange={handleChange}
+              required
+              className="w-full p-3 sm:p-4 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800 text-sm sm:text-base resize-vertical"
+            ></textarea>
+            {errors.message && <p className="text-red-500 text-xs mt-1">{errors.message}</p>}
 
             {/* Submit Status Messages */}
             {submitStatus === 'success' && (
-              <div className="success-message">
-                <p>✅ Thank you! Your message has been sent successfully. We'll get back to you soon.</p>
+              <div className="success-message p-3 sm:p-4 rounded-md">
+                <p className="text-sm sm:text-base">✅ Thank you! Your message has been sent successfully. We'll get back to you soon.</p>
               </div>
             )}
-            
+
             {submitStatus === 'error' && (
-              <div className="error-message">
-                <p>❌ Sorry, there was an error sending your message. Please try again.</p>
+              <div className="error-message p-3 sm:p-4 rounded-md">
+                <p className="text-sm sm:text-base">❌ Sorry, there was an error sending your message. Please try again.</p>
               </div>
             )}
 
             {/* Submit Button */}
-            <div className="form-submit">
-              <button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <i className="loading-spinner"></i>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <i className="send-icon">📧</i>
-                    Send Message
-                  </>
-                )}
+            <div className="form-submit text-center">
+              <button
+                type="submit"
+                className="btn-primary px-6 sm:px-8 py-2 sm:py-3 text-sm sm:text-base md:text-lg"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Sending...' : 'Submit'}
               </button>
             </div>
           </form>
         </div>
 
         {/* Contact Information */}
-        <div className="contact-box">
-          <h2>Other Ways to Reach Us</h2>
-          <p><strong>Phone:</strong> +91 8881119890</p>
-          <p><strong>Email:</strong> info@bonebuddy.com</p>
-          <p><strong>Address:</strong> Plot No.44, A-Block, Indira Nagar, Lucknow, 226010</p>
-          <p><strong>Business Hours:</strong> Mon-Sat: 8AM-6PM</p>
+        <div className="contact-box bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-lg text-center">
+          <h2 className="text-lg sm:text-xl md:text-2xl font-semibold mb-4">Reach Us</h2>
+          <div className="space-y-2 text-sm sm:text-base">
+            <p><strong>Phone:</strong> +91 92778 01060</p>
+            <p><strong>Email:</strong> info@bonebuddy.in</p>
+            <p><strong>Address:</strong> Plot No.44, A-Block, Indira Nagar, Lucknow, 226010</p>
+            <p><strong>Business Hours:</strong> 24/7</p>
+          </div>
         </div>
       </main>
     </div>

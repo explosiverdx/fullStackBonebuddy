@@ -6,9 +6,9 @@ dotenv.config({path:'.env'});
 
 async function seedAdmin() {
   try {
-    await mongoose.connect(`${process.env.MONGODB_URI}/${DB_NAME}`);
+    await mongoose.connect(`${process.env.MONGODB_URI}/Backend`);
     const adminUser = await User.create({
-      mobile_number: '+918795736312',
+      mobile_number: '6387045470',
       userType: 'admin',
       username: 'admin_user',
       email: 'admin@bonebuddy.com',

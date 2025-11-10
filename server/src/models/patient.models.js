@@ -34,18 +34,8 @@ const patientSchema = new mongoose.Schema(
       required: false,
     },
     address: {
-      city: {
-        type: String,
-        required: true,
-      },
-      state: {
-        type: String,
-        required: true,
-      },
-      country: {
-        type: String,
-        required: true,
-      },
+      type: String,
+      required: false,
     },
     surgeryType: {
       type: String,
@@ -56,13 +46,17 @@ const patientSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
-    hospitalName: {
+    hospitalClinic: {
       type: String,
-      required: true,
+      required: false,
     },
-    doctorName: {
+    assignedDoctor: {
       type: String,
-      required: true,
+      required: false,
+    },
+    assignedPhysiotherapist: {
+      type: String,
+      required: false,
     },
     currentCondition: {
       type: String,
@@ -84,6 +78,10 @@ const patientSchema = new mongoose.Schema(
       required: true,
     },
     medicalInsurance: {
+      type: String,
+      required: false,
+    },
+    medicalReport: {
       type: String,
       required: false,
     }

@@ -1,10 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
-const AuthContext = createContext();
-
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+import React, { useState, useEffect } from 'react';
+import { AuthContext } from './AuthContextValue';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -13,37 +8,55 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Check if user is logged in on app start
     const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/v1/users/me', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.data);
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        try {
+          const response = await fetch('/api/v1/users/me', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+          });
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.data);
+          } else {
+            // Token might be expired, try refresh or clear
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+          }
+        } catch {
+          // Auth check failed, clear tokens
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
         }
-      } catch (error) {
-        console.error('Auth check failed:', error);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     };
     checkAuth();
   }, []);
 
-  const login = (userData) => {
+  const login = (userData, accessToken, refreshToken) => {
     setUser(userData);
+    if (accessToken) localStorage.setItem('accessToken', accessToken);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
   };
 
   const logout = async () => {
     try {
+      const refreshToken = localStorage.getItem('refreshToken');
       await fetch('/api/v1/users/logout', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
         credentials: 'include',
       });
     } catch (error) {
       console.error('Logout failed:', error);
     }
     setUser(null);
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
   };
 
   return (

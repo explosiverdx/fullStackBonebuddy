@@ -1,81 +1,43 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 
 const About = () => {
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    message: '',
-  });
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Basic validation
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.message) {
-      alert('Please fill in all fields.');
-      return;
-    }
-    // Simulate form submission
-    alert('Message sent successfully!');
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      message: '',
-    });
-  };
-
   return (
-    <main className="main-content">
+    <main className="main-content py-8 sm:py-12 pt-20 sm:pt-24">
       {/* About Section */}
-      <section className="max-w-7xl mx-auto px-8 flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-8 sm:gap-12 lg:flex-row lg:items-start lg:gap-12 lg:gap-16">
         <div className="flex-1">
-          <h1 className="text-4xl font-bold mb-2">About</h1>
-          <h3 className="text-xl font-medium text-gray-700 mb-4">Subheading for description or instructions</h3>
-          <p className="text-base text-gray-600 leading-relaxed mb-4">
-            Body text for your whole article or post. We'll put in some lorem ipsum
-            to show how a filled-out page might look.
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-gray-800">About BoneBuddy</h1>
+          <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed mb-4 sm:mb-6">
+            BoneBuddy is a digital health platform developed by Physiox Pvt Ltd, designed to enhance post-surgical recovery through seamless collaboration among patients, physiotherapists, and doctors. Its primary goal is to provide personalized, efficient, and accessible rehabilitation care.
           </p>
-          <p className="text-base text-gray-600 leading-relaxed mb-4">
-            Excepteur efficient emerging, minim veniam anim aute carefully curated
-            Ginza conversation exquisite perfect nostrud nisi intricate content.
-          </p>
-          <p className="text-base text-gray-600 leading-relaxed mb-4">
-            Exclusive izakaya charming Scandinavian impeccable aute quality of life
-            soft power pariatur Melbourne occaecat discerning.
+          <div className="flex flex-col md:flex-row gap-6 sm:gap-8 mb-6 sm:mb-8">
+            <div className="flex-1">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-2">Our Mission</h3>
+              <p className="text-sm sm:text-base text-gray-600">To offer an innovative platform that fosters collaboration among doctors, physiotherapists, and patients, enabling faster, safer, and more effective recoveries.</p>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-2">Our Vision</h3>
+              <p className="text-sm sm:text-base text-gray-600">To redefine the post-surgical recovery experience by bridging the gap between patients and healthcare providers, ensuring holistic, patient-centered care.</p>
+            </div>
+          </div>
+          <div className="mb-6 sm:mb-8">
+            <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4">Key Features</h3>
+            <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base text-gray-700">
+              <li>• Personalized Care Plans: Tailored rehabilitation programs designed to meet individual patient needs</li>
+              <li>• Real-Time Collaboration: Facilitates communication between patients, physiotherapists, and doctors for continuous monitoring and support</li>
+              <li>• Progress Tracking: Allows patients and healthcare providers to monitor recovery progress through detailed logs and updates</li>
+              <li>• Secure Data Management: Ensures patient information is protected with robust security measures</li>
+            </ul>
+          </div>
+          <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed mb-4 sm:mb-6">
+            BoneBuddy aims to simplify the recovery process, making it more efficient and accessible for patients, while also providing healthcare professionals with tools to deliver optimal care.
           </p>
         </div>
 
         <div className="flex-1 flex justify-center">
-          <img src="/assets/About.png" alt="About BoneBuddy" className="w-full max-w-md rounded-lg object-cover md:max-w-full md:h-auto" />
+          <img src="/assets/About.png" alt="About BoneBuddy" className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-full rounded-lg object-cover" />
         </div>
-      </section>
-
-      {/* Contact Section */}
-      <section id="contact" className="contact-page">
-        <h1>Contact Me</h1>
-        <p className="subtitle">
-          Have questions or need help? Fill out the form below and we’ll get back to you soon.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
-          <div className="flex gap-4">
-            <input type="text" name="firstName" placeholder="First name" value={formData.firstName} onChange={handleChange} required className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800" />
-            <input type="text" name="lastName" placeholder="Last name" value={formData.lastName} onChange={handleChange} required className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800" />
-          </div>
-          <input type="email" name="email" placeholder="Email address" value={formData.email} onChange={handleChange} required className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800" />
-          <textarea name="message" rows="5" placeholder="Your message" value={formData.message} onChange={handleChange} className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:border-gray-800"></textarea>
-          <button type="submit" className="btn-primary self-start">Submit</button>
-        </form>
       </section>
     </main>
   );

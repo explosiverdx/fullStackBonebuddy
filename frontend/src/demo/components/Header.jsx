@@ -8,8 +8,8 @@ const Header = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <a href="/demo" className="text-white font-bold text-xl flex items-center">
-              <div className="logo-circle" style={{ width: '3rem', height: '3rem', borderRadius: '9999px', border: '2px solid #111827', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-                <img src="/assets/BoneBuddy_Logo-modified.webp" alt="BoneBuddy logo" style={{ width: '2rem', height: '2rem', objectFit: 'contain' }} />
+              <div className="logo-circle" style={{ width: '3.5rem', height: '3.5rem', borderRadius: '9999px', border: '2px solid #111827', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', padding: '4px' }}>
+                <img src="/assets/bone buddy logo-1.png" alt="BoneBuddy logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               BoneBuddy
             </a>

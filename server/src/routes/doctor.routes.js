@@ -4,7 +4,8 @@ import {
     getDoctorProfile,
     updateDoctorProfile,
     getAllPatients,
-    getAllDoctors
+    getAllDoctors,
+    getMyPatientsAndSessions
 } from "../controllers/doctor.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { verifyPermission } from "../middleware/permission.middleware.js";
@@ -16,8 +17,9 @@ router.route("/")
     .get(verifyJWT, getDoctorProfile)
     .patch(verifyJWT, updateDoctorProfile);
 
-router.route("/getAllDoctors").get(verifyJWT, getAllDoctors)
+router.route("/getAllDoctors").get(verifyJWT, getAllDoctors);
 
-router.route("/patients").get(verifyJWT, verifyPermission(['view-all-patients']), getAllPatients);
+router.route("/patients").get(verifyJWT, verifyPermission(['doctor']), getAllPatients);
+router.route("/my-patients-sessions").get(verifyJWT, getMyPatientsAndSessions);
 
 export default router;

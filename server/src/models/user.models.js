@@ -1,6 +1,7 @@
 import mongoose ,{Schema} from "mongoose";
 import jwt from "jsonwebtoken"
 import bcrypt from "bcrypt"
+import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 
 const userSchema=new mongoose.Schema({
     username:{
@@ -30,29 +31,19 @@ const userSchema=new mongoose.Schema({
     gender: {
         type: String,
         enum: ['Male', 'Female', 'Other'],
-        required: [true, "Gender is required"]
+        required: false
     },
     dateOfBirth: {
         type: Date,
-        required: [true, "Date of birth is required"]
+        required: false
     },
     age: {
         type: Number,
-        required: [true, "Age is required"]
+        required: false
     },
     address: {
-        city: {
-            type: String,
-            required: [true, "City is required"]
-        },
-        state: {
-            type: String,
-            required: [true, "State is required"]
-        },
-        pincode: {
-            type: String,
-            required: [true, "Pincode is required"]
-        }
+        type: String,
+        required: false
     },
     avatar:{
         type:String,      //cloudinary url
@@ -87,6 +78,76 @@ const userSchema=new mongoose.Schema({
     lastLogin: {
         type: Date,
         default: null,
+    },
+    // Patient-specific fields
+    surgeryType: {
+        type: String,
+        enum: ['Fracture', 'Knee Replacement', 'Hip Replacement', 'Spine Surgery', 'Other'],
+        required: false,
+    },
+    surgeryDate: {
+        type: Date,
+        required: false,
+    },
+    doctorName: {
+        type: String,
+        required: false,
+    },
+    hospitalName: {
+        type: String,
+        required: function() {
+            return this.userType === 'patient' || this.userType === 'doctor';
+        },
+    },
+    assignedPhysio: {
+        type: String,
+        required: false,
+    },
+    assignedDoctor: {
+        type: String,
+        required: false,
+    },
+    medicalReport: {
+        type: String, // Cloudinary URL
+        required: false,
+    },
+    currentStatus: {
+        type: String,
+        enum: ['Pending', 'Active', 'In Treatment', 'Completed'],
+        default: 'Pending',
+    },
+    // Doctor-specific fields
+    specialization: {
+        type: String,
+        required: false,
+    },
+    experience: {
+        type: Number,
+        required: false,
+    },
+    qualification: {
+        type: String,
+        required: false,
+    },
+    registrationNumber: {
+        type: String,
+        required: false,
+    },
+    availableDays: {
+        type: [String],
+        required: false,
+    },
+    availableTimeSlots: {
+        type: String,
+        required: false,
+    },
+    consultationFee: {
+        type: Number,
+        required: false,
+    },
+    bio: {
+        type: String,
+        required: false,
     },
 },{timestamps:true})
 
@@ -127,6 +188,6 @@ userSchema.methods.generateRefreshToken=function(){
     )
 }
 
+userSchema.plugin(mongooseAggregatePaginate);
+
 export const User=mongoose.model("User",userSchema)
-
-

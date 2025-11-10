@@ -1,52 +1,93 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import Blog from './components/Blog';
+import BlogPost from './components/BlogPost'; // Import the Blog component
 import './index.css'; // Import the main CSS file
 import Header from './components/Header';
 import Home from './components/Home';
 import Services from './components/Services';
+import KneeReplacementRehab from './components/ServicesContentPages/KneeReplacementRehab';
+import SpinalSurgeryRehab from './components/ServicesContentPages/SpinalSurgeryRehab';
+import HipReplacementRehab from './components/ServicesContentPages/HipReplacementRehab';
+import AnkleSurgeryRehab from './components/ServicesContentPages/AnkleSurgeryRehab';
+import ElbowSurgeryRehab from './components/ServicesContentPages/ElbowSurgeryRehab';
+import WristSurgeryRehab from './components/ServicesContentPages/WristSurgeryRehab';
+import ShoulderSurgeryRehab from './components/ServicesContentPages/ShoulderSurgeryRehab';
+import TraumaPostSurgery from './components/ServicesContentPages/TraumaPostSurgery';
+import SportsInjuryRecovery from './components/ServicesContentPages/SportsInjuryRecovery';
+import NeurosurgeryRehab from './components/ServicesContentPages/NeurosurgeryRehab';
 import About from './components/About';
-import Pricing from './components/Pricing';
+
 import Contact from './components/Contact';
 import Footer from './components/Footer';
 import SignIn from './components/SignIn';
 import PatientSignup from './components/PatientSignup';
+import SignUpForm from './components/SignUpForm';
 import AdminProfile from './components/AdminProfile';
 import AdminDashboard from './components/AdminDashboard';
+import AdminLoginGate from './components/AdminLoginGate';
 import UserProfile from './components/UserProfile';
+import PatientProfile from './components/PatientProfile';
+import DoctorProfile from './components/DoctorProfile';
+import PhysiotherapistProfile from './components/PhysiotherapistProfile';
 import Appointment from './components/Appointment';
 import Demo from './components/Demo';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import LoginRedirector from './components/LoginRedirector';
+import ScrollToTop from './components/ScrollToTop';
+import FloatingWhatsAppButton from './components/FloatingWhatsAppButton';
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const isSignInOpen = location.pathname === '/login';
+  const isSignInOpen = location.pathname === '/signUp';
   const isAdminPage = location.pathname.startsWith('/admin');
+  const isDemoPage = location.pathname.startsWith('/demo');
 
   const closeSignIn = () => {
     navigate(-1);
   };
 
   return (
-    <div className={`App ${isSignInOpen ? 'overflow-hidden' : ''}`}>
-      {!isAdminPage && <Header />}
-      <Routes>
+    <div className={`App flex flex-col min-h-screen ${isSignInOpen ? 'overflow-hidden' : ''}`}>
+      <ScrollToTop />
+      {!isAdminPage && !isDemoPage && <Header />}
+      <main className={`flex-grow ${!isAdminPage && !isDemoPage ? 'pt-20' : ''}`}>
+        <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
+        <Route path="/services/knee-replacement-rehab" element={<KneeReplacementRehab />} />
+        <Route path="/services/spinal-surgery-rehab" element={<SpinalSurgeryRehab />} />
+        <Route path="/services/hip-replacement-rehab" element={<HipReplacementRehab />} />
+        <Route path="/services/ankle-surgery-rehab" element={<AnkleSurgeryRehab />} />
+        <Route path="/services/elbow-surgery-rehab" element={<ElbowSurgeryRehab />} />
+        <Route path="/services/wrist-surgery-rehab" element={<WristSurgeryRehab />} />
+        <Route path="/services/shoulder-surgery-rehab" element={<ShoulderSurgeryRehab />} />
+        <Route path="/services/trauma-post-surgery" element={<TraumaPostSurgery />} />
+        <Route path="/services/sports-injury-recovery" element={<SportsInjuryRecovery />} />
+        <Route path="/services/neurosurgery-rehab" element={<NeurosurgeryRehab />} />
         <Route path="/about" element={<About />} />
         <Route path="/appointment" element={<Appointment />} />
-        <Route path="/pricing" element={<Pricing />} />
+
         <Route path="/contact" element={<Contact />} />
-        <Route path="/login" element={<Home />} />
+        <Route path="/signUp" element={<Home />} />
         <Route path="/demo/*" element={<Demo />} />
-        <Route path="/patient-signup" element={<ProtectedRoute allowedRoles={['patient']}><PatientSignup /></ProtectedRoute>} />
+        <Route path="/login-success" element={<ProtectedRoute><LoginRedirector /></ProtectedRoute>} />
+        <Route path="/userForm" element={<ProtectedRoute allowedRoles={['patient', 'doctor', 'physiotherapist']}><PatientSignup /></ProtectedRoute>} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/user-profile" element={<Navigate to="/user" replace />} />
         <Route path="/user" element={<ProtectedRoute allowedRoles={['patient', 'admin', 'user']}><UserProfile /></ProtectedRoute>} />
-        <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/PatientProfile" element={<ProtectedRoute allowedRoles={['patient']}><PatientProfile /></ProtectedRoute>} />
+        <Route path="/DoctorProfile" element={<ProtectedRoute allowedRoles={['doctor']}><DoctorProfile /></ProtectedRoute>} />
+        <Route path="/PhysiotherapistProfile" element={<ProtectedRoute allowedRoles={['physiotherapist', 'physio']}><PhysiotherapistProfile /></ProtectedRoute>} />
+        <Route path="/admin/*" element={<AdminLoginGate><AdminDashboard /></AdminLoginGate>} />
       </Routes>
-      {!isAdminPage && <Footer />}
+      </main>
+      {!isAdminPage && !isDemoPage && <Footer />}
+      {!isAdminPage && !isDemoPage && <FloatingWhatsAppButton />}
       <SignIn isOpen={isSignInOpen} onClose={closeSignIn} />
     </div>
   );

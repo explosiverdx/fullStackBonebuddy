@@ -47,7 +47,7 @@ const createPatientProfile = asyncHandler(async (req, res) => {
     }
 
     // Required fields validation
-    if ([fullName, email, dateOfBirth, age, gender, city, state, country, emergencyContactNumber].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
+    if ([fullName, dateOfBirth, age, gender, city, state, country, emergencyContactNumber].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
         throw new ApiError(400, "All required fields must be filled out.");
     }
 
@@ -80,7 +80,7 @@ const createPatientProfile = asyncHandler(async (req, res) => {
         age,
         mobileNumber: user.mobile_number,
         email,
-        address: { city, state, country },
+        address: `${city}, ${state}, ${country}`,
         allergies,
         bloodGroup,
         emergencyContactNumber
@@ -99,10 +99,11 @@ const createPatientProfile = asyncHandler(async (req, res) => {
 
     const loggedInUser = await User.findById(userId).select("-password -refreshToken -otp -otpExpires");
 
+    const isProduction = process.env.NODE_ENV === 'production';
     const options = {
         httpOnly: true,
-        secure: false,
-        sameSite: 'lax'
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax'
     };
 
     return res
@@ -152,12 +153,12 @@ const getAllPatients = asyncHandler(async (req, res) => {
 });
 
 const updatePatientProfile = asyncHandler(async (req, res) => {
-    const { name, diagnosedWith, address, age, bloodGroup, gender, contactNumber, emergencyContactNumber } = req.body;
+    const { name, surgeryType, address, age, bloodGroup, gender, mobileNumber, emergencyContactNumber, email, dateOfBirth } = req.body;
     const userId = req.user._id;
 
     const patient = await Patient.findOneAndUpdate(
         { userId },
-        { $set: { name, diagnosedWith, address, age, bloodGroup, gender, contactNumber, emergencyContactNumber } },
+        { $set: { name, surgeryType, address, age, bloodGroup, gender, mobileNumber, emergencyContactNumber, email, dateOfBirth } },
         { new: true, runValidators: true }
     );
 

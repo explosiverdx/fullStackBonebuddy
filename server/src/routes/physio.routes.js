@@ -1,9 +1,13 @@
 import { Router } from "express";
-import { 
+import {
     createPhysioProfile,
     getPhysioProfile,
     updatePhysioProfile,
-    getAllPhysios
+    getAllPhysios,
+    deletePhysio,
+    adminCreatePhysio,
+    adminUpdatePhysio,
+    getMyPatientsAndSessions
 } from "../controllers/physio.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
@@ -15,5 +19,8 @@ router.route("/")
     .patch(verifyJWT, updatePhysioProfile);
 
 router.route("/getAllPhysios").get(verifyJWT, getAllPhysios);
+router.route("/my-patients-sessions").get(verifyJWT, getMyPatientsAndSessions);
+
+router.route("/:id").delete(verifyJWT, deletePhysio);
 
 export default router;

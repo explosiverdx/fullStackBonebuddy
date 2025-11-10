@@ -13,6 +13,12 @@ export default defineConfig({
         secure: false,
         credentials: true,
       },
+      '/api/v1/admin/allocate-session': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        credentials: true,
+      },
     },
   },
   build: {
