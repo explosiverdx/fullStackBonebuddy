@@ -16,6 +16,7 @@ const Home = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
+  const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
   const slides = [
     { src: "/assets/carousel1.jpeg", alt: "Physiotherapy Treatment" },
     { src: "/assets/carousel2.jpeg", alt: "Physiotherapy Image 1" },
@@ -33,6 +34,24 @@ const Home = () => {
     { name: 'Dr. P.K. Yadav', img: '/assets/PhysioPics/Dr P.K. Yadav.jpeg', qualification: 'DPT, BPT', experience: '11 years Experience', specialty: 'Specialist in Ortho' },
 
 
+  ];
+
+  const testimonials = [
+    {
+      name: 'Snehlata Singh',
+      rating: 5,
+      text: "After my femur bone fracture, I was nervous about recovery. With BoneBuddy , I got expert, highly experienced, and specially trained post surgery Physiotherapist, at home, along with regular monitoring. My doctor could track my progress on BoneBuddy App. Within three months I was walking confidently. Truly life changing"
+    },
+    {
+      name: 'Faizaan Ahmad',
+      rating: 5,
+      text: "Choosing BoneBuddy Physiotherapy for my post-operative ACL reconstruction rehabilitation was the best decision I made for my recovery. My therapist,  Dr Ashish Shetty , was incredibly knowledgeable, bringing all the necessary equipment and ensuring every session was focused, safe, and effective. I am now fully satisfied with my recovery progress—it truly exceeded my expectations. The BoneBuddy team helped me process my insurance claim seamlessly. BoneBuddy team was good, professional, and gave immediate responses to all my queries and concerns. For anyone undergoing ACL reconstruction who needs excellent home-based care and hassle-free insurance support, I recommend BoneBuddy Physiotherapy for dedicated five star service."
+    },
+    {
+      name: 'Haroon Khan',
+      rating: 5,
+      text: "My knee was operated by Dr Rizwan. He referred to take my physiotherapy sessions from BoneBuddy Premium physiotherapy services. BoneBuddy deputed Dr Laxmi Physiotherapist to provide sessions at my home in the Village with in 24 hours. I am fully satisfied with the recovery. Now I can walk and do my routine work without any pain and problem. Thanks to BoneBuddy for providing Excellent service. I recommend BoneBuddy as a perfect choice for Post operative Knee rehabilitation."
+    }
   ];
 
   const nextSlide = () => {
@@ -152,6 +171,18 @@ const Home = () => {
     }, 3000);
     return () => clearInterval(interval);
   }, [isPlaying, physiotherapists.length]);
+
+  // Auto-slide testimonials
+  useEffect(() => {
+    const testimonialInterval = setInterval(() => {
+      setCurrentTestimonialIndex((prev) => {
+        // When showing 2 cards at a time, cycle through each card
+        // With 3 cards, we'll have positions: 0(cards 0&1), 1(cards 1&2), 2(cards 2&0)
+        return (prev + 1) % testimonials.length;
+      });
+    }, 4000); // Slide every 4 seconds
+    return () => clearInterval(testimonialInterval);
+  }, [testimonials.length]);
 
   return (
     <>
@@ -337,36 +368,51 @@ const Home = () => {
             We value your feedback! Share your experience and help us improve our services.
           </p>
 
-          {/* Testimonial Cards */}
-          <div className="mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 my-6 sm:my-8">
-              <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
-                  <div className="flex items-center mb-3 sm:mb-4">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full mr-2 sm:mr-3 md:mr-4 bg-pink-100 text-pink-600 flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
+          {/* Testimonial Cards Carousel - One at a Time */}
+          <div className="relative mx-auto my-6 sm:my-8 max-w-4xl px-4">
+            <div className="overflow-hidden">
+              <div className="flex transition-transform duration-700 ease-in-out"
+                   style={{ 
+                     transform: `translateX(-${currentTestimonialIndex * 100}%)`,
+                   }}>
+                {testimonials.map((testimonial, index) => (
+                  <div key={index} className="flex-shrink-0 w-full px-2 sm:px-4">
+                    <div className="bg-white p-4 sm:p-6 md:p-8 rounded-lg shadow-md transform transition-all duration-300 hover:shadow-xl">
+                      <div className="flex items-center mb-4 sm:mb-6">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full mr-3 sm:mr-4 bg-pink-100 text-pink-600 flex items-center justify-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-sm sm:text-base md:text-lg">{testimonial.name}</h4>
+                          <div className="text-yellow-500 text-sm sm:text-base md:text-lg">
+                            {'★'.repeat(testimonial.rating)}
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                          <h4 className="font-semibold text-xs sm:text-sm md:text-base">Snehlata Singh</h4>
-                          <div className="text-yellow-500 text-xs sm:text-sm md:text-base">★★★★★</div>
-                      </div>
+                      <p className="text-gray-600 italic text-sm sm:text-base md:text-lg leading-relaxed">"{testimonial.text}"</p>
+                    </div>
                   </div>
-                  <p className="text-gray-600 italic text-xs sm:text-sm md:text-base">"After my femur bone fracture, I was nervous about recovery. With BoneBuddy , I got expert, highly experienced, and specially trained post surgery Physiotherapist, at home, along with regular monitoring. My doctor could track my progress on BoneBuddy App. Within three months I was walking confidently. Truly life changing"</p>
+                ))}
               </div>
-              <div className="bg-white p-3 sm:p-4 md:p-6 rounded-lg shadow-md">
-                  <div className="flex items-center mb-3 sm:mb-4">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full mr-2 sm:mr-3 md:mr-4 bg-pink-100 text-pink-600 flex items-center justify-center flex-shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                          <h4 className="font-semibold text-xs sm:text-sm md:text-base">Faizaan Ahmad</h4>
-                          <div className="text-yellow-500 text-xs sm:text-sm md:text-base">★★★★★</div>
-                      </div>
-                  </div>
-                  <p className="text-gray-600 italic text-xs sm:text-sm md:text-base">"Choosing BoneBuddy Physiotherapy for my post-operative ACL reconstruction rehabilitation was the best decision I made for my recovery. My therapist,  Dr Ashish Shetty , was incredibly knowledgeable, bringing all the necessary equipment and ensuring every session was focused, safe, and effective. I am now fully satisfied with my recovery progress—it truly exceeded my expectations. The BoneBuddy team helped me process my insurance claim seamlessly. BoneBuddy team was good, professional, and gave immediate responses to all my queries and concerns. For anyone undergoing ACL reconstruction who needs excellent home-based care and hassle-free insurance support, I recommend BoneBuddy Physiotherapy for dedicated five star service."</p>
-              </div>
+            </div>
+            
+            {/* Carousel Indicators */}
+            <div className="flex justify-center gap-2 sm:gap-3 mt-6 sm:mt-8">
+              {testimonials.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentTestimonialIndex(index)}
+                  className={`h-2 sm:h-3 rounded-full transition-all duration-300 ${
+                    currentTestimonialIndex === index 
+                      ? 'bg-teal-500 w-8 sm:w-10' 
+                      : 'bg-gray-300 w-2 sm:w-3 hover:bg-gray-400'
+                  }`}
+                  aria-label={`Go to testimonial ${index + 1}`}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Feedback Form */}
