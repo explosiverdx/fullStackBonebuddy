@@ -24,10 +24,10 @@ const About = () => {
           <div className="mb-6 sm:mb-8">
             <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4">Key Features</h3>
             <ul className="space-y-2 sm:space-y-3 text-sm sm:text-base text-gray-700">
-              <li>• Personalized Care Plans: Tailored rehabilitation programs designed to meet individual patient needs</li>
-              <li>• Real-Time Collaboration: Facilitates communication between patients, physiotherapists, and doctors for continuous monitoring and support</li>
-              <li>• Progress Tracking: Allows patients and healthcare providers to monitor recovery progress through detailed logs and updates</li>
-              <li>• Secure Data Management: Ensures patient information is protected with robust security measures</li>
+              <li>Personalized Care Plans: Tailored rehabilitation programs designed to meet individual patient needs</li>
+              <li>Real-Time Collaboration: Facilitates communication between patients, physiotherapists, and doctors for continuous monitoring and support</li>
+              <li>Progress Tracking: Allows patients and healthcare providers to monitor recovery progress through detailed logs and updates</li>
+              <li>Secure Data Management: Ensures patient information is protected with robust security measures</li>
             </ul>
           </div>
           <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed mb-4 sm:mb-6">
