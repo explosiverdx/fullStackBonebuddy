@@ -5,7 +5,18 @@ import cookieParser from 'cookie-parser'
 const app=express()
 
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:5174','https://bonebuddy.cloud',"http://bonebuddy.cloud"],
+    origin: [
+        'http://localhost:3000', 
+        'http://localhost:3001', 
+        'http://localhost:5173', 
+        'http://localhost:5174',
+        'https://bonebuddy.cloud',
+        'http://bonebuddy.cloud',
+        'https://bonebuddy.in',
+        'http://bonebuddy.in',
+        'https://www.bonebuddy.in',
+        'http://www.bonebuddy.in'
+    ],
     credentials: true
 }))
 
