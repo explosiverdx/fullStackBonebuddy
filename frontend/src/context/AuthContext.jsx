@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthContext } from './AuthContextValue';
 
 export const AuthProvider = ({ children }) => {
@@ -59,8 +59,14 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('refreshToken');
   };
 
+  // Create authHeaders dynamically - updates when user changes
+  const authHeaders = useMemo(() => {
+    const token = localStorage.getItem('accessToken');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, authHeaders }}>
       {children}
     </AuthContext.Provider>
   );

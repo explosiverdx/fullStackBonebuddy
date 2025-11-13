@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContextValue';
 
 const Blog = () => {
+  const { user } = useContext(AuthContext);
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [deleteModalBlogId, setDeleteModalBlogId] = useState(null);
 
   useEffect(() => {
     fetchBlogs();
@@ -34,6 +37,37 @@ const Blog = () => {
   };
 
   const categories = ['Physiotherapy', 'Recovery Tips', 'Success Stories', 'News', 'Health & Wellness', 'Exercise', 'Other'];
+
+  const handleDeleteBlog = async (blogId) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      alert('You must be logged in to delete a blog post');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/blogs/${blogId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        alert('Blog post deleted successfully!');
+        setBlogs(blogs.filter(blog => blog._id !== blogId));
+        setDeleteModalBlogId(null);
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Failed to delete blog post');
+      }
+    } catch (error) {
+      console.error('Error deleting blog:', error);
+      alert('An error occurred while deleting the blog post');
+    }
+  };
+
+  const isAdmin = user && user.role === 'admin';
 
   return (
     <>
@@ -120,6 +154,27 @@ const Blog = () => {
                           {new Date(blog.publishedAt).toLocaleDateString()}
                         </span>
                       </div>
+                      
+                      {/* Admin Actions */}
+                      {isAdmin && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                          <Link
+                            to={`/blog/${blog.slug}`}
+                            className="flex-1 bg-blue-600 text-white px-3 py-2 rounded text-sm hover:bg-blue-700 transition-colors text-center"
+                          >
+                            ✏️ Edit
+                          </Link>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setDeleteModalBlogId(blog._id);
+                            }}
+                            className="flex-1 bg-red-600 text-white px-3 py-2 rounded text-sm hover:bg-red-700 transition-colors"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -160,6 +215,32 @@ const Blog = () => {
             </>
           )}
         </section>
+
+        {/* Delete Confirmation Modal */}
+        {deleteModalBlogId && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-xl font-bold mb-4 text-gray-900">Confirm Delete</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this blog post? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setDeleteModalBlogId(null)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDeleteBlog(deleteModalBlogId)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </>
   );

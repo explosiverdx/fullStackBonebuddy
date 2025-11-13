@@ -1,13 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { AuthContext } from '../context/AuthContextValue';
 
 const BlogPost = () => {
   const { slug } = useParams();
   const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [relatedPosts, setRelatedPosts] = useState([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editData, setEditData] = useState({
+    title: '',
+    content: '',
+    excerpt: '',
+    category: '',
+    tags: '',
+    metaTitle: '',
+    metaDescription: ''
+  });
 
   useEffect(() => {
     fetchBlogPost();
@@ -65,6 +78,91 @@ const BlogPost = () => {
     }
   };
 
+  const handleDelete = async () => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      alert('You must be logged in to delete a blog post');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/blogs/${blog._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        alert('Blog post deleted successfully!');
+        navigate('/blog');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Failed to delete blog post');
+      }
+    } catch (error) {
+      console.error('Error deleting blog:', error);
+      alert('An error occurred while deleting the blog post');
+    } finally {
+      setShowDeleteModal(false);
+    }
+  };
+
+  const openEditModal = () => {
+    if (blog) {
+      setEditData({
+        title: blog.title || '',
+        content: blog.content || '',
+        excerpt: blog.excerpt || '',
+        category: blog.category || '',
+        tags: blog.tags ? blog.tags.join(', ') : '',
+        metaTitle: blog.metaTitle || '',
+        metaDescription: blog.metaDescription || ''
+      });
+      setShowEditModal(true);
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      alert('You must be logged in to edit a blog post');
+      return;
+    }
+
+    try {
+      const updateData = {
+        ...editData,
+        tags: editData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+      };
+
+      const response = await fetch(`/api/v1/blogs/${blog._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBlog(data.data);
+        setShowEditModal(false);
+        alert('Blog post updated successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.message || 'Failed to update blog post');
+      }
+    } catch (error) {
+      console.error('Error updating blog:', error);
+      alert('An error occurred while updating the blog post');
+    }
+  };
+
+  const isAdmin = user && user.role === 'admin';
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-24">
@@ -102,13 +200,33 @@ const BlogPost = () => {
 
       <main className="main-content py-12 pt-24 px-4 sm:px-6 lg:px-8">
         <article className="max-w-4xl mx-auto">
-          {/* Back Button */}
-          <button
-            onClick={() => navigate('/blog')}
-            className="text-teal-600 hover:text-teal-700 font-semibold mb-6 flex items-center gap-2"
-          >
-            <span>←</span> Back to Blog
-          </button>
+          {/* Back Button and Admin Actions */}
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => navigate('/blog')}
+              className="text-teal-600 hover:text-teal-700 font-semibold flex items-center gap-2"
+            >
+              <span>←</span> Back to Blog
+            </button>
+            
+            {/* Edit and Delete Buttons (Admin Only) */}
+            {isAdmin && (
+              <div className="flex gap-3">
+                <button
+                  onClick={openEditModal}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <span>✏️</span> Edit
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                >
+                  <span>🗑️</span> Delete
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Featured Image */}
           {blog.featuredImage?.url && (
@@ -289,6 +407,155 @@ const BlogPost = () => {
               ))}
             </div>
           </section>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-xl font-bold mb-4 text-gray-900">Confirm Delete</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this blog post? This action cannot be undone.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full my-8">
+              <h3 className="text-2xl font-bold mb-6 text-gray-900">Edit Blog Post</h3>
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.title}
+                    onChange={(e) => setEditData({...editData, title: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Category *
+                  </label>
+                  <select
+                    value={editData.category}
+                    onChange={(e) => setEditData({...editData, category: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select Category</option>
+                    <option value="Physiotherapy">Physiotherapy</option>
+                    <option value="Recovery Tips">Recovery Tips</option>
+                    <option value="Success Stories">Success Stories</option>
+                    <option value="News">News</option>
+                    <option value="Health & Wellness">Health & Wellness</option>
+                    <option value="Exercise">Exercise</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Excerpt
+                  </label>
+                  <textarea
+                    value={editData.excerpt}
+                    onChange={(e) => setEditData({...editData, excerpt: e.target.value})}
+                    rows="2"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="Brief summary of the blog post"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Content *
+                  </label>
+                  <textarea
+                    value={editData.content}
+                    onChange={(e) => setEditData({...editData, content: e.target.value})}
+                    rows="12"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tags (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.tags}
+                    onChange={(e) => setEditData({...editData, tags: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    placeholder="tag1, tag2, tag3"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Meta Title (SEO)
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.metaTitle}
+                    onChange={(e) => setEditData({...editData, metaTitle: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Meta Description (SEO)
+                  </label>
+                  <textarea
+                    value={editData.metaDescription}
+                    onChange={(e) => setEditData({...editData, metaDescription: e.target.value})}
+                    rows="2"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </main>
     </>

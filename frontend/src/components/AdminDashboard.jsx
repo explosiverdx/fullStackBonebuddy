@@ -1090,7 +1090,7 @@ const BlogManagement = ({ authHeaders }) => {
   const [uploading, setUploading] = useState(false);
   const [page, setPage] = useState(1);
   const [stats, setStats] = useState(null);
-  const [showBlogList, setShowBlogList] = useState(false);
+  const [showBlogList, setShowBlogList] = useState(true); // Changed to true to show by default
 
   useEffect(() => {
     fetchBlogs();
@@ -1278,12 +1278,12 @@ const BlogManagement = ({ authHeaders }) => {
   const categories = ['Physiotherapy', 'Recovery Tips', 'Success Stories', 'News', 'Health & Wellness', 'Exercise', 'Other'];
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-start sm:items-center">
-        <h2 className="text-xl sm:text-2xl font-bold">Blog Management</h2>
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold">Blog Management</h2>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="w-full sm:w-auto bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 text-sm sm:text-base"
+          className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700"
         >
           ✍️ Create New Post
         </button>
@@ -1291,36 +1291,11 @@ const BlogManagement = ({ authHeaders }) => {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-lg transition-shadow border-2 border-transparent hover:border-teal-500"
-            onClick={() => {
-              setShowBlogList(!showBlogList);
-              // Scroll to blog list after a short delay to let it render
-              if (!showBlogList) {
-                setTimeout(() => {
-                  const blogListElement = document.getElementById('blog-list-section');
-                  if (blogListElement) {
-                    blogListElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }, 100);
-              }
-            }}
-            title="Click to view all posts"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Total Posts</p>
-                <p className="text-2xl font-bold text-teal-600">
-                  {stats.statusStats.reduce((sum, s) => sum + s.count, 0)}
-                </p>
-              </div>
-              <div className="text-2xl">
-                {showBlogList ? '👁️' : '📝'}
-              </div>
-            </div>
-            <p className="text-xs text-teal-600 mt-2">
-              {showBlogList ? 'Hide list' : 'View all posts'} →
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p className="text-gray-600 text-sm">Total Posts</p>
+            <p className="text-2xl font-bold text-teal-600">
+              {stats.statusStats.reduce((sum, s) => sum + s.count, 0)}
             </p>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
@@ -1340,144 +1315,102 @@ const BlogManagement = ({ authHeaders }) => {
         </div>
       )}
 
-      {/* Blog Posts List - Show only if showBlogList is true */}
-      {showBlogList && (
-      <div id="blog-list-section" className="bg-white rounded-lg shadow overflow-hidden mt-6 animate-fadeIn">
-        <div className="bg-teal-50 px-6 py-3 border-b border-teal-100">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-teal-900 flex items-center gap-2">
-              <span>📋</span>
-              <span>All Blog Posts ({blogs.length})</span>
-            </h3>
-            <button
-              onClick={() => {
-                console.log('🔍 Current blogs state:', blogs);
-                console.log('🔍 Blogs length:', blogs.length);
-                console.log('🔍 Blogs array:', JSON.stringify(blogs, null, 2));
-              }}
-              className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700"
-              title="Debug: Log blogs to console"
-            >
-              🐛 Debug
-            </button>
-          </div>
-        </div>
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mb-4"></div>
-              <p className="text-gray-600">Loading blog posts...</p>
-            </div>
-          ) : blogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 px-4 bg-gray-50">
-              <div className="text-6xl mb-4 animate-bounce">📝</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Blog Posts Found</h3>
-              <p className="text-gray-600 text-center mb-2">The blog list is empty.</p>
-              <p className="text-sm text-gray-500 text-center mb-6">Try creating a new post or check if posts were deleted.</p>
-              <button
-                onClick={() => {
-                  setShowCreateModal(true);
-                  setShowBlogList(false);
-                }}
-                className="bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-colors"
-              >
-                ✍️ Create Your First Post
-              </button>
-              <button
-                onClick={() => {
-                  fetchBlogs();
-                  fetchStats();
-                }}
-                className="mt-3 text-teal-600 hover:text-teal-700 text-sm"
-              >
-                🔄 Refresh Data
-              </button>
-            </div>
-          ) : (
-            <table className="min-w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Views</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Published</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {blogs.map(blog => (
-                  <tr key={blog._id} className="hover:bg-gray-50">
-                    <td className="px-4 py-4">
-                      <div className="flex items-center">
-                        {blog.featuredImage?.url && (
-                          <img src={blog.featuredImage.url} alt="" className="w-12 h-12 rounded object-cover mr-3" />
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900">{blog.title}</p>
-                          <p className="text-sm text-gray-500">{blog.excerpt?.substring(0, 60)}...</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600">{blog.category}</td>
-                    <td className="px-4 py-4">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        blog.status === 'published' ? 'bg-green-100 text-green-800' :
-                        blog.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {blog.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-sm text-gray-600">{blog.views || 0}</td>
-                    <td className="px-4 py-4 text-sm text-gray-600">
-                      {blog.publishedAt ? new Date(blog.publishedAt).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => openEditModal(blog)}
-                          className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(blog._id)}
-                          className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      {/* Blog Posts List - Simplified and Always Visible */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="bg-teal-50 px-4 py-3 border-b flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-teal-900">
+            📋 All Blog Posts ({blogs.length})
+          </h3>
+          <span className="text-xs text-gray-600">
+            <span className="hidden md:inline">Desktop View</span>
+            <span className="md:hidden">Mobile View</span>
+          </span>
         </div>
 
-        {/* Mobile Card View */}
-        <div className="md:hidden">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mb-4"></div>
-              <p className="text-gray-600">Loading...</p>
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mb-4"></div>
+            <p className="text-gray-600">Loading blog posts...</p>
+          </div>
+        ) : blogs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <div className="text-6xl mb-4">📝</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Blog Posts Yet</h3>
+            <p className="text-gray-600 text-center mb-4">Create your first blog post to get started!</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-teal-600 text-white px-6 py-2 rounded hover:bg-teal-700"
+            >
+              ✍️ Create First Post
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View - Shows on all screens */}
+            <div className="overflow-auto" style={{maxHeight: '500px'}}>
+              <table className="w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Title</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Category</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Views</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Published</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {blogs.map(blog => (
+                    <tr key={blog._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {blog.featuredImage?.url && (
+                            <img src={blog.featuredImage.url} alt="" className="w-12 h-12 rounded object-cover mr-3 flex-shrink-0" />
+                          )}
+                          <div className="max-w-xs">
+                            <p className="font-medium text-gray-900 truncate">{blog.title}</p>
+                            <p className="text-sm text-gray-500 truncate">{blog.excerpt?.substring(0, 50)}...</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{blog.category}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          blog.status === 'published' ? 'bg-green-100 text-green-800' :
+                          blog.status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {blog.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{blog.views || 0}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {blog.publishedAt ? new Date(blog.publishedAt).toLocaleDateString() : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openEditModal(blog)}
+                            className="bg-blue-500 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-600 transition-colors"
+                          >
+                            ✏️ Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(blog._id)}
+                            className="bg-red-500 text-white px-3 py-1.5 rounded text-sm hover:bg-red-600 transition-colors"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ) : blogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4">
-              <div className="text-5xl mb-3">📝</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Blog Posts Yet</h3>
-              <p className="text-gray-600 text-center text-sm mb-4">Create your first blog post!</p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700 w-full"
-              >
-                ✍️ Create First Post
-              </button>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
+
+            {/* Mobile Card View */}
+            <div className="md:hidden divide-y divide-gray-200">
               {blogs.map(blog => (
                 <div key={blog._id} className="p-4 space-y-3">
                   <div className="flex items-start gap-3">
@@ -1485,7 +1418,7 @@ const BlogManagement = ({ authHeaders }) => {
                       <img src={blog.featuredImage.url} alt="" className="w-16 h-16 rounded object-cover flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{blog.title}</p>
+                      <p className="font-medium text-gray-900">{blog.title}</p>
                       <p className="text-xs text-gray-500 mt-1">{blog.category}</p>
                       <p className="text-xs text-gray-500 mt-1 line-clamp-2">{blog.excerpt}</p>
                     </div>
@@ -1508,22 +1441,21 @@ const BlogManagement = ({ authHeaders }) => {
                       onClick={() => openEditModal(blog)}
                       className="flex-1 bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600"
                     >
-                      Edit
+                      ✏️ Edit
                     </button>
                     <button
                       onClick={() => handleDelete(blog._id)}
                       className="flex-1 bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600"
                     >
-                      Delete
+                      🗑️ Delete
                     </button>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
-      )}
 
       {/* Create/Edit Modal */}
       {(showCreateModal || showEditModal) && (
@@ -2103,8 +2035,8 @@ const AdminDashboard = () => {
       </aside>
 
       {/* Main Content */}
-      {/* FIX 1: Set main to flex column and h-full to occupy remaining space */}
-      <main className="flex-1 flex flex-col p-2 md:p-6 h-screen overflow-y-hidden"> 
+      {/* Fixed: Changed overflow-y-hidden to overflow-y-auto to allow scrolling */}
+      <main className="flex-1 flex flex-col p-2 md:p-6 h-screen overflow-y-auto"> 
         {/* Topbar */}
         <div className="bg-white rounded-lg shadow-md p-2 md:p-4 mb-4 md:mb-6 flex justify-between items-center sticky top-0 z-30">
           <button
