@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import apiClient from '../api/apiClient';
 
 const DoctorTable = ({ selectedItem }) => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const authHeaders = { Authorization: `Bearer ${localStorage.getItem('accessToken')}` };
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -14,6 +14,25 @@ const DoctorTable = ({ selectedItem }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    mobileNumber: '',
+    specialization: '',
+    qualification: '',
+    experience: '',
+    hospitalAffiliation: '',
+    userId: ''
+  });
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    mobileNumber: '',
+    specialization: '',
+    qualification: '',
+    experience: '',
+    hospitalAffiliation: ''
+  });
 
   useEffect(() => {
     fetchDoctors();
@@ -35,18 +54,22 @@ const DoctorTable = ({ selectedItem }) => {
         sortBy,
         sortOrder
       });
-      const response = await fetch(`/api/v1/doctors/getAllDoctors?${params}`, {
-        headers: authHeaders
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setDoctors(data.data.docs || []);
-        setTotalPages(data.data.totalPages || 1);
-      } else {
-        setError('Failed to fetch doctors');
-      }
+      const response = await apiClient.get(`/admin/doctors?${params}`);
+      const doctorsList = response.data.data.doctors || [];
+      const total = response.data.data.total || 0;
+      console.log('Fetched doctors:', doctorsList.map(d => ({
+        id: d.doctorId || d._id,
+        name: d.name,
+        specialization: d.specialization,
+        qualification: d.qualification
+      })));
+      setDoctors(doctorsList);
+      setTotalPages(Math.ceil(total / limit) || 1);
+      setError('');
     } catch (err) {
-      setError(`Error fetching doctors: ${err.message}`);
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to fetch doctors';
+      setError(errorMsg);
+      console.error('Error fetching doctors:', err);
     } finally {
       setLoading(false);
     }
@@ -73,24 +96,108 @@ const DoctorTable = ({ selectedItem }) => {
   };
 
   const handleEdit = (doctor) => {
+    // Check if doctor has a valid doctorId
+    const doctorId = doctor.doctorId || doctor._id;
+    
+    if (!doctorId || doctorId === 'N/A' || doctorId === 'undefined') {
+      alert('Error: This doctor does not have a valid profile. Cannot edit.');
+      return;
+    }
+
+    console.log('Editing doctor:', doctor);
+    console.log('Doctor ID:', doctorId);
+    
     setSelectedDoctor(doctor);
+    setEditFormData({
+      name: doctor.name || '',
+      email: doctor.email || '',
+      mobileNumber: doctor.contact || '',
+      specialization: doctor.specialization || '',
+      qualification: doctor.qualification || '',
+      experience: doctor.experience || '',
+      hospitalAffiliation: doctor.hospitalAffiliation || ''
+    });
     setShowEditModal(true);
   };
 
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!editFormData.name || !editFormData.specialization || !editFormData.qualification || !editFormData.hospitalAffiliation) {
+      alert('Please fill in all required fields: Name, Specialization, Qualification, and Hospital/Clinic');
+      return;
+    }
+
+    try {
+      const payload = { ...editFormData };
+      
+      // Convert experience to number
+      if (payload.experience) {
+        payload.experience = parseInt(payload.experience, 10);
+      }
+
+      // Use doctorId if available, otherwise fall back to _id
+      const doctorId = selectedDoctor.doctorId || selectedDoctor._id;
+      
+      console.log('Updating doctor with ID:', doctorId, 'Selected doctor:', selectedDoctor);
+      
+      if (!doctorId || doctorId === 'N/A') {
+        alert('Error: Doctor ID not found. Please refresh the page and try again.');
+        return;
+      }
+
+      const response = await apiClient.patch(`/admin/doctors/${doctorId}`, payload);
+      
+      console.log('Doctor updated:', response.data);
+      alert('Doctor updated successfully!');
+      setShowEditModal(false);
+      setSelectedDoctor(null);
+      
+      // Force refresh the doctors list after a short delay to ensure database is updated
+      setTimeout(() => {
+        fetchDoctors();
+      }, 500);
+      
+      setError('');
+    } catch (err) {
+      console.error('Error updating doctor:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to update doctor. Please check the console for details.';
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setShowEditModal(false);
+    setSelectedDoctor(null);
+    setEditFormData({
+      name: '',
+      email: '',
+      mobileNumber: '',
+      specialization: '',
+      qualification: '',
+      experience: '',
+      hospitalAffiliation: ''
+    });
+  };
+
   const handleDelete = async (doctorId) => {
+    if (!doctorId || doctorId === 'N/A') {
+      alert('Error: Doctor ID not found. Please refresh the page and try again.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this doctor?')) {
       try {
-        const response = await fetch(`/api/v1/doctors/${doctorId}`, {
-          method: 'DELETE',
-          headers: authHeaders
-        });
-        if (response.ok) {
-          fetchDoctors();
-        } else {
-          setError('Failed to delete doctor');
-        }
+        await apiClient.delete(`/admin/doctors/${doctorId}`);
+        fetchDoctors();
+        setError('');
+        alert('Doctor deleted successfully!');
       } catch (err) {
-        setError(`Error deleting doctor: ${err.message}`);
+        const errorMsg = err.response?.data?.message || err.message || 'Failed to delete doctor';
+        setError(errorMsg);
+        alert(`Error: ${errorMsg}`);
       }
     }
   };
@@ -121,7 +228,83 @@ const DoctorTable = ({ selectedItem }) => {
   };
 
   const handleAddNew = () => {
+    setFormData({
+      name: '',
+      email: '',
+      mobileNumber: '',
+      specialization: '',
+      qualification: '',
+      experience: '',
+      hospitalAffiliation: '',
+      userId: ''
+    });
     setShowAddModal(true);
+  };
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate required fields
+    if (!formData.name || !formData.specialization || !formData.qualification || !formData.hospitalAffiliation) {
+      alert('Please fill in all required fields: Name, Specialization, Qualification, and Hospital/Clinic');
+      return;
+    }
+
+    if (!formData.mobileNumber) {
+      alert('Mobile number is required to create a doctor account.');
+      return;
+    }
+
+    try {
+      const payload = { ...formData };
+      
+      // Convert experience to number
+      if (payload.experience) {
+        payload.experience = parseInt(payload.experience, 10);
+      }
+      
+      // Remove userId if empty
+      if (!payload.userId || payload.userId === '' || payload.userId === 'undefined' || payload.userId === 'null') {
+        delete payload.userId;
+      }
+
+      const response = await apiClient.post('/admin/doctors', payload);
+      
+      console.log('Doctor created:', response.data);
+      alert('Doctor created successfully!');
+      setShowAddModal(false);
+      fetchDoctors();
+      setFormData({
+        name: '',
+        email: '',
+        mobileNumber: '',
+        specialization: '',
+        qualification: '',
+        experience: '',
+        hospitalAffiliation: '',
+        userId: ''
+      });
+      setError('');
+    } catch (err) {
+      console.error('Error creating doctor:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to create doctor. Please check the console for details.';
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
+    }
+  };
+
+  const handleFormCancel = () => {
+    setShowAddModal(false);
+    setFormData({
+      name: '',
+      email: '',
+      mobileNumber: '',
+      specialization: '',
+      qualification: '',
+      experience: '',
+      hospitalAffiliation: '',
+      userId: ''
+    });
   };
 
   if (loading) return <div className="text-center">Loading doctors...</div>;
@@ -220,9 +403,9 @@ const DoctorTable = ({ selectedItem }) => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{doctor.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.contact || 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.email || 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.specialization}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.qualification}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.experience} years</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.specialization || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.qualification || 'N/A'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.experience ? `${doctor.experience} years` : 'N/A'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{doctor.hospitalAffiliation}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
@@ -244,7 +427,7 @@ const DoctorTable = ({ selectedItem }) => {
                         ✏️
                       </button>
                       <button
-                        onClick={() => handleDelete(doctor._id)}
+                        onClick={() => handleDelete(doctor.doctorId || doctor._id)}
                         className="text-red-600 hover:text-red-900"
                       >
                         🗑️
@@ -281,42 +464,255 @@ const DoctorTable = ({ selectedItem }) => {
         </div>
       </div>
 
-      {/* Add/Edit Modals - Placeholder */}
+      {/* Add Doctor Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">Add New Doctor</h3>
-            <p>Form to add new doctor will be implemented here.</p>
-            <button
-              onClick={() => setShowAddModal(false)}
-              className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"
-            >
-              Close
-            </button>
+            <p className="text-xs text-gray-600 mb-4">Fields marked with <span className="text-red-500">*</span> are required</p>
+            
+            <form onSubmit={handleFormSubmit}>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter doctor name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mobile Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Enter mobile number"
+                  value={formData.mobileNumber}
+                  onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Specialization <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Orthopedic, General Physician"
+                  value={formData.specialization}
+                  onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Qualification <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., MBBS, MD, MS"
+                  value={formData.qualification}
+                  onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Experience (Years)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Enter years of experience"
+                  value={formData.experience}
+                  onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  min="0"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Hospital/Clinic <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter hospital or clinic name"
+                  value={formData.hospitalAffiliation}
+                  onChange={(e) => setFormData({ ...formData, hospitalAffiliation: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-blue-600"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={handleFormCancel}
+                  className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
+      {/* Edit Doctor Modal */}
       {showEditModal && selectedDoctor && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Doctor Details</h3>
-            <div className="space-y-2">
-              <p><strong>Name:</strong> {selectedDoctor.name}</p>
-              <p><strong>Contact:</strong> {selectedDoctor.contact}</p>
-              <p><strong>Email:</strong> {selectedDoctor.email}</p>
-              <p><strong>Specialization:</strong> {selectedDoctor.specialization}</p>
-              <p><strong>Qualification:</strong> {selectedDoctor.qualification}</p>
-              <p><strong>Experience:</strong> {selectedDoctor.experience} years</p>
-              <p><strong>Hospital:</strong> {selectedDoctor.hospitalAffiliation}</p>
-              <p><strong>Joined:</strong> {new Date(selectedDoctor.createdAt).toLocaleDateString()}</p>
-            </div>
-            <button
-              onClick={() => setShowEditModal(false)}
-              className="mt-4 bg-gray-500 text-white px-4 py-2 rounded"
-            >
-              Close
-            </button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">Edit Doctor</h3>
+            <p className="text-xs text-gray-600 mb-4">Fields marked with <span className="text-red-500">*</span> are required</p>
+            
+            <form onSubmit={handleEditSubmit}>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter doctor name"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  placeholder="Enter email address"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Enter mobile number"
+                  value={editFormData.mobileNumber}
+                  onChange={(e) => setEditFormData({ ...editFormData, mobileNumber: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Specialization <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., Orthopedic, General Physician"
+                  value={editFormData.specialization}
+                  onChange={(e) => setEditFormData({ ...editFormData, specialization: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Qualification <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., MBBS, MD, MS"
+                  value={editFormData.qualification}
+                  onChange={(e) => setEditFormData({ ...editFormData, qualification: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Experience (Years)
+                </label>
+                <input
+                  type="number"
+                  placeholder="Enter years of experience"
+                  value={editFormData.experience}
+                  onChange={(e) => setEditFormData({ ...editFormData, experience: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  min="0"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Hospital/Clinic <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter hospital or clinic name"
+                  value={editFormData.hospitalAffiliation}
+                  onChange={(e) => setEditFormData({ ...editFormData, hospitalAffiliation: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="mb-3 text-xs text-gray-500">
+                <p><strong>Joined:</strong> {selectedDoctor.createdAt ? new Date(selectedDoctor.createdAt).toLocaleDateString() : 'N/A'}</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-blue-600"
+                >
+                  Update
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEditCancel}
+                  className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

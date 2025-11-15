@@ -8,12 +8,12 @@ import { Session } from "../models/sessions.models.js";
 import mongoose from 'mongoose';
 import { Doctor } from "../models/doctor.models.js";
 import { Physio } from "../models/physio.models.js";
+import { Report } from "../models/report.model.js";
 import { Hospital } from "../models/hospital.models.js";
 import { Payment } from "../models/payments.models.js";
 import { Notification } from "../models/notification.models.js";
 import { Contact } from "../models/contact.model.js";
 import { Appointment } from "../models/appointments.models.js";
-import { Report } from "../models/report.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import otpGenerator from "otp-generator";
 import { generateAccessAndRefreshTokens } from "../utils/auth.utils.js";
@@ -199,9 +199,22 @@ const getAllPatientsAdmin = asyncHandler(async (req, res) => {
             }
         },
         {
+            $lookup: {
+                from: 'reports',
+                let: { patientId: '$patient._id' },
+                pipeline: [
+                    { $match: { $expr: { $eq: ['$patientId', '$$patientId'] } } },
+                    { $sort: { createdAt: -1 } },
+                    { $limit: 1 }
+                ],
+                as: 'latestReport'
+            }
+        },
+        {
             $addFields: {
                 isProfileComplete: true,
-                status: { $cond: { if: { $gte: ['$lastLogin', thirtyDaysAgo] }, then: 'active', else: 'inactive' } }
+                status: { $cond: { if: { $gte: ['$lastLogin', thirtyDaysAgo] }, then: 'active', else: 'inactive' } },
+                latestReport: { $arrayElemAt: ['$latestReport', 0] }
             }
         },
         {
@@ -251,7 +264,56 @@ const getAllPatientsAdmin = asyncHandler(async (req, res) => {
                 bloodGroup: '$patient.bloodGroup',
                 emergencyContactNumber: '$patient.emergencyContactNumber',
                 medicalInsurance: '$patient.medicalInsurance',
-                medicalReport: '$patient.medicalReport',
+                medicalReport: {
+                    $cond: {
+                        // If latestReport exists and is newer than patient.medicalReport, use it
+                        if: {
+                            $and: [
+                                { $ne: ['$latestReport', null] },
+                                { $ne: ['$latestReport.fileUrl', null] },
+                                { $ne: ['$latestReport.fileUrl', ''] },
+                                {
+                                    $or: [
+                                        { $in: ['$patient.medicalReport', [null, '']] },
+                                        { 
+                                            $gt: [
+                                                { $ifNull: ['$latestReport.createdAt', new Date(0)] },
+                                                { $ifNull: ['$patient.updatedAt', new Date(0)] }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        then: '$latestReport.fileUrl',
+                        // Otherwise, use patient.medicalReport if it exists
+                        else: {
+                            $cond: {
+                                if: {
+                                    $and: [
+                                        { $ne: ['$patient.medicalReport', null] },
+                                        { $ne: ['$patient.medicalReport', ''] }
+                                    ]
+                                },
+                                then: '$patient.medicalReport',
+                                // Fallback to latestReport if patient.medicalReport doesn't exist
+                                else: {
+                                    $cond: {
+                                        if: {
+                                            $and: [
+                                                { $ne: ['$latestReport', null] },
+                                                { $ne: ['$latestReport.fileUrl', null] },
+                                                { $ne: ['$latestReport.fileUrl', ''] }
+                                            ]
+                                        },
+                                        then: '$latestReport.fileUrl',
+                                        else: null
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 mobile_number: 1,
                 lastLogin: 1,
                 isProfileComplete: 1,
@@ -326,41 +388,127 @@ const getAllPatientsAdmin = asyncHandler(async (req, res) => {
 });
 
 const createPatientAdmin = asyncHandler(async (req, res) => {
-    const { name, email, dateOfBirth, gender, mobileNumber, surgeryType, surgeryDate, assignedDoctor, hospitalClinic, emergencyContactNumber, userId, age, address, currentCondition, assignedPhysiotherapist, medicalHistory, allergies, bloodGroup, medicalInsurance } = req.body;
+    try {
+        const {
+            name,
+            email,
+            dateOfBirth,
+            gender,
+            mobileNumber,
+            surgeryType,
+            surgeryDate,
+            assignedDoctor,
+            hospitalClinic,
+            emergencyContactNumber,
+            userId,
+            age,
+            address,
+            currentCondition,
+            assignedPhysiotherapist,
+            medicalHistory,
+            allergies,
+            bloodGroup,
+            medicalInsurance
+        } = req.body;
 
-    if ([name, dateOfBirth, age, gender, mobileNumber, emergencyContactNumber, surgeryType, surgeryDate, currentCondition].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
-        throw new ApiError(400, "All required fields must be filled out.");
+        console.log('createPatientAdmin received data:', { name, email, dateOfBirth, age, gender, mobileNumber, surgeryType, surgeryDate, currentCondition, emergencyContactNumber, userId });
+
+        // Convert age to number if it's a string
+        const ageNum = age ? parseInt(age, 10) : null;
+        if (!ageNum || isNaN(ageNum)) {
+            throw new ApiError(400, "Age must be a valid number.");
+        }
+
+        if ([name, dateOfBirth, gender, mobileNumber, emergencyContactNumber, surgeryType, surgeryDate, currentCondition].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
+            throw new ApiError(400, "All required fields must be filled out.");
+        }
+
+        let resolvedUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '' ? userId : null;
+
+        if (!resolvedUserId) {
+            // Allow admins to create a new patient along with a lightweight user account
+            let existingUser = await User.findOne({ mobile_number: mobileNumber });
+
+            if (existingUser) {
+                const patientExists = await Patient.findOne({ userId: existingUser._id });
+                if (patientExists) {
+                    throw new ApiError(409, "A patient profile already exists for this mobile number.");
+                }
+
+                existingUser.userType = 'patient';
+                existingUser.Fullname = name;
+                existingUser.email = email || existingUser.email;
+                existingUser.gender = gender || existingUser.gender;
+                existingUser.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : existingUser.dateOfBirth;
+                existingUser.age = ageNum || existingUser.age;
+                existingUser.address = address || existingUser.address;
+                existingUser.hospitalName = hospitalClinic || existingUser.hospitalName || 'Not Specified'; // Required for patient userType
+                await existingUser.save({ validateBeforeSave: false });
+
+                resolvedUserId = existingUser._id;
+            } else {
+                const usernameBase = email ? email.split('@')[0] : `patient_${mobileNumber}`;
+                const newUser = await User.create({
+                    Fullname: name,
+                    email: email || `${usernameBase}@autogen.bonebuddy`,
+                    username: usernameBase.toLowerCase(),
+                    userType: 'patient',
+                    mobile_number: mobileNumber,
+                    gender,
+                    dateOfBirth: new Date(dateOfBirth),
+                    age: ageNum,
+                    address,
+                    hospitalName: hospitalClinic || 'Not Specified', // Required for patient userType
+                    profileCompleted: false
+                });
+
+                resolvedUserId = newUser._id;
+            }
+        } else {
+            // Ensure supplied user doesn't already have a patient profile
+            const patientExists = await Patient.findOne({ userId: resolvedUserId });
+            if (patientExists) {
+                throw new ApiError(409, "A patient profile already exists for the selected user.");
+            }
+        }
+
+        const patientData = {
+            userId: resolvedUserId,
+            name,
+            email: email || undefined,
+            dateOfBirth: new Date(dateOfBirth),
+            gender,
+            mobileNumber,
+            surgeryType,
+            surgeryDate: new Date(surgeryDate),
+            assignedDoctor: assignedDoctor || undefined,
+            hospitalClinic: hospitalClinic || undefined,
+            emergencyContactNumber,
+            age: ageNum,
+            address: address || undefined,
+            currentCondition,
+            assignedPhysiotherapist: assignedPhysiotherapist || undefined,
+            medicalHistory: medicalHistory || undefined,
+            allergies: allergies || undefined,
+            bloodGroup: bloodGroup || undefined,
+            medicalInsurance: medicalInsurance || undefined
+        };
+
+        if (req.file) {
+            patientData.medicalReport = `/uploads/${req.file.filename}`;
+        }
+
+        console.log('Creating patient with data:', patientData);
+
+        const patient = await Patient.create(patientData);
+
+        console.log('Patient created successfully:', patient._id);
+
+        return res.status(201).json(new ApiResponse(201, patient, "Patient created successfully."));
+    } catch (error) {
+        console.error('Error in createPatientAdmin:', error);
+        throw error;
     }
-
-    const patientData = {
-        userId,
-        name,
-        email,
-        dateOfBirth: new Date(dateOfBirth),
-        gender,
-        mobileNumber,
-        surgeryType,
-        surgeryDate: new Date(surgeryDate),
-        assignedDoctor,
-        hospitalClinic,
-        emergencyContactNumber,
-        age,
-        address,
-        currentCondition,
-        assignedPhysiotherapist,
-        medicalHistory,
-        allergies,
-        bloodGroup,
-        medicalInsurance
-    };
-
-    if (req.file) {
-        patientData.medicalReport = `/uploads/${req.file.filename}`;
-    }
-
-    const patient = await Patient.create(patientData);
-
-    return res.status(201).json(new ApiResponse(201, patient, "Patient created successfully."));
 });
 
 const updatePatientAdmin = asyncHandler(async (req, res) => {
@@ -431,6 +579,16 @@ const getPatientDetailsAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Patient not found");
     }
 
+    const latestReport = await Report.findOne({ patientId: id }).sort({ createdAt: -1 });
+
+    const patientData = patient.toObject();
+    if (latestReport?.fileUrl) {
+        const patientUpdatedAt = patient.updatedAt || patient.createdAt || new Date(0);
+        if (!patientData.medicalReport || latestReport.createdAt > patientUpdatedAt) {
+            patientData.medicalReport = latestReport.fileUrl;
+        }
+    }
+
     const medicalRecords = await MedicalRecord.find({ patientId: id }).populate('doctorId', 'name specialization');
 
     const progressReports = await ProgressReport.find({ patientId: id }).populate('physioId', 'name').populate('doctorId', 'name');
@@ -445,7 +603,7 @@ const getPatientDetailsAdmin = asyncHandler(async (req, res) => {
     }
 
     return res.status(200).json(new ApiResponse(200, {
-        patient,
+        patient: patientData,
         medicalHistory: medicalRecords,
         progressReports,
         sessions,
@@ -1420,33 +1578,138 @@ const getAllDoctorsAdmin = asyncHandler(async (req, res) => {
 });
 
 const createDoctorAdmin = asyncHandler(async (req, res) => {
-    const { name, specialization, qualification, experience, hospitalAffiliation, userId } = req.body;
+    try {
+        const { name, specialization, qualification, experience, hospitalAffiliation, userId, email, mobileNumber } = req.body;
 
-    if ([name, specialization, qualification, experience, hospitalAffiliation].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
-        throw new ApiError(400, "All required fields must be filled out.");
+        console.log('createDoctorAdmin received data:', { name, specialization, qualification, experience, hospitalAffiliation, userId, email, mobileNumber });
+
+        // Convert experience to number if it's a string
+        const experienceNum = experience ? parseInt(experience, 10) : 0;
+        if (isNaN(experienceNum)) {
+            throw new ApiError(400, "Experience must be a valid number.");
+        }
+
+        if ([name, specialization, qualification, hospitalAffiliation].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
+            throw new ApiError(400, "All required fields must be filled out.");
+        }
+
+        let resolvedUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '' ? userId : null;
+
+        if (!resolvedUserId) {
+            // Create a new user account for the doctor
+            if (!mobileNumber) {
+                throw new ApiError(400, "Mobile number is required to create a doctor account.");
+            }
+
+            let existingUser = await User.findOne({ mobile_number: mobileNumber });
+
+            if (existingUser) {
+                const doctorExists = await Doctor.findOne({ userId: existingUser._id });
+                if (doctorExists) {
+                    throw new ApiError(409, "A doctor profile already exists for this mobile number.");
+                }
+
+                existingUser.userType = 'doctor';
+                existingUser.Fullname = name;
+                existingUser.email = email || existingUser.email;
+                existingUser.hospitalName = hospitalAffiliation || existingUser.hospitalName || 'Not Specified';
+                await existingUser.save({ validateBeforeSave: false });
+
+                resolvedUserId = existingUser._id;
+            } else {
+                const usernameBase = email ? email.split('@')[0] : `doctor_${mobileNumber}`;
+                const newUser = await User.create({
+                    Fullname: name,
+                    email: email || `${usernameBase}@autogen.bonebuddy`,
+                    username: usernameBase.toLowerCase(),
+                    userType: 'doctor',
+                    mobile_number: mobileNumber,
+                    hospitalName: hospitalAffiliation || 'Not Specified',
+                    profileCompleted: false
+                });
+
+                resolvedUserId = newUser._id;
+            }
+        } else {
+            // Ensure supplied user doesn't already have a doctor profile
+            const doctorExists = await Doctor.findOne({ userId: resolvedUserId });
+            if (doctorExists) {
+                throw new ApiError(409, "A doctor profile already exists for the selected user.");
+            }
+        }
+
+        const doctor = await Doctor.create({
+            userId: resolvedUserId,
+            name,
+            specialization,
+            qualification,
+            experience: experienceNum,
+            hospitalAffiliation
+        });
+
+        console.log('Doctor created successfully:', doctor._id);
+
+        return res.status(201).json(new ApiResponse(201, doctor, "Doctor created successfully."));
+    } catch (error) {
+        console.error('Error in createDoctorAdmin:', error);
+        throw error;
     }
-
-    const doctor = await Doctor.create({
-        userId,
-        name,
-        specialization,
-        qualification,
-        experience,
-        hospitalAffiliation
-    });
-
-    return res.status(201).json(new ApiResponse(201, doctor, "Doctor created successfully."));
 });
 
 const updateDoctorAdmin = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const doctor = await Doctor.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+    console.log('updateDoctorAdmin called with ID:', id);
+    console.log('Update data:', updateData);
+
+    // Validate ID format
+    if (!id || id === 'undefined' || id === 'null' || id === 'N/A') {
+        throw new ApiError(400, "Invalid doctor ID");
+    }
+
+    // Try to find doctor by ID
+    let existingDoctor = await Doctor.findById(id);
+    
+    // If not found, try to find by userId (in case id is actually a userId)
+    if (!existingDoctor) {
+        console.log('Doctor not found by ID, trying to find by userId...');
+        existingDoctor = await Doctor.findOne({ userId: id });
+    }
+
+    console.log('Existing doctor found:', existingDoctor ? existingDoctor._id : 'Not found');
+
+    if (!existingDoctor) {
+        // List all doctor IDs for debugging
+        const allDoctors = await Doctor.find({}).select('_id name').limit(5);
+        console.log('Sample doctor IDs in database:', allDoctors.map(d => ({ id: d._id.toString(), name: d.name })));
+        throw new ApiError(404, `Doctor not found with ID: ${id}`);
+    }
+
+    // Use the found doctor's ID for update
+    const doctorId = existingDoctor._id;
+    
+    // Filter out undefined values but keep empty strings and null
+    const cleanUpdateData = Object.fromEntries(
+        Object.entries(updateData).filter(([_, value]) => value !== undefined)
+    );
+    
+    console.log('Cleaned update data:', cleanUpdateData);
+    
+    const doctor = await Doctor.findByIdAndUpdate(doctorId, cleanUpdateData, { new: true, runValidators: true });
 
     if (!doctor) {
-        throw new ApiError(404, "Doctor not found");
+        throw new ApiError(404, "Doctor not found after update");
     }
+
+    console.log('Doctor updated successfully:', doctor._id);
+    console.log('Updated doctor data:', {
+        name: doctor.name,
+        specialization: doctor.specialization,
+        qualification: doctor.qualification,
+        experience: doctor.experience,
+        hospitalAffiliation: doctor.hospitalAffiliation
+    });
 
     return res.status(200).json(new ApiResponse(200, doctor, "Doctor updated successfully."));
 });
@@ -1710,21 +1973,40 @@ const getPhysioDetailsAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid physiotherapist ID");
     }
 
-    const physio = await Physio.findById(id);
+    // Try to find by userId first (since id might be userId)
+    let physio = await Physio.findOne({ userId: id });
+    let userId = id;
+    
+    if (!physio) {
+        // Try to find by physio _id
+        physio = await Physio.findById(id);
+        if (physio) {
+            userId = physio.userId;
+        }
+    } else {
+        userId = physio.userId;
+    }
 
     if (!physio) {
         throw new ApiError(404, "Physiotherapist not found");
     }
 
-    const progressReports = await ProgressReport.find({ physioId: id }).populate('patientId', 'name').populate('doctorId', 'name');
+    // Get user data
+    const user = await User.findById(userId).select('Fullname email mobile_number gender dateOfBirth age address specialization experience qualification availableDays availableTimeSlots consultationFee bio');
 
-    const sessions = await Session.find({ physioId: id }).populate('patientId', 'name').populate('doctorId', 'name');
+    const progressReports = await ProgressReport.find({ physioId: physio._id }).populate('patientId', 'name').populate('doctorId', 'name');
 
-    return res.status(200).json(new ApiResponse(200, {
-        physio,
-        progressReports,
-        sessions
-    }, "Physiotherapist details retrieved successfully."));
+    const sessions = await Session.find({ physioId: physio._id }).populate('patientId', 'name').populate('doctorId', 'name');
+
+    // Combine physio and user data
+    const physioData = {
+        ...physio.toObject(),
+        ...user.toObject(),
+        name: user.Fullname || physio.name,
+        Fullname: user.Fullname
+    };
+
+    return res.status(200).json(new ApiResponse(200, physioData, "Physiotherapist details retrieved successfully."));
 });
 
 const deleteUserAdmin = asyncHandler(async (req, res) => {

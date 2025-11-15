@@ -3,6 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 
+// Helper function to construct medical report URL
+const getMedicalReportUrl = (reportPath) => {
+  if (!reportPath) return null;
+  // If it's already a full URL, return as is
+  if (reportPath.startsWith('http://') || reportPath.startsWith('https://')) {
+    return reportPath;
+  }
+  // If it starts with /uploads, it's a relative path from the backend
+  // Since backend static files are served from root, use current origin
+  return `${window.location.origin}${reportPath.startsWith('/') ? reportPath : '/' + reportPath}`;
+};
+
 const PatientRecord = () => {
   const [activeTab, setActiveTab] = useState('patients'); // 'patients' or 'incomplete'
   const [patients, setPatients] = useState([]);
@@ -66,6 +78,23 @@ const PatientRecord = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
 
+  const calculateAgeFromDob = (dobString) => {
+    if (!dobString) return '';
+    const birthDate = new Date(dobString);
+    if (Number.isNaN(birthDate.getTime())) return '';
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      age -= 1;
+    }
+
+    return Math.max(age, 0);
+  };
+
   useEffect(() => {
     if (activeTab === 'patients') {
       fetchPatients();
@@ -84,6 +113,15 @@ const PatientRecord = () => {
     fetchDoctors();
     fetchPhysiotherapists();
   }, []);
+
+  useEffect(() => {
+    if (!formData.dateOfBirth) return;
+    const autoAge = calculateAgeFromDob(formData.dateOfBirth);
+    const currentAge = Number(formData.age);
+    if (autoAge !== currentAge && autoAge !== '') {
+      setFormData((prev) => ({ ...prev, age: autoAge.toString() }));
+    }
+  }, [formData.dateOfBirth]);
 
   const fetchDoctors = async () => {
     try {
@@ -177,12 +215,6 @@ const PatientRecord = () => {
   };
 
   const handleAdd = () => {
-    // Check if there are available users to create profiles for
-    if (availableUsers.length === 0) {
-      alert('No incomplete user accounts available.\n\nAll registered users already have patient profiles. To add a new patient:\n1. The user must first register on the app\n2. Then you can create their patient profile here');
-      return;
-    }
-
     setModalMode('add');
     setFormData({
       name: '',
@@ -338,28 +370,32 @@ const PatientRecord = () => {
       return;
     }
 
-    // Check userId is selected when adding a new patient
-    if (modalMode === 'add' && !formData.userId && availableUsers.length > 0) {
-      alert('Please select a user account from the dropdown to link with this patient profile.');
-      return;
-    }
-
-    // If there are no available users when trying to add, show error
-    if (modalMode === 'add' && availableUsers.length === 0) {
-      alert('Cannot create patient profile: No incomplete user accounts available. All registered users already have patient profiles.');
-      return;
-    }
-
     try {
-      let dataToSend = formData;
+      const payload = { ...formData };
+      
+      // Convert age to number
+      if (payload.age) {
+        payload.age = parseInt(payload.age, 10);
+      }
+      
+      // Remove userId if it's empty or not selected
+      if (!payload.userId || payload.userId === '' || payload.userId === 'undefined' || payload.userId === 'null') {
+        delete payload.userId;
+      }
+
+      let dataToSend = payload;
       let headers = {};
 
       // If there's a file (medicalReport is a File object), use FormData
-      if (formData.medicalReport instanceof File) {
+      if (payload.medicalReport instanceof File) {
         const formDataObj = new FormData();
-        Object.keys(formData).forEach(key => {
-          if (formData[key] !== null && formData[key] !== undefined && formData[key] !== '') {
-            formDataObj.append(key, formData[key]);
+        Object.keys(payload).forEach(key => {
+          if (key === 'medicalReport' && payload[key] instanceof File) {
+            formDataObj.append(key, payload[key]);
+          } else if (payload[key] !== null && payload[key] !== undefined && payload[key] !== '') {
+            // Convert age to string for FormData
+            const value = key === 'age' ? String(payload[key]) : payload[key];
+            formDataObj.append(key, value);
           }
         });
         dataToSend = formDataObj;
@@ -371,11 +407,34 @@ const PatientRecord = () => {
       if (modalMode === 'add') {
         const response = await apiClient.post('/admin/patients', dataToSend, headers);
         console.log('Patient created:', response.data);
-        alert('Patient profile created successfully!');
+        alert('Patient added successfully!');
+        // Reset form after successful add
+        setFormData({
+          name: '',
+          email: '',
+          dateOfBirth: '',
+          gender: '',
+          mobileNumber: '',
+          surgeryType: '',
+          surgeryDate: '',
+          assignedDoctor: '',
+          medicalReport: '',
+          hospitalClinic: '',
+          emergencyContactNumber: '',
+          userId: '',
+          age: '',
+          address: '',
+          currentCondition: '',
+          assignedPhysiotherapist: '',
+          medicalHistory: '',
+          allergies: '',
+          bloodGroup: '',
+          medicalInsurance: ''
+        });
       } else {
         const response = await apiClient.patch(`/admin/patients/${selectedPatient.patientId}`, dataToSend, headers);
         console.log('Patient updated:', response.data);
-        alert('Patient profile updated successfully!');
+        alert('Patient updated successfully!');
       }
       
       setShowModal(false);
@@ -667,7 +726,14 @@ const PatientRecord = () => {
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.assignedDoctor || 'N/A'}</td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">
                     {patient.medicalReport ? (
-                      <a href={patient.medicalReport} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">View</a>
+                      <a 
+                        href={getMedicalReportUrl(patient.medicalReport)} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-500 hover:underline"
+                      >
+                        View
+                      </a>
                     ) : 'N/A'}
                   </td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.hospitalClinic || 'N/A'}</td>
@@ -848,7 +914,16 @@ const PatientRecord = () => {
               <p><strong>Surgery Date:</strong> {selectedPatient.patient.surgeryDate ? new Date(selectedPatient.patient.surgeryDate).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Assigned Doctor:</strong> {selectedPatient.patient.assignedDoctor || 'N/A'}</p>
               <p><strong>Hospital/Clinic:</strong> {selectedPatient.patient.hospitalClinic || 'N/A'}</p>
-              <p><strong>Medical Report:</strong> {selectedPatient.patient.medicalReport ? <a href={selectedPatient.patient.medicalReport} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">View Report</a> : 'Not Uploaded'}</p>
+              <p><strong>Medical Report:</strong> {selectedPatient.patient.medicalReport ? (
+                <a 
+                  href={getMedicalReportUrl(selectedPatient.patient.medicalReport)} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-blue-500 hover:underline"
+                >
+                  View Report
+                </a>
+              ) : 'Not Uploaded'}</p>
               <p><strong>Last Login:</strong> {selectedPatient.patient.lastLogin ? new Date(selectedPatient.patient.lastLogin).toLocaleDateString() : 'Never'}</p>
               <p><strong>Profile Status:</strong> {selectedPatient.patient.isProfileComplete ? 'Complete' : 'Incomplete'}</p>
               <p><strong>Address:</strong> {selectedPatient.patient.address ? 
@@ -967,14 +1042,16 @@ const PatientRecord = () => {
               </label>
               <input
                 type="number"
-                placeholder="Enter age"
+                placeholder="Auto-calculated from DOB"
                 value={formData.age}
                 onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
                 min="0"
                 max="150"
+                readOnly
                 required
               />
+              <p className="text-xs text-gray-500 mt-1">Age is auto-calculated from the selected date of birth.</p>
             </div>
 
             <div className="mb-3">
@@ -1054,9 +1131,16 @@ const PatientRecord = () => {
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">Medical Report</label>
-              {modalMode === 'edit' && formData.medicalReport && (
+              {modalMode === 'edit' && formData.medicalReport && typeof formData.medicalReport === 'string' && (
                 <p className="text-sm text-blue-600 mb-1">
-                  Current: <a href={formData.medicalReport} target="_blank" rel="noopener noreferrer" className="underline">View Report</a>
+                  Current: <a 
+                    href={getMedicalReportUrl(formData.medicalReport)} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="underline hover:text-blue-800"
+                  >
+                    View Report
+                  </a>
                 </p>
               )}
               <input
@@ -1185,10 +1269,10 @@ const PatientRecord = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
               />
             </div>
-            {modalMode === 'add' && availableUsers.length > 0 && (
-              <div className="mb-2">
+            {modalMode === 'add' && (
+              <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select User Account (Required) <span className="text-red-500">*</span>
+                  Link Existing User Account (optional)
                 </label>
                 <select
                   value={formData.userId}
@@ -1203,22 +1287,16 @@ const PatientRecord = () => {
                     });
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded"
-                  required
                 >
-                  <option value="">-- Select User Account --</option>
+                  <option value="">-- Create new patient account --</option>
                   {availableUsers.map(user => (
                     <option key={user._id} value={user._id}>
-                      {user.Fullname || user.username} - {user.mobile_number} ({user.email})
+                      {user.Fullname || user.username} - {user.mobile_number} ({user.email || 'no email'})
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Select the user account to link with this patient profile</p>
-              </div>
-            )}
-            {modalMode === 'add' && availableUsers.length === 0 && (
-              <div className="mb-2 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ No incomplete user accounts available. All registered users have patient profiles.
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave this as default to auto-create a patient user using the details above, or select an existing registration to link.
                 </p>
               </div>
             )}

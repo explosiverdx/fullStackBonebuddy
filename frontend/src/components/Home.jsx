@@ -187,7 +187,11 @@ const Home = () => {
   return (
     <>
       <Helmet>
-        <title>BoneBuddy - Expert Physiotherapy Services</title>
+        <title>BoneBuddy – Physiotherapy Specialists | Faster Recovery & Expert Care</title>
+
+
+        <meta name="description" content=" BoneBuddy connects you with qualified and experienced physiotherapy specialists with years of experience in ortho care and recovery. Book your expert physiotherapist today for personalised treatment."></meta>
+      
         <meta name="description" content="Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services. Book your appointment today." />
         <meta name="keywords" content="physiotherapy, rehabilitation, sports injury, orthopaedic, post-surgery recovery, physiotherapy clinic, bone health, muscle recovery" />
         <meta property="og:title" content="BoneBuddy - Expert Physiotherapy Services" />
@@ -261,10 +265,16 @@ const Home = () => {
       {/* Empower Your Healing Journey */}
       <section id="treatments-services" className="section px-4 sm:px-6 lg:px-8">
         <div className="mx-auto">
-          <h5 className="section-title text-xl sm:text-2xl lg:text-3xl">Empower Your Healing Journey</h5>
+          <h1 className="section-title text-xl sm:text-2xl lg:text-3xl">BoneBuddy - India's Premium Post Oprative Doorstep Physiotherapy Services</h1>
           <p className="list-disc list-inside text-sm sm:text-base md:text-lg text-gray-700 space-y-2">
             At BoneBuddy, we believe in transforming recovery into a powerful, personalized experience. Our expert physiotherapists guide you through tailored therapies that not only heal but empower you to regain strength, confidence, and independence. From post-surgical rehabilitation to sports injury recovery, every step is designed to accelerate your healing and restore your quality of life.
+            <br />
+            <br />
+            BoneBuddy connects you with <strong>qualified and experienced physiotherapy specialists</strong> who bring <strong>years of expertise</strong> in post operative <strong>ortho</strong> and <strong> Neuro </strong> Rehabilitation and <strong>recovery</strong> to routine. 
+Our platform ensures personalized treatment plans designed to improve your health and provide the best possible care with expert support.
           </p>
+
+
           <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 items-center mt-6 sm:mt-8">
             <div className="flex-1 w-full">
               <h3 className="section-title text-lg sm:text-xl md:text-2xl lg:text-3xl">Why Choose BoneBuddy?</h3>

@@ -34,10 +34,16 @@ const PhysiotherapistTable = () => {
     bio: ''
   });
   const [editPhysio, setEditPhysio] = useState({
-    name: '',
-    qualification: '',
+    fullName: '',
+    mobile_number: '',
+    email: '',
+    gender: '',
+    dateOfBirth: '',
+    age: '',
+    address: { city: '', state: '', pincode: '' },
     specialization: '',
     experience: '',
+    qualification: '',
     availableDays: '',
     availableTimeSlots: '',
     consultationFee: '',
@@ -187,18 +193,78 @@ const PhysiotherapistTable = () => {
     setShowAddModal(true);
   };
 
-  const handleEdit = (physio) => {
+  const handleEdit = async (physio) => {
     setSelectedPhysio(physio);
-    setEditPhysio({
-      name: physio.name || '',
-      qualification: physio.qualification || '',
-      specialization: physio.specialization || '',
-      experience: physio.experience || '',
-      availableDays: physio.availableDays ? physio.availableDays.join(', ') : '',
-      availableTimeSlots: physio.availableTimeSlots || '',
-      consultationFee: physio.consultationFee || '',
-      bio: physio.bio || ''
-    });
+    
+    // Fetch full physio details including user data
+    try {
+      const response = await fetch(`/api/v1/admin/physiotherapists/${physio._id || physio.userId}`, {
+        headers: authHeaders
+      });
+      
+      let physioData = physio;
+      if (response.ok) {
+        const data = await response.json();
+        physioData = data.data || physio;
+      }
+      
+      // Parse address if it's a string
+      let addressObj = { city: '', state: '', pincode: '' };
+      if (physioData.address) {
+        if (typeof physioData.address === 'string') {
+          const parts = physioData.address.split(',').map(p => p.trim());
+          addressObj.city = parts[0] || '';
+          addressObj.state = parts[1] || '';
+          addressObj.pincode = parts[2] || '';
+        } else if (typeof physioData.address === 'object') {
+          addressObj = physioData.address;
+        }
+      }
+      
+      // Format dateOfBirth for date input
+      let dateOfBirth = '';
+      if (physioData.dateOfBirth) {
+        const dob = new Date(physioData.dateOfBirth);
+        dateOfBirth = dob.toISOString().split('T')[0];
+      }
+      
+      setEditPhysio({
+        fullName: physioData.name || physioData.Fullname || '',
+        mobile_number: physioData.mobile_number || physioData.contact || '',
+        email: physioData.email || '',
+        gender: physioData.gender || '',
+        dateOfBirth: dateOfBirth,
+        age: physioData.age ? String(physioData.age) : '',
+        address: addressObj,
+        specialization: physioData.specialization || '',
+        experience: physioData.experience ? String(physioData.experience) : '',
+        qualification: physioData.qualification || '',
+        availableDays: physioData.availableDays ? (Array.isArray(physioData.availableDays) ? physioData.availableDays.join(', ') : physioData.availableDays) : '',
+        availableTimeSlots: physioData.availableTimeSlots || '',
+        consultationFee: physioData.consultationFee ? String(physioData.consultationFee) : '',
+        bio: physioData.bio || ''
+      });
+    } catch (err) {
+      console.error('Error fetching physio details:', err);
+      // Fallback to basic data
+      setEditPhysio({
+        fullName: physio.name || '',
+        mobile_number: physio.mobile_number || physio.contact || '',
+        email: physio.email || '',
+        gender: '',
+        dateOfBirth: '',
+        age: '',
+        address: { city: '', state: '', pincode: '' },
+        specialization: physio.specialization || '',
+        experience: physio.experience ? String(physio.experience) : '',
+        qualification: physio.qualification || '',
+        availableDays: physio.availableDays ? (Array.isArray(physio.availableDays) ? physio.availableDays.join(', ') : physio.availableDays) : '',
+        availableTimeSlots: physio.availableTimeSlots || '',
+        consultationFee: physio.consultationFee ? String(physio.consultationFee) : '',
+        bio: physio.bio || ''
+      });
+    }
+    
     setIsEditMode(false);
     setShowEditModal(true);
   };
@@ -206,54 +272,158 @@ const PhysiotherapistTable = () => {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Convert age to number
+      const ageNum = newPhysio.age ? parseInt(newPhysio.age, 10) : null;
+      if (!ageNum || isNaN(ageNum)) {
+        alert('Please enter a valid date of birth to calculate age.');
+        return;
+      }
+
       const payload = {
         ...newPhysio,
+        age: ageNum,
         availableDays: newPhysio.availableDays ? newPhysio.availableDays.split(',').map(d => d.trim()) : [],
-        experience: parseInt(newPhysio.experience),
-        consultationFee: newPhysio.consultationFee ? parseInt(newPhysio.consultationFee) : undefined
+        experience: newPhysio.experience ? parseInt(newPhysio.experience, 10) : 0,
+        consultationFee: newPhysio.consultationFee ? parseInt(newPhysio.consultationFee, 10) : undefined
       };
       const response = await fetch('/api/v1/physios/admin/create', {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
+      const contentType = response.headers.get('content-type');
       if (response.ok) {
+        let responseData;
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await response.json();
+        }
+        alert('Physiotherapist added successfully!');
         setShowAddModal(false);
+        // Reset form
+        setNewPhysio({
+          fullName: '',
+          mobile_number: '',
+          email: '',
+          gender: '',
+          dateOfBirth: '',
+          age: '',
+          address: { city: '', state: '', pincode: '' },
+          specialization: '',
+          experience: '',
+          qualification: '',
+          availableDays: '',
+          availableTimeSlots: '',
+          consultationFee: '',
+          bio: ''
+        });
         fetchPhysios();
+        setError('');
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Failed to add physiotherapist');
+        let errorMessage = 'Failed to add physiotherapist';
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = `Server error (${response.status}): ${text.substring(0, 100)}`;
+          }
+        } catch (parseError) {
+          errorMessage = `Server error (${response.status}). Please check your connection and try again.`;
+        }
+        alert(`Error: ${errorMessage}`);
+        setError(errorMessage);
       }
     } catch (err) {
-      setError(`Error adding physiotherapist: ${err.message}`);
+      const errorMessage = `Error adding physiotherapist: ${err.message}`;
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
     }
   };
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Convert age to number
+      const ageNum = editPhysio.age ? parseInt(editPhysio.age, 10) : null;
+      
       const payload = {
-        ...editPhysio,
+        fullName: editPhysio.fullName,
+        mobile_number: editPhysio.mobile_number,
+        email: editPhysio.email || undefined,
+        gender: editPhysio.gender || undefined,
+        dateOfBirth: editPhysio.dateOfBirth || undefined,
+        age: ageNum || undefined,
+        address: editPhysio.address,
+        specialization: editPhysio.specialization,
+        experience: editPhysio.experience ? parseInt(editPhysio.experience, 10) : 0,
+        qualification: editPhysio.qualification,
         availableDays: editPhysio.availableDays ? editPhysio.availableDays.split(',').map(d => d.trim()) : [],
-        experience: parseInt(editPhysio.experience),
-        consultationFee: editPhysio.consultationFee ? parseInt(editPhysio.consultationFee) : undefined
+        availableTimeSlots: editPhysio.availableTimeSlots || undefined,
+        consultationFee: editPhysio.consultationFee ? parseInt(editPhysio.consultationFee, 10) : undefined,
+        bio: editPhysio.bio || undefined
       };
-      const response = await fetch(`/api/v1/physios/${selectedPhysio._id}`, {
+      
+      const physioId = selectedPhysio._id || selectedPhysio.userId;
+      const response = await fetch(`/api/v1/physios/admin/${physioId}`, {
         method: 'PATCH',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+      
+      const contentType = response.headers.get('content-type');
       if (response.ok) {
+        alert('Physiotherapist updated successfully!');
         setShowEditModal(false);
+        setSelectedPhysio(null);
         fetchPhysios();
+        setError('');
       } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Failed to update physiotherapist');
+        let errorMessage = 'Failed to update physiotherapist';
+        try {
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = `Server error (${response.status}): ${text.substring(0, 100)}`;
+          }
+        } catch (parseError) {
+          errorMessage = `Server error (${response.status}). Please check your connection and try again.`;
+        }
+        alert(`Error: ${errorMessage}`);
+        setError(errorMessage);
       }
     } catch (err) {
-      setError(`Error updating physiotherapist: ${err.message}`);
+      const errorMessage = `Error updating physiotherapist: ${err.message}`;
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
     }
   };
+
+  // Calculate age from date of birth
+  const calculateAgeFromDob = (dateOfBirth) => {
+    if (!dateOfBirth) return '';
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age > 0 ? age : '';
+  };
+
+  // Auto-calculate age when dateOfBirth changes
+  useEffect(() => {
+    if (newPhysio.dateOfBirth) {
+      const calculatedAge = calculateAgeFromDob(newPhysio.dateOfBirth);
+      if (calculatedAge !== newPhysio.age) {
+        setNewPhysio(prev => ({ ...prev, age: calculatedAge }));
+      }
+    }
+  }, [newPhysio.dateOfBirth]);
 
   const handleNewPhysioChange = (e) => {
     const { name, value } = e.target;
@@ -270,19 +440,64 @@ const PhysiotherapistTable = () => {
         address: { ...prev.address, [field]: processedValue }
       }));
     } else {
-      setNewPhysio(prev => ({ ...prev, [name]: processedValue }));
+      setNewPhysio(prev => {
+        const updated = { ...prev, [name]: processedValue };
+        // Auto-calculate age if dateOfBirth is being changed
+        if (name === 'dateOfBirth' && processedValue) {
+          updated.age = calculateAgeFromDob(processedValue);
+        }
+        return updated;
+      });
     }
   };
+
+  // Calculate age from date of birth for edit form
+  const calculateAgeFromDobEdit = (dateOfBirth) => {
+    if (!dateOfBirth) return '';
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age > 0 ? age : '';
+  };
+
+  // Auto-calculate age when dateOfBirth changes in edit form
+  useEffect(() => {
+    if (editPhysio.dateOfBirth) {
+      const calculatedAge = calculateAgeFromDobEdit(editPhysio.dateOfBirth);
+      if (calculatedAge !== editPhysio.age) {
+        setEditPhysio(prev => ({ ...prev, age: calculatedAge }));
+      }
+    }
+  }, [editPhysio.dateOfBirth]);
 
   const handleEditPhysioChange = (e) => {
     const { name, value } = e.target;
     let processedValue = value;
 
-    if (name === 'experience' && parseInt(value, 10) > 100) {
+    if ((name === 'age' || name === 'experience') && parseInt(value, 10) > 100) {
       processedValue = '100';
     }
 
-    setEditPhysio(prev => ({ ...prev, [name]: processedValue }));
+    if (name.startsWith('address.')) {
+      const field = name.split('.')[1];
+      setEditPhysio(prev => ({
+        ...prev,
+        address: { ...prev.address, [field]: processedValue }
+      }));
+    } else {
+      setEditPhysio(prev => {
+        const updated = { ...prev, [name]: processedValue };
+        // Auto-calculate age if dateOfBirth is being changed
+        if (name === 'dateOfBirth' && processedValue) {
+          updated.age = calculateAgeFromDobEdit(processedValue);
+        }
+        return updated;
+      });
+    }
   };
 
   if (loading) return <div className="text-center">Loading physiotherapists...</div>;
@@ -535,11 +750,12 @@ const PhysiotherapistTable = () => {
                 <input
                   type="number"
                   name="age"
-                  placeholder="Age"
+                  placeholder="Age (auto-calculated)"
                   value={newPhysio.age}
-                  onChange={handleNewPhysioChange}
-                  className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  readOnly
+                  className="px-3 py-2 border border-gray-300 rounded bg-gray-100 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
                   required
+                  title="Age is automatically calculated from Date of Birth"
                 />
                 <input
                   type="text"
@@ -667,9 +883,86 @@ const PhysiotherapistTable = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <input
                     type="text"
-                    name="name"
-                    placeholder="Name"
-                    value={editPhysio.name}
+                    name="fullName"
+                    placeholder="Full Name"
+                    value={editPhysio.fullName}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    required
+                  />
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="Email"
+                    value={editPhysio.email}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <input
+                    type="text"
+                    name="mobile_number"
+                    placeholder="Mobile Number"
+                    value={editPhysio.mobile_number}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    required
+                  />
+                  <select
+                    name="gender"
+                    value={editPhysio.gender}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <input
+                    type="date"
+                    name="dateOfBirth"
+                    value={editPhysio.dateOfBirth}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <input
+                    type="number"
+                    name="age"
+                    placeholder="Age (auto-calculated)"
+                    value={editPhysio.age}
+                    readOnly
+                    className="px-3 py-2 border border-gray-300 rounded bg-gray-100 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    title="Age is automatically calculated from Date of Birth"
+                  />
+                  <input
+                    type="text"
+                    name="address.city"
+                    placeholder="City"
+                    value={editPhysio.address.city}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <input
+                    type="text"
+                    name="address.state"
+                    placeholder="State"
+                    value={editPhysio.address.state}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <input
+                    type="text"
+                    name="address.pincode"
+                    placeholder="Pincode"
+                    value={editPhysio.address.pincode}
+                    onChange={handleEditPhysioChange}
+                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  />
+                  <input
+                    type="text"
+                    name="specialization"
+                    placeholder="Specialization"
+                    value={editPhysio.specialization}
                     onChange={handleEditPhysioChange}
                     className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
                     required
@@ -679,15 +972,6 @@ const PhysiotherapistTable = () => {
                     name="qualification"
                     placeholder="Qualification"
                     value={editPhysio.qualification}
-                    onChange={handleEditPhysioChange}
-                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    required
-                  />
-                  <input
-                    type="text"
-                    name="specialization"
-                    placeholder="Specialization"
-                    value={editPhysio.specialization}
                     onChange={handleEditPhysioChange}
                     className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
                     required

@@ -24,6 +24,10 @@ const doctorSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    hospitalAffiliation: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }
 );

@@ -25,14 +25,14 @@ const uploadReport = asyncHandler(async (req, res) => {
 
     const reportFile = await uploadOnCloudinary(reportLocalPath);
 
-    if (!reportFile?.url) {
+    if (!reportFile?.secure_url && !reportFile?.url) {
         throw new ApiError(500, "Failed to upload report to cloud storage.");
     }
 
     const report = await Report.create({
         patientId: patient._id,
         title: title || req.file.originalname,
-        fileUrl: reportFile.url,
+        fileUrl: reportFile.secure_url || reportFile.url,
         fileType: req.file.mimetype,
         uploadedBy: req.user._id, // The logged-in user (patient or admin)
     });

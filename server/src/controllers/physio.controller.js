@@ -134,12 +134,12 @@ const updatePhysioProfile = asyncHandler(async (req, res) => {
         { new: true, runValidators: true }
     );
 
-    if (!physio) {
-        throw new ApiError(404, "Physio profile not found.");
+    if (!updatedPhysio) {
+        throw new ApiError(404, "Physio profile not found after update.");
     }
 
     return res.status(200).json(
-        new ApiResponse(200, physio, "Physio profile updated successfully.")
+        new ApiResponse(200, updatedPhysio, "Physiotherapist updated successfully.")
     );
 });
 
@@ -162,95 +162,152 @@ const deletePhysio = asyncHandler(async (req, res) => {
 });
 
 const adminCreatePhysio = asyncHandler(async (req, res) => {
-    const { fullName, mobile_number, email, gender, dateOfBirth, age, address, specialization, experience, qualification, availableDays, availableTimeSlots, consultationFee, bio } = req.body;
+    try {
+        const { fullName, mobile_number, email, gender, dateOfBirth, age, address, specialization, experience, qualification, availableDays, availableTimeSlots, consultationFee, bio } = req.body;
 
-    if (req.user.userType !== 'admin') {
-        throw new ApiError(403, "Only admins can create physiotherapist accounts.");
+        console.log('adminCreatePhysio received data:', { fullName, mobile_number, email, gender, dateOfBirth, age, address, specialization, qualification });
+
+        if (req.user.userType !== 'admin') {
+            throw new ApiError(403, "Only admins can create physiotherapist accounts.");
+        }
+
+        // Convert age to number if it's a string
+        const ageNum = age ? parseInt(age, 10) : null;
+        if (!ageNum || isNaN(ageNum)) {
+            throw new ApiError(400, "Age must be a valid number.");
+        }
+
+        // Validate required fields (age is now a number, so check separately)
+        if ([fullName, mobile_number, gender, dateOfBirth, address?.city, address?.state, address?.pincode, specialization, qualification].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
+            throw new ApiError(400, "All required fields must be provided.");
+        }
+
+        // Check if mobile_number or email already exists
+        const queryConditions = [{ mobile_number }];
+        if (email && email.trim() !== '') {
+            queryConditions.push({ email });
+        }
+        const existingUser = await User.findOne({ $or: queryConditions });
+        if (existingUser) {
+            throw new ApiError(409, "User with this mobile number or email already exists.");
+        }
+
+        // Convert address object to string format
+        const addressString = address && typeof address === 'object' 
+            ? `${address.city || ''}, ${address.state || ''}, ${address.pincode || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ',')
+            : (address || '');
+
+        // Create user
+        const user = await User.create({
+            mobile_number,
+            email: email || undefined,
+            userType: 'physio',
+            Fullname: fullName,
+            gender,
+            dateOfBirth: new Date(dateOfBirth),
+            age: ageNum,
+            address: addressString,
+            specialization,
+            experience: experience ? parseInt(experience, 10) : 0,
+            qualification,
+            availableDays: Array.isArray(availableDays) ? availableDays : (availableDays ? [availableDays] : []),
+            availableTimeSlots: availableTimeSlots || undefined,
+            consultationFee: consultationFee ? parseInt(consultationFee, 10) : undefined,
+            bio: bio || undefined
+        });
+
+        // Create physio profile
+        const physio = await Physio.create({
+            userId: user._id,
+            name: fullName,
+            qualification,
+            specialization,
+            experience: experience ? parseInt(experience, 10) : 0
+        });
+
+        console.log('Physiotherapist created successfully:', { userId: user._id, physioId: physio._id });
+        
+        return res.status(201).json(
+            new ApiResponse(201, { user, physio }, "Physiotherapist created successfully.")
+        );
+    } catch (error) {
+        console.error('Error in adminCreatePhysio:', error);
+        throw error;
     }
-
-    if ([fullName, mobile_number, gender, dateOfBirth, age, address.city, address.state, address.pincode, specialization, qualification].some(field => !field || field.trim() === "")) {
-        throw new ApiError(400, "All required fields must be provided.");
-    }
-
-    // Check if mobile_number or email already exists
-    const existingUser = await User.findOne({ $or: [{ mobile_number }, { email }] });
-    if (existingUser) {
-        throw new ApiError(409, "User with this mobile number or email already exists.");
-    }
-
-    // Create user
-    const user = await User.create({
-        mobile_number,
-        email,
-        userType: 'physio',
-        Fullname: fullName,
-        gender,
-        dateOfBirth: new Date(dateOfBirth),
-        age,
-        address,
-        specialization,
-        experience,
-        qualification,
-        availableDays,
-        availableTimeSlots,
-        consultationFee,
-        bio
-    });
-
-    // Create physio profile
-    const physio = await Physio.create({
-        userId: user._id,
-        name: fullName,
-        qualification,
-        specialization,
-        experience
-    });
-
-    return res.status(201).json(
-        new ApiResponse(201, { user, physio }, "Physiotherapist created successfully.")
-    );
 });
 
 const adminUpdatePhysio = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { name, qualification, specialization, experience, availableDays, availableTimeSlots, consultationFee, bio } = req.body;
+    const { fullName, mobile_number, email, gender, dateOfBirth, age, address, specialization, experience, qualification, availableDays, availableTimeSlots, consultationFee, bio } = req.body;
 
     if (req.user.userType !== 'admin') {
         throw new ApiError(403, "Only admins can update physiotherapist profiles.");
     }
 
+    // Find physio by userId or _id
+    let physio = await Physio.findOne({ userId: id });
+    let userId = id;
+    
+    if (!physio) {
+        physio = await Physio.findById(id);
+        if (physio) {
+            userId = physio.userId;
+        }
+    } else {
+        userId = physio.userId;
+    }
+
+    if (!physio) {
+        throw new ApiError(404, "Physiotherapist not found.");
+    }
+
+    // Convert address object to string if needed
+    let addressString = address;
+    if (address && typeof address === 'object') {
+        addressString = `${address.city || ''}, ${address.state || ''}, ${address.pincode || ''}`.replace(/^,\s*|,\s*$/g, '').replace(/,\s*,/g, ',');
+    }
+
+    // Convert age to number
+    const ageNum = age ? parseInt(age, 10) : undefined;
+
     // Update User fields
     const userUpdate = {};
-    if (availableDays) userUpdate.availableDays = availableDays;
-    if (availableTimeSlots) userUpdate.availableTimeSlots = availableTimeSlots;
-    if (consultationFee !== undefined) userUpdate.consultationFee = consultationFee;
-    if (bio) userUpdate.bio = bio;
+    if (fullName) userUpdate.Fullname = fullName;
+    if (mobile_number) userUpdate.mobile_number = mobile_number;
+    if (email !== undefined) userUpdate.email = email;
+    if (gender) userUpdate.gender = gender;
+    if (dateOfBirth) userUpdate.dateOfBirth = new Date(dateOfBirth);
+    if (ageNum !== undefined) userUpdate.age = ageNum;
+    if (addressString !== undefined) userUpdate.address = addressString;
     if (specialization) userUpdate.specialization = specialization;
-    if (experience !== undefined) userUpdate.experience = experience;
+    if (experience !== undefined) userUpdate.experience = parseInt(experience, 10);
     if (qualification) userUpdate.qualification = qualification;
-    if (name) userUpdate.Fullname = name;
+    if (availableDays) userUpdate.availableDays = Array.isArray(availableDays) ? availableDays : (availableDays ? [availableDays] : []);
+    if (availableTimeSlots !== undefined) userUpdate.availableTimeSlots = availableTimeSlots;
+    if (consultationFee !== undefined) userUpdate.consultationFee = consultationFee ? parseInt(consultationFee, 10) : undefined;
+    if (bio !== undefined) userUpdate.bio = bio;
 
-    await User.findByIdAndUpdate(id, { $set: userUpdate }, { runValidators: true });
+    await User.findByIdAndUpdate(userId, { $set: userUpdate }, { runValidators: true });
 
     // Update Physio profile
     const physioUpdate = {};
-    if (name) physioUpdate.name = name;
+    if (fullName) physioUpdate.name = fullName;
     if (qualification) physioUpdate.qualification = qualification;
     if (specialization) physioUpdate.specialization = specialization;
-    if (experience !== undefined) physioUpdate.experience = experience;
+    if (experience !== undefined) physioUpdate.experience = parseInt(experience, 10);
 
-    const physio = await Physio.findOneAndUpdate(
-        { userId: id },
+    const updatedPhysio = await Physio.findOneAndUpdate(
+        { userId },
         { $set: physioUpdate },
         { new: true, runValidators: true }
     );
 
-    if (!physio) {
-        throw new ApiError(404, "Physio profile not found.");
+    if (!updatedPhysio) {
+        throw new ApiError(404, "Physio profile not found after update.");
     }
 
     return res.status(200).json(
-        new ApiResponse(200, physio, "Physiotherapist updated successfully.")
+        new ApiResponse(200, updatedPhysio, "Physiotherapist updated successfully.")
     );
 });
 

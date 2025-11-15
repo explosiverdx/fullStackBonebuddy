@@ -10,6 +10,7 @@ import {
     getMyPatientsAndSessions
 } from "../controllers/physio.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
+import { verifyPermission } from "../middleware/permission.middleware.js";
 
 const router = Router();
 
@@ -20,6 +21,9 @@ router.route("/")
 
 router.route("/getAllPhysios").get(verifyJWT, getAllPhysios);
 router.route("/my-patients-sessions").get(verifyJWT, getMyPatientsAndSessions);
+
+router.route("/admin/create").post(verifyJWT, verifyPermission(['admin']), adminCreatePhysio);
+router.route("/admin/:id").patch(verifyJWT, verifyPermission(['admin']), adminUpdatePhysio);
 
 router.route("/:id").delete(verifyJWT, deletePhysio);
 

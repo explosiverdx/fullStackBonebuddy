@@ -14,6 +14,8 @@ const PhysiotherapistProfile = () => {
   const [videoTitle, setVideoTitle] = useState('');
   const [videoDescription, setVideoDescription] = useState('');
   const [uploadProgress, setUploadProgress] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPatientId, setSelectedPatientId] = useState(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -351,7 +353,7 @@ const PhysiotherapistProfile = () => {
 
             {activeTab === 'sessions' && (
               <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center flex-wrap gap-4">
                   <h3 className="text-xl font-semibold">Your Sessions</h3>
                   {stats && (
                     <div className="flex gap-4 text-sm">
@@ -362,28 +364,138 @@ const PhysiotherapistProfile = () => {
                   )}
                 </div>
 
+                {/* Search Bar */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex gap-3 items-center flex-wrap">
+                    <div className="flex-1 min-w-[200px]">
+                      <input
+                        type="text"
+                        placeholder="Search patient by name, phone, or email..."
+                        value={searchQuery}
+                        onChange={(e) => {
+                          setSearchQuery(e.target.value);
+                          setSelectedPatientId(null);
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
+                    {selectedPatientId && (
+                      <button
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSelectedPatientId(null);
+                        }}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                      >
+                        Clear Filter
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Patient Suggestions */}
+                  {searchQuery && !selectedPatientId && (
+                    <div className="mt-3 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {patients
+                        .filter(patient => {
+                          const query = searchQuery.toLowerCase();
+                          const name = (patient.name || patient.userId?.Fullname || '').toLowerCase();
+                          const phone = (patient.userId?.mobile_number || patient.mobile_number || '').toLowerCase();
+                          const email = (patient.userId?.email || patient.email || '').toLowerCase();
+                          return name.includes(query) || phone.includes(query) || email.includes(query);
+                        })
+                        .slice(0, 5)
+                        .map((patient) => (
+                          <div
+                            key={patient._id}
+                            onClick={() => {
+                              setSelectedPatientId(patient._id);
+                              setSearchQuery(patient.name || patient.userId?.Fullname || '');
+                            }}
+                            className="p-3 hover:bg-teal-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                          >
+                            <div className="font-semibold text-gray-900">
+                              {patient.name || patient.userId?.Fullname || 'N/A'}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {patient.userId?.mobile_number || patient.mobile_number || ''} | {patient.userId?.email || patient.email || ''}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {patient.totalSessions} session{patient.totalSessions !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        ))}
+                      {patients.filter(patient => {
+                        const query = searchQuery.toLowerCase();
+                        const name = (patient.name || patient.userId?.Fullname || '').toLowerCase();
+                        const phone = (patient.userId?.mobile_number || patient.mobile_number || '').toLowerCase();
+                        const email = (patient.userId?.email || patient.email || '').toLowerCase();
+                        return name.includes(query) || phone.includes(query) || email.includes(query);
+                      }).length === 0 && (
+                        <div className="p-3 text-gray-500 text-sm">No patients found</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selected Patient Info */}
+                  {selectedPatientId && (
+                    <div className="mt-3 bg-teal-50 border border-teal-200 rounded-lg p-3">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-sm text-gray-600">Showing sessions for: </span>
+                          <span className="font-semibold text-teal-700">
+                            {patients.find(p => p._id === selectedPatientId)?.name || 
+                             patients.find(p => p._id === selectedPatientId)?.userId?.Fullname || 
+                             'Selected Patient'}
+                          </span>
+                          <span className="text-sm text-gray-600 ml-2">
+                            ({sessions.filter(s => s.patientId?._id === selectedPatientId || s.patientId === selectedPatientId).length} sessions)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {dataLoading ? (
                   <div className="text-center py-8">Loading sessions...</div>
                 ) : sessions.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <p>No sessions scheduled yet.</p>
                   </div>
-                ) : (
+                ) : (() => {
+                  // Filter sessions by selected patient if any
+                  const filteredSessions = selectedPatientId 
+                    ? sessions.filter(s => s.patientId?._id === selectedPatientId || s.patientId === selectedPatientId)
+                    : sessions;
+                  
+                  if (selectedPatientId && filteredSessions.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-gray-500">
+                        <p>No sessions found for this patient.</p>
+                      </div>
+                    );
+                  }
+                  
+                  return (
                   <div className="space-y-4">
                     {/* Upcoming Sessions */}
                     <div>
-                      <h4 className="font-semibold text-lg mb-3 text-blue-600">Upcoming Sessions ({sessions.filter(s => new Date(s.sessionDate) > new Date()).length})</h4>
+                      <h4 className="font-semibold text-lg mb-3 text-blue-600">
+                        Upcoming Sessions ({filteredSessions.filter(s => new Date(s.sessionDate) > new Date()).length})
+                      </h4>
                       <div className="space-y-3">
-                        {sessions.filter(s => new Date(s.sessionDate) > new Date()).length > 0 ? (
-                          sessions.filter(s => new Date(s.sessionDate) > new Date()).map((session) => {
+                        {filteredSessions.filter(s => new Date(s.sessionDate) > new Date()).length > 0 ? (
+                          filteredSessions.filter(s => new Date(s.sessionDate) > new Date()).map((session) => {
                             // Check if session can be started (within 15 minutes of scheduled time)
                             const sessionTime = new Date(session.sessionDate);
                             const now = new Date();
                             const minutesUntilSession = (sessionTime - now) / (1000 * 60);
                             const canStart = minutesUntilSession <= 15 && minutesUntilSession >= -60; // Can start 15min before, up to 60min after
                             
-                            // Normalize status - treat 'ongoing' as 'scheduled' for backward compatibility
-                            const actualStatus = session.status === 'ongoing' ? 'scheduled' : session.status;
+                            // Check if session is active (in-progress or ongoing)
+                            const isSessionActive = session.status === 'in-progress' || session.status === 'ongoing';
+                            // Normalize status for display - but keep original for logic
+                            const displayStatus = session.status === 'ongoing' ? 'in-progress' : session.status;
                             
                             return (
                               <div key={session._id} className="border-l-4 border-blue-500 p-4 rounded-r-lg bg-blue-50 shadow-sm">
@@ -399,7 +511,7 @@ const PhysiotherapistProfile = () => {
                                     {session.startTime && (
                                       <p className="text-sm text-green-600"><strong>Started at:</strong> {new Date(session.startTime).toLocaleTimeString()}</p>
                                     )}
-                                    {!canStart && actualStatus !== 'in-progress' && (
+                                    {!canStart && !isSessionActive && (
                                       <p className="text-xs text-orange-600 mt-2">
                                         ⏰ Session can be started 15 minutes before scheduled time ({Math.ceil(minutesUntilSession)} minutes remaining)
                                       </p>
@@ -407,12 +519,12 @@ const PhysiotherapistProfile = () => {
                                   </div>
                                   <div className="text-right">
                                     <span className={`inline-block px-3 py-1 text-xs rounded-full ${
-                                      actualStatus === 'in-progress' ? 'bg-yellow-100 text-yellow-800 animate-pulse' :
-                                      canStart && actualStatus === 'scheduled' ? 'bg-green-100 text-green-800' :
+                                      isSessionActive ? 'bg-yellow-100 text-yellow-800 animate-pulse' :
+                                      canStart && displayStatus === 'scheduled' ? 'bg-green-100 text-green-800' :
                                       'bg-blue-100 text-blue-800'
                                     }`}>
-                                      {actualStatus === 'in-progress' ? '🔴 LIVE' : 
-                                       canStart && actualStatus === 'scheduled' ? 'READY' :
+                                      {isSessionActive ? '🔴 LIVE' : 
+                                       canStart && displayStatus === 'scheduled' ? 'READY' :
                                        'SCHEDULED'}
                                     </span>
                                   </div>
@@ -420,7 +532,7 @@ const PhysiotherapistProfile = () => {
 
                                 {/* Action Buttons */}
                                 <div className="flex gap-2 mt-3 pt-3 border-t">
-                                  {actualStatus === 'scheduled' && (
+                                  {displayStatus === 'scheduled' && !isSessionActive && (
                                     <button
                                       onClick={() => handleStartSession(session._id)}
                                       disabled={!canStart || actionLoading === session._id}
@@ -436,7 +548,7 @@ const PhysiotherapistProfile = () => {
                                        `🔒 Starts in ${Math.ceil(minutesUntilSession)} min`}
                                     </button>
                                   )}
-                                  {actualStatus === 'in-progress' && (
+                                  {isSessionActive && (
                                     <button
                                       onClick={() => handleEndSession(session._id)}
                                       disabled={actionLoading === session._id}
@@ -457,10 +569,16 @@ const PhysiotherapistProfile = () => {
 
                     {/* Past Sessions */}
                     <div>
-                      <h4 className="font-semibold text-lg mb-3 text-gray-600">Past Sessions ({sessions.filter(s => new Date(s.sessionDate) <= new Date()).length})</h4>
+                      <h4 className="font-semibold text-lg mb-3 text-gray-600">
+                        Past Sessions ({filteredSessions.filter(s => new Date(s.sessionDate) <= new Date()).length})
+                      </h4>
                       <div className="space-y-3">
-                        {sessions.filter(s => new Date(s.sessionDate) <= new Date()).length > 0 ? (
-                          sessions.filter(s => new Date(s.sessionDate) <= new Date()).map((session) => (
+                        {filteredSessions.filter(s => new Date(s.sessionDate) <= new Date()).length > 0 ? (
+                          filteredSessions.filter(s => new Date(s.sessionDate) <= new Date()).map((session) => {
+                            // Check if session is still active (in-progress or ongoing)
+                            const isSessionActive = session.status === 'in-progress' || session.status === 'ongoing';
+                            
+                            return (
                             <div key={session._id} className="border p-4 rounded-lg bg-gray-50 shadow-sm">
                               <div className="flex justify-between items-start mb-3">
                                 <div className="flex-1">
@@ -474,16 +592,34 @@ const PhysiotherapistProfile = () => {
                                     <p className="text-sm text-green-600"><strong>Actual Duration:</strong> {session.actualDuration} minutes</p>
                                   )}
                                   <p className="text-sm text-gray-600"><strong>Doctor:</strong> {session.doctorId?.name || 'N/A'}</p>
+                                  {session.startTime && (
+                                    <p className="text-sm text-green-600"><strong>Started at:</strong> {new Date(session.startTime).toLocaleTimeString()}</p>
+                                  )}
                                   {session.notes && (
                                     <p className="text-sm text-gray-600 mt-2 italic bg-gray-100 p-2 rounded"><strong>Notes:</strong> {session.notes}</p>
                                   )}
                                 </div>
                                 <div className="text-right">
-                                  <span className="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full mb-2">
-                                    {session.status === 'completed' ? '✅ Completed' : 'Ongoing'}
+                                  <span className={`inline-block px-3 py-1 text-xs rounded-full mb-2 ${
+                                    isSessionActive ? 'bg-yellow-100 text-yellow-800 animate-pulse' : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {isSessionActive ? '🔴 LIVE' : session.status === 'completed' ? '✅ Completed' : 'Ongoing'}
                                   </span>
                                 </div>
                               </div>
+
+                              {/* End Session Button - Always visible for active sessions */}
+                              {isSessionActive && (
+                                <div className="mt-3 pt-3 border-t">
+                                  <button
+                                    onClick={() => handleEndSession(session._id)}
+                                    disabled={actionLoading === session._id}
+                                    className="w-full bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 disabled:bg-gray-400 font-semibold transition-colors"
+                                  >
+                                    {actionLoading === session._id ? '⏳ Ending...' : '⏹️ End Session'}
+                                  </button>
+                                </div>
+                              )}
 
                               {/* Video Section */}
                               {session.sessionVideo && session.sessionVideo.url && (
@@ -577,14 +713,16 @@ const PhysiotherapistProfile = () => {
                                 </div>
                               )}
                             </div>
-                          ))
+                            );
+                          })
                         ) : (
                           <p className="text-sm text-gray-500">No past sessions.</p>
                         )}
                       </div>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>

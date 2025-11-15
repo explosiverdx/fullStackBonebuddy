@@ -19,6 +19,12 @@ export default defineConfig({
         secure: false,
         credentials: true,
       },
+      '/uploads': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        credentials: true,
+      },
     },
   },
   build: {

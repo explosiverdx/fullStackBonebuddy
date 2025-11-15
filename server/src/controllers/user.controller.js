@@ -44,7 +44,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const user = await User.create({
         Fullname,
-        avatar: avatar.url,
+        avatar: avatar.secure_url || avatar.url,
         email,
         password,
         username: username.toLowerCase(),
@@ -543,15 +543,15 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     const avatar = await uploadOnCloudinary(avatarLocalPath);
 
-    if (!avatar.url) {
-        throw new ApiError(400, "Error while uploading on avatar");
+    if (!avatar?.secure_url && !avatar?.url) {
+        throw new ApiError(400, "Error while uploading avatar");
     }
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
-                avatar: avatar.url
+                avatar: avatar.secure_url || avatar.url
             }
         },
         { new: true }

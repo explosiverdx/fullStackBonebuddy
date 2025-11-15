@@ -25,7 +25,7 @@ const createBlogPost = asyncHandler(async (req, res) => {
         const imageResult = await uploadOnCloudinary(req.file.path);
         if (imageResult) {
             featuredImage = {
-                url: imageResult.url,
+                url: imageResult.secure_url || imageResult.url,
                 publicId: imageResult.public_id,
             };
         }
@@ -185,7 +185,7 @@ const updateBlogPost = asyncHandler(async (req, res) => {
         const imageResult = await uploadOnCloudinary(req.file.path);
         if (imageResult) {
             blog.featuredImage = {
-                url: imageResult.url,
+                url: imageResult.secure_url || imageResult.url,
                 publicId: imageResult.public_id,
             };
         }

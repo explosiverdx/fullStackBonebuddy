@@ -840,6 +840,22 @@ const SessionHistory = ({ authHeaders }) => {
   };
 
   const getSessionStatus = (session) => {
+    const normalizedStatus = (session.status || '').toLowerCase();
+
+    if (normalizedStatus === 'completed') {
+      return { text: 'Completed', className: 'bg-gray-100 text-gray-800' };
+    }
+    if (normalizedStatus === 'in-progress' || normalizedStatus === 'ongoing') {
+      return { text: 'Ongoing', className: 'bg-green-100 text-green-800 animate-pulse' };
+    }
+    if (normalizedStatus === 'scheduled' || normalizedStatus === 'upcoming') {
+      return { text: 'Upcoming', className: 'bg-blue-100 text-blue-800' };
+    }
+    if (normalizedStatus === 'canceled') {
+      return { text: 'Canceled', className: 'bg-red-100 text-red-800' };
+    }
+
+    // Fallback to time-based status if backend status missing
     const now = new Date();
     const sessionStart = new Date(session.sessionDate);
     const duration = session.durationMinutes || 60;
@@ -851,9 +867,7 @@ const SessionHistory = ({ authHeaders }) => {
     if (now < sessionStart) {
       return { text: 'Upcoming', className: 'bg-blue-100 text-blue-800' };
     }
-    if (session.status === 'completed') {
-      return { text: 'Completed', className: 'bg-gray-100 text-gray-800' };
-    }
+
     return { text: 'Past', className: 'bg-red-100 text-red-800' };
   };
 

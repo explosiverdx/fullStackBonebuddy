@@ -1,6 +1,6 @@
 
 import { Router } from "express";
-import { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllDoctorsAdmin, getAllPhysiosAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus } from "../controllers/admin.controller.js";
+import { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus } from "../controllers/admin.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { verifyPermission } from "../middleware/permission.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -20,7 +20,12 @@ router.route("/patients/export").get(verifyJWT, verifyPermission(['admin']), exp
 router.route("/users-without-patients").get(verifyJWT, verifyPermission(['admin']), getUsersWithoutPatients);
 router.route("/users/:id").delete(verifyJWT, verifyPermission(['admin']), deleteUserAdmin);
 router.route("/doctors").get(verifyJWT, verifyPermission(['admin']), getAllDoctorsAdmin);
+router.route("/doctors").post(verifyJWT, verifyPermission(['admin']), createDoctorAdmin);
+router.route("/doctors/:id").patch(verifyJWT, verifyPermission(['admin']), updateDoctorAdmin);
+router.route("/doctors/:id").delete(verifyJWT, verifyPermission(['admin']), deleteDoctorAdmin);
+router.route("/doctors/:id/details").get(verifyJWT, verifyPermission(['admin']), getDoctorDetailsAdmin);
 router.route("/physiotherapists").get(verifyJWT, verifyPermission(['admin']), getAllPhysiosAdmin);
+router.route("/physiotherapists/:id").get(verifyJWT, verifyPermission(['admin']), getPhysioDetailsAdmin);
 router.route("/payments").post(verifyJWT, verifyPermission(['admin']), createPaymentRequest);
 router.route("/payments").get(verifyJWT, verifyPermission(['admin']), getAllPaymentsAdmin);
 router.route("/payments/:id").patch(verifyJWT, verifyPermission(['admin']), updatePaymentStatus);

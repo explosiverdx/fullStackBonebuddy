@@ -421,7 +421,7 @@ const uploadSessionVideo = asyncHandler(async (req, res) => {
 
     // Update session with video details
     session.sessionVideo = {
-        url: videoResult.url,
+        url: videoResult.secure_url || videoResult.url,
         publicId: videoResult.public_id,
         uploadedAt: new Date(),
         uploadedBy: req.user._id,

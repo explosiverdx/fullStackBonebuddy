@@ -134,6 +134,19 @@ const PatientSignup = () => {
     }
   }, [user, location.state]);
 
+  // Calculate age from date of birth
+  const calculateAgeFromDob = (dobValue) => {
+    if (!dobValue) return '';
+    const birthDate = new Date(dobValue);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age > 0 ? age : '';
+  };
+
   const handleChange = (e) => {
     const { name, value, type, files, checked } = e.target;
 
@@ -159,9 +172,26 @@ const PatientSignup = () => {
           setFormData(prev => ({ ...prev, physioAvailableDays: newDays }));
         }
     } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
+      setFormData(prev => {
+        const updated = { ...prev, [name]: value };
+        // Auto-calculate age if dob is being changed
+        if (name === 'dob' && value) {
+          updated.age = calculateAgeFromDob(value);
+        }
+        return updated;
+      });
     }
   };
+
+  // Auto-calculate age when dob changes
+  useEffect(() => {
+    if (formData.dob) {
+      const calculatedAge = calculateAgeFromDob(formData.dob);
+      if (calculatedAge !== formData.age) {
+        setFormData(prev => ({ ...prev, age: calculatedAge }));
+      }
+    }
+  }, [formData.dob]);
 
   const validateDOB = (dobValue) => {
     if (!dobValue) return true;
@@ -187,7 +217,13 @@ const PatientSignup = () => {
   const handleDOBBlur = (e) => {
     const dobValue = e.target.value;
     if (!validateDOB(dobValue)) {
-      setFormData(prev => ({ ...prev, dob: '' }));
+      setFormData(prev => ({ ...prev, dob: '', age: '' }));
+    } else {
+      // Auto-calculate age on blur as well
+      const calculatedAge = calculateAgeFromDob(dobValue);
+      if (calculatedAge) {
+        setFormData(prev => ({ ...prev, age: calculatedAge }));
+      }
     }
   };
 
@@ -414,13 +450,14 @@ const PatientSignup = () => {
               <input
                 type="number"
                 name="age"
-                placeholder="Enter your age"
+                placeholder="Age (auto-calculated)"
                 value={formData.age}
-                onChange={handleChange}
+                readOnly
                 min="0"
                 max="150"
                 required={selectedRole === 'patient'}
-                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="w-full px-3 py-2 border rounded bg-gray-100 cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-teal-500"
+                title="Age is automatically calculated from Date of Birth"
               />
             </div>
 
