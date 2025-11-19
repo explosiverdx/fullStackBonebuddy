@@ -184,13 +184,13 @@ const PhysiotherapistProfile = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-teal-600 mb-4">🏋️ Physiotherapist Profile</h1>
+    <div className="min-h-screen bg-gray-50 pt-16 sm:pt-20">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-teal-600 mb-3 sm:mb-4">🏋️ Physiotherapist Profile</h1>
 
           {/* Tabs */}
-          <div className="flex space-x-1 mb-6">
+          <div className="flex space-x-1 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-3 sm:mx-0 px-3 sm:px-0">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -199,7 +199,7 @@ const PhysiotherapistProfile = () => {
                   // Save active tab to localStorage so it persists on refresh
                   localStorage.setItem('physiotherapistProfileActiveTab', tab.id);
                 }}
-                className={`px-4 py-2 rounded-t-lg font-medium ${
+                className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-t-lg font-medium text-xs sm:text-sm whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-teal-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -213,7 +213,7 @@ const PhysiotherapistProfile = () => {
           {/* Tab Content */}
           <div className="min-h-96">
             {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-4">
                   <div>
                     <label className="block font-semibold mb-1">Physiotherapist ID</label>
@@ -303,8 +303,8 @@ const PhysiotherapistProfile = () => {
 
             {activeTab === 'patients' && (
               <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-semibold">Assigned Patients</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-semibold">Assigned Patients</h3>
                   {stats && (
                     <div className="text-sm text-gray-600">
                       Total: {stats.totalPatients} patients
@@ -319,23 +319,23 @@ const PhysiotherapistProfile = () => {
                     <p>No patients assigned yet.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {patients.map((patient) => (
-                      <div key={patient._id} className="border p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-semibold text-lg text-gray-900">
+                      <div key={patient._id} className="border p-3 sm:p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start mb-3 gap-2">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base sm:text-lg text-gray-900">
                               {patient.name || patient.userId?.Fullname || 'N/A'}
                             </h4>
-                            <p className="text-sm text-gray-500">Patient ID: {patient._id.toString().substring(0, 8)}...</p>
+                            <p className="text-xs sm:text-sm text-gray-500">Patient ID: {patient._id.toString().substring(0, 8)}...</p>
                           </div>
-                          <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full">
+                          <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full whitespace-nowrap">
                             {patient.totalSessions} sessions
                           </span>
                         </div>
-                        <div className="space-y-1 text-sm">
+                        <div className="space-y-1 text-xs sm:text-sm">
                           <p><strong>Phone:</strong> {patient.userId?.mobile_number || patient.mobile_number || 'N/A'}</p>
-                          <p><strong>Email:</strong> {patient.userId?.email || patient.email || 'N/A'}</p>
+                          <p><strong>Email:</strong> <span className="break-all">{patient.userId?.email || patient.email || 'N/A'}</span></p>
                           <p><strong>Surgery:</strong> {patient.surgeryType || 'N/A'}</p>
                           <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-center">
                             <div>
@@ -361,8 +361,8 @@ const PhysiotherapistProfile = () => {
 
             {activeTab === 'sessions' && (
               <div className="space-y-6">
-                <div className="flex justify-between items-center flex-wrap gap-4">
-                  <h3 className="text-xl font-semibold">Your Sessions</h3>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+                  <h3 className="text-lg sm:text-xl font-semibold">Your Sessions</h3>
                   {stats && (
                     <div className="flex gap-4 text-sm">
                       <span className="text-gray-600">Total: {stats.totalSessions}</span>

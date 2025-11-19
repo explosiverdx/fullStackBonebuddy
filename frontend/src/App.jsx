@@ -38,6 +38,7 @@ import LoginRedirector from './components/LoginRedirector';
 import ScrollToTop from './components/ScrollToTop';
 import FloatingWhatsAppButton from './components/FloatingWhatsAppButton';
 import AIAssistant from './components/AIAssistant';
+import Analytics from './components/Analytics';
 
 function App() {
   const location = useLocation();
@@ -51,6 +52,7 @@ function App() {
 
   return (
     <div className={`App flex flex-col min-h-screen ${isSignInOpen ? 'overflow-hidden' : ''}`}>
+      <Analytics />
       <ScrollToTop />
       {!isAdminPage && <Header />}
       <main className={`flex-grow ${!isAdminPage ? 'pt-20' : ''}`}>

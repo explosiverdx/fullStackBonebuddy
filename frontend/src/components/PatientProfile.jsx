@@ -521,25 +521,25 @@ const PatientProfile = () => {
         if (isEditing) {
           return (
             <div className="space-y-6">
-              <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold">Edit Profile</h2>
-                <div className="space-x-2">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <h2 className="text-xl sm:text-2xl font-bold">Edit Profile</h2>
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                   <button
                     onClick={handleSave}
-                    className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
+                    className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm sm:text-base"
                   >
                     Save Changes
                   </button>
                   <button
                     onClick={handleCancel}
-                    className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                    className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm sm:text-base"
                   >
                     Cancel
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-4">
                   <h3 className="font-semibold text-gray-800">Personal Information</h3>
                   <div>
@@ -652,22 +652,22 @@ const PatientProfile = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <div className="bg-white p-4 rounded-lg shadow-sm border">
-                <h3 className="font-semibold text-gray-800 mb-2">Personal Information</h3>
-                <div className="space-y-2 text-sm">
-                  <div><strong>Patient ID:</strong> {profile._id}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
+                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Personal Information</h3>
+                <div className="space-y-2 text-xs sm:text-sm">
+                  <div><strong>Patient ID:</strong> <span className="break-all">{profile._id}</span></div>
                   <div><strong>Name:</strong> {profile.Fullname}</div>
                   <div><strong>DOB:</strong> {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : 'N/A'}</div>
                   <div><strong>Gender:</strong> {profile.gender}</div>
                   <div><strong>Contact:</strong> {profile.mobile_number}</div>
-                  <div><strong>Email:</strong> {profile.email}</div>
+                  <div><strong>Email:</strong> <span className="break-all">{profile.email}</span></div>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg shadow-sm border">
-                <h3 className="font-semibold text-gray-800 mb-2">Medical Information</h3>
-                <div className="space-y-2 text-sm">
+              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
+                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Medical Information</h3>
+                <div className="space-y-2 text-xs sm:text-sm">
                   <div><strong>Surgery Type:</strong> {profile.surgeryType || 'N/A'}</div>
                   <div><strong>Surgery Date:</strong> {profile.surgeryDate ? new Date(profile.surgeryDate).toLocaleDateString() : 'N/A'}</div>
                   <div><strong>Hospital/Clinic:</strong> {profile.hospitalName || 'N/A'}</div>
@@ -676,31 +676,31 @@ const PatientProfile = () => {
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg shadow-sm border">
-                <h3 className="font-semibold text-gray-800 mb-2">Assigned Healthcare Team</h3>
-                <div className="space-y-2 text-sm">
+              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
+                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Assigned Healthcare Team</h3>
+                <div className="space-y-2 text-xs sm:text-sm">
                   <div><strong>Doctor:</strong> {profile.sessions?.[0]?.doctorId?.name || profile.assignedDoctor || 'Not Assigned'}</div>
                   <div><strong>Physiotherapist:</strong> {profile.sessions?.[0]?.physioId?.name || profile.assignedPhysio || 'Not Assigned'}</div>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-lg shadow-sm border md:col-span-2 lg:col-span-3">
-                <h3 className="font-semibold text-gray-800 mb-2">Progress Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border md:col-span-2 lg:col-span-3">
+                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Progress Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-teal-600">{profile.sessionsCompleted || 0}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-teal-600">{profile.sessionsCompleted || 0}</div>
                     <div className="text-gray-600">Sessions Completed</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">{profile.missedSessions || 0}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-orange-600">{profile.missedSessions || 0}</div>
                     <div className="text-gray-600">Missed Sessions</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{profile.recoveryProgress || 0}%</div>
+                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{profile.recoveryProgress || 0}%</div>
                     <div className="text-gray-600">Recovery Progress</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{profile.lastLogin ? new Date(profile.lastLogin).toLocaleDateString() : 'N/A'}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-green-600">{profile.lastLogin ? new Date(profile.lastLogin).toLocaleDateString() : 'N/A'}</div>
                     <div className="text-gray-600">Last Login</div>
                   </div>
                 </div>
@@ -1063,13 +1063,13 @@ const PatientProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-teal-600 mb-4">🧑‍⚕️ Patient Profile</h1>
+    <div className="min-h-screen bg-gray-50 pt-16 sm:pt-20">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 md:p-6 mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-teal-600 mb-3 sm:mb-4">🧑‍⚕️ Patient Profile</h1>
 
           {/* Tabs */}
-          <div className="flex space-x-1 mb-6">
+          <div className="flex space-x-1 mb-4 sm:mb-6 overflow-x-auto pb-2 -mx-3 sm:mx-0 px-3 sm:px-0">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -1078,7 +1078,7 @@ const PatientProfile = () => {
                   // Save active tab to localStorage so it persists on refresh
                   localStorage.setItem('patientProfileActiveTab', tab.id);
                 }}
-                className={`px-4 py-2 rounded-t-lg font-medium flex items-center space-x-2 ${
+                className={`px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-t-lg font-medium flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-teal-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'

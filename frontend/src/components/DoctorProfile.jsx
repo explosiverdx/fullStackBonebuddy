@@ -240,13 +240,13 @@ const DoctorProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h1 className="text-3xl font-bold text-teal-600 mb-4">👨‍⚕️ Doctor Profile</h1>
+    <div className="min-h-screen bg-gray-50 pt-14 sm:pt-16 md:pt-20">
+      <div className="max-w-6xl mx-auto px-2 sm:px-3 md:px-4 lg:px-6 py-3 sm:py-4 md:py-6">
+        <div className="bg-white rounded-lg shadow-md p-2.5 sm:p-3 md:p-4 lg:p-6 mb-3 sm:mb-4 md:mb-6 overflow-hidden">
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-teal-600 mb-2 sm:mb-3 md:mb-4">👨‍⚕️ Doctor Profile</h1>
 
           {/* Tabs */}
-          <div className="flex space-x-1 mb-6">
+          <div className="flex space-x-0.5 sm:space-x-1 mb-3 sm:mb-4 md:mb-6 overflow-x-auto pb-2 -mx-2.5 sm:-mx-3 md:mx-0 px-2.5 sm:px-3 md:px-0 scrollbar-hide">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -255,7 +255,7 @@ const DoctorProfile = () => {
                   // Save active tab to localStorage so it persists on refresh
                   localStorage.setItem('doctorProfileActiveTab', tab.id);
                 }}
-                className={`px-4 py-2 rounded-t-lg font-medium ${
+                className={`px-2 sm:px-2.5 md:px-3 lg:px-4 py-1 sm:py-1.5 md:py-2 rounded-t-lg font-medium text-[11px] sm:text-xs md:text-sm whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id
                     ? 'bg-teal-600 text-white'
                     : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
@@ -269,30 +269,30 @@ const DoctorProfile = () => {
           {/* Tab Content */}
           <div className="min-h-96">
             {activeTab === 'overview' && (
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 {isEditing ? (
                   <div>
-                    <div className="flex justify-between items-center mb-6">
-                      <h2 className="text-2xl font-bold">Edit Profile</h2>
-                      <div className="space-x-2">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
+                      <h2 className="text-xl sm:text-2xl font-bold">Edit Profile</h2>
+                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
                         <button
                           onClick={handleSave}
-                          className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
+                          className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 text-sm sm:text-base"
                         >
                           Save Changes
                         </button>
                         <button
                           onClick={handleCancel}
-                          className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                          className="px-3 sm:px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm sm:text-base"
                         >
                           Cancel
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                       <div className="space-y-4">
-                        <h3 className="font-semibold text-gray-800">Personal Information</h3>
+                        <h3 className="font-semibold text-sm sm:text-base text-gray-800">Personal Information</h3>
                         <div>
                           <label className="block text-sm font-medium mb-1">Full Name</label>
                           <input
@@ -393,9 +393,9 @@ const DoctorProfile = () => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium mb-1">Available Days</label>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                              <label key={day} className="flex items-center">
+                              <label key={day} className="flex items-center text-sm">
                                 <input
                                   type="checkbox"
                                   checked={editForm.availableDays?.includes(day) || false}
@@ -451,25 +451,25 @@ const DoctorProfile = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                    <div className="flex justify-end gap-2">
+                  <div className="space-y-4 sm:space-y-6">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2">
                       <button
                         onClick={() => setShowReferModal(true)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-2"
+                        className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center space-x-2 text-sm sm:text-base"
                       >
                         <span>📋</span>
                         <span>Refer Patient</span>
                       </button>
                       <button
                         onClick={handleEditClick}
-                        className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 flex items-center space-x-2"
+                        className="px-3 sm:px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 flex items-center justify-center space-x-2 text-sm sm:text-base"
                       >
                         <span>✏️</span>
                         <span>Edit Profile</span>
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                       <div className="space-y-4">
                         <div>
                           <label className="block font-semibold mb-1">Doctor ID</label>
@@ -561,11 +561,11 @@ const DoctorProfile = () => {
             )}
 
             {activeTab === 'patients' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-semibold">Assigned Patients</h3>
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-semibold">Assigned Patients</h3>
                   {stats && (
-                    <div className="text-sm text-gray-600">
+                    <div className="text-xs sm:text-sm text-gray-600">
                       Total: {stats.totalPatients} patients
                     </div>
                   )}
@@ -578,23 +578,23 @@ const DoctorProfile = () => {
                     <p>No patients assigned yet.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     {patients.map((patient) => (
-                      <div key={patient._id} className="border p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h4 className="font-semibold text-lg text-gray-900">
+                      <div key={patient._id} className="border p-3 sm:p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start mb-3 gap-2">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base sm:text-lg text-gray-900">
                               {patient.name || patient.userId?.Fullname || 'N/A'}
                             </h4>
-                            <p className="text-sm text-gray-500">Patient ID: {patient._id.toString().substring(0, 8)}...</p>
+                            <p className="text-xs sm:text-sm text-gray-500">Patient ID: {patient._id.toString().substring(0, 8)}...</p>
                           </div>
-                          <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full">
+                          <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full whitespace-nowrap">
                             {patient.totalSessions} sessions
                           </span>
                         </div>
-                        <div className="space-y-1 text-sm">
+                        <div className="space-y-1 text-xs sm:text-sm">
                           <p><strong>Phone:</strong> {patient.userId?.mobile_number || patient.mobile_number || 'N/A'}</p>
-                          <p><strong>Email:</strong> {patient.userId?.email || patient.email || 'N/A'}</p>
+                          <p><strong>Email:</strong> <span className="break-all">{patient.userId?.email || patient.email || 'N/A'}</span></p>
                           <p><strong>Surgery:</strong> {patient.surgeryType || 'N/A'}</p>
                           <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-center">
                             <div>
@@ -619,11 +619,11 @@ const DoctorProfile = () => {
             )}
 
             {activeTab === 'schedule' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-semibold">Your Sessions Schedule</h3>
+              <div className="space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-semibold">Your Sessions Schedule</h3>
                   {stats && (
-                    <div className="flex gap-4 text-sm">
+                    <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm">
                       <span className="text-gray-600">Total: {stats.totalSessions}</span>
                       <span className="text-blue-600">Upcoming: {stats.upcomingSessions}</span>
                       <span className="text-green-600">Completed: {stats.completedSessions}</span>
@@ -641,24 +641,24 @@ const DoctorProfile = () => {
                   <div className="space-y-4">
                     {/* Upcoming Sessions */}
                     <div>
-                      <h4 className="font-semibold text-lg mb-3 text-blue-600">Upcoming Sessions ({sessions.filter(s => new Date(s.sessionDate) > new Date()).length})</h4>
+                      <h4 className="font-semibold text-base sm:text-lg mb-3 text-blue-600">Upcoming Sessions ({sessions.filter(s => new Date(s.sessionDate) > new Date()).length})</h4>
                       <div className="space-y-3">
                         {sessions.filter(s => new Date(s.sessionDate) > new Date()).length > 0 ? (
                           sessions.filter(s => new Date(s.sessionDate) > new Date()).map((session) => (
-                            <div key={session._id} className="border-l-4 border-blue-500 p-4 rounded-r-lg bg-blue-50 shadow-sm">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <p className="font-semibold text-gray-900">
+                            <div key={session._id} className="border-l-4 border-blue-500 p-3 sm:p-4 rounded-r-lg bg-blue-50 shadow-sm">
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm sm:text-base text-gray-900">
                                     {session.patientId?.name || 'N/A'}
                                   </p>
-                                  <p className="text-sm text-gray-600"><strong>Date:</strong> {new Date(session.sessionDate).toLocaleString()}</p>
-                                  <p className="text-sm text-gray-600"><strong>Surgery/Condition:</strong> {session.surgeryType}</p>
-                                  <p className="text-sm text-gray-600"><strong>Duration:</strong> {session.durationMinutes} minutes</p>
-                                  <p className="text-sm text-gray-600"><strong>Physiotherapist:</strong> {session.physioId?.name || 'N/A'}</p>
-                                  <p className="text-sm text-gray-600"><strong>Patient Contact:</strong> {session.patientId?.mobile_number || 'N/A'}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Date:</strong> {new Date(session.sessionDate).toLocaleString()}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Surgery/Condition:</strong> {session.surgeryType}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Duration:</strong> {session.durationMinutes} minutes</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Physiotherapist:</strong> {session.physioId?.name || 'N/A'}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Patient Contact:</strong> {session.patientId?.mobile_number || 'N/A'}</p>
                                 </div>
-                                <div className="text-right">
-                                  <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                <div className="text-left sm:text-right">
+                                  <span className="inline-block px-2 sm:px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                                     {session.completedSessions || 0}/{session.totalSessions} completed
                                   </span>
                                 </div>
@@ -666,36 +666,36 @@ const DoctorProfile = () => {
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-gray-500">No upcoming sessions.</p>
+                          <p className="text-xs sm:text-sm text-gray-500">No upcoming sessions.</p>
                         )}
                       </div>
                     </div>
 
                     {/* Past Sessions */}
                     <div>
-                      <h4 className="font-semibold text-lg mb-3 text-gray-600">Past Sessions ({sessions.filter(s => new Date(s.sessionDate) <= new Date()).length})</h4>
+                      <h4 className="font-semibold text-base sm:text-lg mb-3 text-gray-600">Past Sessions ({sessions.filter(s => new Date(s.sessionDate) <= new Date()).length})</h4>
                       <div className="space-y-3">
                         {sessions.filter(s => new Date(s.sessionDate) <= new Date()).length > 0 ? (
                           sessions.filter(s => new Date(s.sessionDate) <= new Date()).map((session) => (
-                            <div key={session._id} className="border p-4 rounded-lg bg-gray-50 shadow-sm">
-                              <div className="flex justify-between items-start mb-3">
-                                <div className="flex-1">
-                                  <p className="font-semibold text-gray-900">
+                            <div key={session._id} className="border p-3 sm:p-4 rounded-lg bg-gray-50 shadow-sm">
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start gap-2 mb-3">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm sm:text-base text-gray-900">
                                     {session.patientId?.name || 'N/A'}
                                   </p>
-                                  <p className="text-sm text-gray-600"><strong>Date:</strong> {new Date(session.sessionDate).toLocaleString()}</p>
-                                  <p className="text-sm text-gray-600"><strong>Surgery/Condition:</strong> {session.surgeryType}</p>
-                                  <p className="text-sm text-gray-600"><strong>Planned Duration:</strong> {session.durationMinutes} minutes</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Date:</strong> {new Date(session.sessionDate).toLocaleString()}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Surgery/Condition:</strong> {session.surgeryType}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Planned Duration:</strong> {session.durationMinutes} minutes</p>
                                   {session.actualDuration && (
-                                    <p className="text-sm text-green-600"><strong>Actual Duration:</strong> {session.actualDuration} minutes</p>
+                                    <p className="text-xs sm:text-sm text-green-600"><strong>Actual Duration:</strong> {session.actualDuration} minutes</p>
                                   )}
-                                  <p className="text-sm text-gray-600"><strong>Physiotherapist:</strong> {session.physioId?.name || 'N/A'}</p>
+                                  <p className="text-xs sm:text-sm text-gray-600"><strong>Physiotherapist:</strong> {session.physioId?.name || 'N/A'}</p>
                                   {session.notes && (
-                                    <p className="text-sm text-gray-600 mt-2 italic bg-gray-100 p-2 rounded"><strong>Notes:</strong> {session.notes}</p>
+                                    <p className="text-xs sm:text-sm text-gray-600 mt-2 italic bg-gray-100 p-2 rounded"><strong>Notes:</strong> {session.notes}</p>
                                   )}
                                 </div>
-                                <div className="text-right">
-                                  <span className={`inline-block px-3 py-1 text-xs rounded-full ${
+                                <div className="text-left sm:text-right">
+                                  <span className={`inline-block px-2 sm:px-3 py-1 text-xs rounded-full ${
                                     session.status === 'completed' ? 'bg-green-100 text-green-800' :
                                     session.status === 'missed' ? 'bg-orange-100 text-orange-800' :
                                     'bg-blue-100 text-blue-800'
@@ -748,12 +748,12 @@ const DoctorProfile = () => {
             )}
 
             {activeTab === 'referrals' && (
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Referred Patients</h2>
+              <div className="space-y-3 sm:space-y-4 md:space-y-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
+                  <h2 className="text-lg sm:text-xl md:text-2xl font-bold">Referred Patients</h2>
                   <button
                     onClick={() => setShowReferModal(true)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-2"
+                    className="px-3 py-1.5 sm:py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center justify-center space-x-1 sm:space-x-2 text-xs sm:text-sm md:text-base w-full sm:w-auto"
                   >
                     <span>📋</span>
                     <span>Refer New Patient</span>
@@ -773,98 +773,157 @@ const DoctorProfile = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient Name</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Condition</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Surgery</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {myReferrals.map((referral) => (
-                          <tr key={referral._id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm whitespace-nowrap">
-                              {new Date(referral.createdAt).toLocaleDateString()}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <div className="font-medium">{referral.patientName}</div>
+                  <>
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-2.5">
+                      {myReferrals.map((referral) => (
+                        <div key={referral._id} className="bg-white border rounded-lg p-2.5 sm:p-3 shadow-sm">
+                          <div className="flex justify-between items-start mb-2 gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm text-gray-900 truncate">{referral.patientName}</h4>
                               {referral.patientAge && referral.patientGender && (
-                                <div className="text-xs text-gray-500">
-                                  {referral.patientAge} years, {referral.patientGender}
-                                </div>
+                                <p className="text-[11px] text-gray-500">{referral.patientAge} years, {referral.patientGender}</p>
                               )}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <div>{referral.patientPhone}</div>
-                              {referral.patientEmail && (
-                                <div className="text-xs text-gray-500">{referral.patientEmail}</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <div className="font-medium">{referral.condition}</div>
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {referral.surgeryType && (
-                                <div>{referral.surgeryType}</div>
-                              )}
-                              {referral.surgeryDate && (
-                                <div className="text-xs text-gray-500">
-                                  {new Date(referral.surgeryDate).toLocaleDateString()}
-                                </div>
-                              )}
-                              {!referral.surgeryType && !referral.surgeryDate && (
-                                <span className="text-gray-400">N/A</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                referral.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                referral.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
-                                referral.status === 'registered' ? 'bg-green-100 text-green-800' :
-                                referral.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {referral.status.charAt(0).toUpperCase() + referral.status.slice(1)}
-                              </span>
-                              {referral.contactedAt && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  Contacted: {new Date(referral.contactedAt).toLocaleDateString()}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {referral.notes ? (
+                            </div>
+                            <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap flex-shrink-0 ${
+                              referral.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              referral.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                              referral.status === 'registered' ? 'bg-green-100 text-green-800' :
+                              referral.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {referral.status.charAt(0).toUpperCase() + referral.status.slice(1)}
+                            </span>
+                          </div>
+                          <div className="space-y-1 text-[11px] sm:text-xs">
+                            <div className="flex flex-wrap gap-x-2"><strong>Date:</strong> <span>{new Date(referral.createdAt).toLocaleDateString()}</span></div>
+                            <div className="flex flex-wrap gap-x-2"><strong>Contact:</strong> <span className="break-all">{referral.patientPhone}</span></div>
+                            {referral.patientEmail && (
+                              <div className="flex flex-wrap gap-x-2"><strong>Email:</strong> <span className="break-all">{referral.patientEmail}</span></div>
+                            )}
+                            <div className="flex flex-wrap gap-x-2"><strong>Condition:</strong> <span>{referral.condition}</span></div>
+                            {(referral.surgeryType || referral.surgeryDate) && (
+                              <div className="flex flex-wrap gap-x-2"><strong>Surgery:</strong> <span>{referral.surgeryType || 'N/A'} {referral.surgeryDate && `(${new Date(referral.surgeryDate).toLocaleDateString()})`}</span></div>
+                            )}
+                            {referral.contactedAt && (
+                              <div className="flex flex-wrap gap-x-2 text-gray-500"><strong>Contacted:</strong> <span>{new Date(referral.contactedAt).toLocaleDateString()}</span></div>
+                            )}
+                            {referral.notes && (
+                              <div>
                                 <button
                                   onClick={() => alert(`Notes:\n\n${referral.notes}`)}
-                                  className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                  className="text-blue-600 hover:text-blue-800 text-[11px] sm:text-xs underline"
                                 >
                                   View Notes
                                 </button>
-                              ) : (
-                                <span className="text-gray-400 text-xs">No notes</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block bg-white rounded-lg shadow overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200" style={{ minWidth: '800px' }}>
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient Name</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Condition</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Surgery</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                          {myReferrals.map((referral) => (
+                            <tr key={referral._id} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 text-sm whitespace-nowrap">
+                                {new Date(referral.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div className="font-medium">{referral.patientName}</div>
+                                {referral.patientAge && referral.patientGender && (
+                                  <div className="text-xs text-gray-500">
+                                    {referral.patientAge} years, {referral.patientGender}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div>{referral.patientPhone}</div>
+                                {referral.patientEmail && (
+                                  <div className="text-xs text-gray-500 break-all">{referral.patientEmail}</div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <div className="font-medium">{referral.condition}</div>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {referral.surgeryType && (
+                                  <div>{referral.surgeryType}</div>
+                                )}
+                                {referral.surgeryDate && (
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(referral.surgeryDate).toLocaleDateString()}
+                                  </div>
+                                )}
+                                {!referral.surgeryType && !referral.surgeryDate && (
+                                  <span className="text-gray-400">N/A</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  referral.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  referral.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                                  referral.status === 'registered' ? 'bg-green-100 text-green-800' :
+                                  referral.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {referral.status.charAt(0).toUpperCase() + referral.status.slice(1)}
+                                </span>
+                                {referral.contactedAt && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    Contacted: {new Date(referral.contactedAt).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {referral.notes ? (
+                                  <button
+                                    onClick={() => alert(`Notes:\n\n${referral.notes}`)}
+                                    className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                  >
+                                    View Notes
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">No notes</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {myReferrals.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
-                      <strong>Total Referrals:</strong> {myReferrals.length} | 
-                      <strong> Pending:</strong> {myReferrals.filter(r => r.status === 'pending').length} | 
-                      <strong> Contacted:</strong> {myReferrals.filter(r => r.status === 'contacted').length} | 
-                      <strong> Registered:</strong> {myReferrals.filter(r => r.status === 'registered').length}
-                    </p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-3 md:p-4">
+                    <div className="text-[10px] sm:text-xs md:text-sm text-blue-800 space-y-1 sm:space-y-0">
+                      <div className="flex flex-wrap gap-x-2 gap-y-1 sm:inline">
+                        <span><strong>Total:</strong> {myReferrals.length}</span>
+                        <span className="hidden sm:inline">|</span>
+                        <span><strong>Pending:</strong> {myReferrals.filter(r => r.status === 'pending').length}</span>
+                        <span className="hidden sm:inline">|</span>
+                        <span><strong>Contacted:</strong> {myReferrals.filter(r => r.status === 'contacted').length}</span>
+                        <span className="hidden sm:inline">|</span>
+                        <span><strong>Registered:</strong> {myReferrals.filter(r => r.status === 'registered').length}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -875,20 +934,20 @@ const DoctorProfile = () => {
 
       {/* Refer Patient Modal */}
       {showReferModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Refer Patient to BoneBuddy</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-3 sm:p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <h2 className="text-lg sm:text-xl md:text-2xl font-bold">Refer Patient to BoneBuddy</h2>
               <button
                 onClick={() => setShowReferModal(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+                className="text-gray-500 hover:text-gray-700 text-xl sm:text-2xl"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleReferSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form onSubmit={handleReferSubmit} className="space-y-3 sm:space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Patient Name <span className="text-red-500">*</span>
@@ -998,18 +1057,18 @@ const DoctorProfile = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 sm:pt-4">
                 <button
                   type="button"
                   onClick={() => setShowReferModal(false)}
-                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm sm:text-base"
                   disabled={referring}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm sm:text-base"
                   disabled={referring}
                 >
                   {referring ? 'Submitting...' : 'Submit Referral'}

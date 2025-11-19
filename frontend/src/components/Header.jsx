@@ -208,27 +208,27 @@ const Header = () => {
 
   return (
     <header className="bg-blue-100 backdrop-blur-sm shadow-lg fixed w-full z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 flex justify-between items-center h-16 sm:h-20">
-        <div className="logo-section">
-          <Link to="/" className="logo-link">
-            <div className="logo-circle w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12">
-              <img src="/assets/bone buddy logo-1.png" alt="BoneBuddy logo" />
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 flex justify-between items-center h-14 sm:h-16 md:h-20 gap-2 sm:gap-4">
+        <div className="logo-section flex-shrink-0 min-w-0">
+          <Link to="/" className="logo-link flex items-center gap-1 sm:gap-2 md:gap-3">
+            <div className="logo-circle w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 lg:w-12 lg:h-12 flex-shrink-0">
+              <img src="/assets/bone buddy logo-1.png" alt="BoneBuddy logo" className="w-full h-full object-cover" />
             </div>
-            <span className="logo-text text-lg sm:text-xl md:text-2xl font-Roboto">BONEBUDDY</span>
+            <span className="logo-text text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-Roboto whitespace-nowrap">BONEBUDDY</span>
           </Link>
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="desktop-nav">
-          <Link to="/" className="nav-link text-sm sm:text-base">Home</Link>
-          <Link to="/about" className="nav-link text-sm sm:text-base">About us</Link>
+        <nav className="desktop-nav hidden lg:flex items-center gap-3 xl:gap-4 2xl:gap-6 flex-shrink-0">
+          <Link to="/" className="nav-link text-xs xl:text-sm 2xl:text-base whitespace-nowrap">Home</Link>
+          <Link to="/about" className="nav-link text-xs xl:text-sm 2xl:text-base whitespace-nowrap">About us</Link>
           <div 
             className="relative" 
             ref={servicesDropdownRef}
             onMouseEnter={() => setIsServicesDropdownOpen(true)}
             onMouseLeave={() => setIsServicesDropdownOpen(false)}
           >
-            <Link to="/services" className="nav-link text-sm sm:text-base">Our Services</Link>
+            <Link to="/services" className="nav-link text-xs xl:text-sm 2xl:text-base whitespace-nowrap">Our Services</Link>
             {isServicesDropdownOpen && (
               <div className="services-dropdown">
                 {servicesData.map((service) => (
@@ -243,25 +243,25 @@ const Header = () => {
               </div>
             )}
           </div>
-          <Link to="/blog" className="nav-link text-sm sm:text-base">Blog</Link>
-          <Link to="/contact" className="nav-link text-sm sm:text-base">Contact us</Link>
+          <Link to="/blog" className="nav-link text-xs xl:text-sm 2xl:text-base whitespace-nowrap">Blog</Link>
+          <Link to="/contact" className="nav-link text-xs xl:text-sm 2xl:text-base whitespace-nowrap">Contact us</Link>
         </nav>
 
-        {/* User Actions */}
-        <div className="desktop-cta flex items-center gap-4">
+        {/* User Actions - Desktop */}
+        <div className="desktop-cta hidden lg:flex items-center gap-2 xl:gap-3 2xl:gap-4 flex-shrink-0">
           {user ? (
             <>
               {/* Notification Icon */}
               <div className="relative" ref={notificationRef}>
                 <button 
                   onClick={toggleNotifications}
-                  className="relative p-2 text-gray-600 hover:text-teal-600 transition-colors"
+                  className="relative p-1.5 sm:p-2 text-gray-600 hover:text-teal-600 transition-colors"
                 >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                   {notifications.filter(n => !n.read).length > 0 && (
-                    <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] sm:text-xs rounded-full h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center">
                       {notifications.filter(n => !n.read).length}
                     </span>
                   )}
@@ -269,7 +269,7 @@ const Header = () => {
 
                 {/* Notification Dropdown */}
                 {isNotificationOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-96 overflow-y-auto">
                     <div className="p-4 border-b border-gray-200">
                       <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
                     </div>
@@ -321,33 +321,34 @@ const Header = () => {
                   const userType = user.userType || user.role;
                   navigate(profileRoutes[userType] || '/PatientProfile');
                 }}
-                className="flex items-center gap-2 hover:bg-gray-100 px-3 py-2 rounded transition-colors"
+                className="flex items-center gap-1.5 xl:gap-2 hover:bg-gray-100 px-2 xl:px-3 py-1.5 xl:py-2 rounded transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white font-semibold">
+                <div className="w-7 h-7 xl:w-8 xl:h-8 rounded-full bg-teal-600 flex items-center justify-center text-white font-semibold text-xs xl:text-sm flex-shrink-0">
                   {(user.Fullname || user.username || 'U').charAt(0).toUpperCase()}
                 </div>
-                <span className="text-sm font-medium text-gray-700">{user.Fullname || user.username}</span>
+                <span className="text-xs xl:text-sm font-medium text-gray-700 whitespace-nowrap hidden 2xl:inline">{user.Fullname || user.username}</span>
               </button>
 
               {/* Logout Button */}
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-sm"
+                className="px-2.5 xl:px-3 2xl:px-4 py-1.5 xl:py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors text-xs xl:text-sm whitespace-nowrap"
               >
                 Logout
               </button>
             </>
           ) : (
-            <Link to="/signUp" className="btn-signin text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-3">SignUp</Link>
+            <Link to="/signUp" className="btn-signin text-xs xl:text-sm 2xl:text-base px-2.5 xl:px-3 2xl:px-4 py-1.5 xl:py-2 2xl:py-2.5 whitespace-nowrap rounded-md">SignUp</Link>
           )}
         </div>
 
         {/* Mobile Menu Button */}
         <button
           id="mobile-menu-button"
-          className="mobile-menu-btn w-10 h-10 sm:w-12 sm:h-12"
+          className="mobile-menu-btn w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:hidden flex-shrink-0"
           onClick={toggleMobileMenu}
           ref={menuButtonRef}
+          aria-label="Toggle menu"
         >
           <svg className="menu-icon w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
@@ -398,7 +399,7 @@ const Header = () => {
               </button>
             </>
           ) : (
-            <Link to="/signUp" className="mobile-btn" onClick={handleMobileLinkClick}>SignIn/SignUp</Link>
+            <Link to="/signUp" className="mobile-btn text-sm sm:text-base px-4 py-2.5 sm:py-3 rounded-md" onClick={handleMobileLinkClick}>SignIn/SignUp</Link>
           )}
         </div>
       </div>
