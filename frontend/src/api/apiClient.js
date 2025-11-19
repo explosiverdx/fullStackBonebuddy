@@ -25,8 +25,9 @@ const processQueue = (error, token = null) => {
 // Request interceptor - Add token to all requests
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Only add token if it exists and is not null/undefined/empty
+  if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
+    config.headers.Authorization = `Bearer ${token.trim()}`;
   }
   config.withCredentials = true;
   return config;

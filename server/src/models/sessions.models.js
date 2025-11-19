@@ -44,7 +44,7 @@ const sessionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['ongoing', 'completed', 'scheduled', 'in-progress', 'cancelled'],
+      enum: ['ongoing', 'completed', 'scheduled', 'in-progress', 'cancelled', 'missed'],
       default: 'scheduled',
     },
     startTime: {
@@ -89,6 +89,10 @@ const sessionSchema = new mongoose.Schema(
     notes: {
       type: String,
       required: false,
+    },
+    paymentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Payment',
     },
   },
   { timestamps: true }

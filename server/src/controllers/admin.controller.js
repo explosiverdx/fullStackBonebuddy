@@ -939,7 +939,7 @@ const universalSearch = asyncHandler(async (req, res) => {
 });
 
 const allocateSession = asyncHandler(async (req, res) => {
-    const { patientId, doctorId, physioId, surgeryType, totalSessions, sessionDate, sessions } = req.body;
+    const { patientId, doctorId, physioId, surgeryType, totalSessions, sessionDate, sessions, paymentId } = req.body;
 
     // Temporary debug logging for admin allocation
     try {
@@ -1041,6 +1041,54 @@ const allocateSession = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Either sessionDate (single) or sessions (array) must be provided");
     }
 
+    if (toCreate.length === 0) {
+        throw new ApiError(400, "No sessions to schedule");
+    }
+
+    // Resolve payment credits
+    let payment = null;
+    if (paymentId) {
+        if (!mongoose.isValidObjectId(paymentId)) {
+            throw new ApiError(400, "Invalid payment reference");
+        }
+        payment = await Payment.findById(paymentId);
+        if (!payment) {
+            throw new ApiError(404, "Payment reference not found");
+        }
+    } else {
+        payment = await Payment.findOne({
+            patientId: patient._id,
+            status: 'completed',
+            sessionCount: { $gt: 0 }
+        }).sort({ paidAt: -1, createdAt: -1 });
+    }
+
+    if (!payment) {
+        throw new ApiError(400, "No completed payment with available sessions found for this patient. Please create or select a payment request first.");
+    }
+
+    if (String(payment.patientId) !== String(patient._id)) {
+        throw new ApiError(400, "Selected payment does not belong to this patient");
+    }
+
+    const totalPaidSessions = payment.sessionCount || 0;
+    const allocatedSessions = payment.sessionsAllocated || 0;
+    const computedRemaining = totalPaidSessions > 0 ? Math.max(totalPaidSessions - allocatedSessions, 0) : 0;
+    const remainingSessions = typeof payment.sessionsRemaining === 'number' ? Math.max(payment.sessionsRemaining, computedRemaining) : computedRemaining;
+
+    if (remainingSessions <= 0) {
+        throw new ApiError(400, "The selected payment does not have any sessions remaining");
+    }
+
+    if (toCreate.length > remainingSessions) {
+        throw new ApiError(400, `Only ${remainingSessions} session(s) remain for this payment. Reduce the count or create another payment request.`);
+    }
+
+    // attach payment reference to each session
+    toCreate.forEach(item => {
+        item.paymentId = payment._id;
+    });
+
     // Validate per-session overrides (doctor/physio) first (outside transaction). This allows
     // a safe fallback to non-transactional insert when running against standalone MongoDB.
     for (const item of toCreate) {
@@ -1078,7 +1126,13 @@ const allocateSession = asyncHandler(async (req, res) => {
         if (mongoSession) mongoSession.endSession();
     }
 
-    return res.status(201).json(new ApiResponse(201, createdSessions, "Session(s) allocated successfully."));
+    const newlyCreatedCount = createdSessions?.length || toCreate.length;
+    payment.sessionsAllocated = (payment.sessionsAllocated || 0) + newlyCreatedCount;
+    const sessionCap = payment.sessionCount || 0;
+    payment.sessionsRemaining = sessionCap > 0 ? Math.max(sessionCap - payment.sessionsAllocated, 0) : 0;
+    await payment.save();
+
+    return res.status(201).json(new ApiResponse(201, { sessions: createdSessions, payment }, "Session(s) allocated successfully."));
 });
 
 const quickSearch = asyncHandler(async (req, res) => {
@@ -2156,7 +2210,7 @@ const cleanupOrphanedSessions = asyncHandler(async (req, res) => {
 });
 
 const createPaymentRequest = asyncHandler(async (req, res) => {
-    const { patientId, userId, amount, description, paymentType, dueDate, sessionId, notes } = req.body;
+    const { patientId, userId, amount, description, paymentType, dueDate, sessionId, notes, sessionCount } = req.body;
 
     if (!patientId || !userId || !amount || !description) {
         throw new ApiError(400, "Patient ID, User ID, amount, and description are required");
@@ -2174,6 +2228,14 @@ const createPaymentRequest = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User not found");
     }
 
+    let normalizedSessionCount = Number(sessionCount) || 0;
+    if (normalizedSessionCount < 0) {
+        throw new ApiError(400, "Session count cannot be negative");
+    }
+    if (paymentType === 'session' && normalizedSessionCount <= 0) {
+        throw new ApiError(400, "Please specify how many sessions are being paid for");
+    }
+
     // Create payment request
     const payment = await Payment.create({
         patientId,
@@ -2185,7 +2247,10 @@ const createPaymentRequest = asyncHandler(async (req, res) => {
         requestedBy: req.user._id,
         dueDate: dueDate ? new Date(dueDate) : null,
         sessionId: sessionId || null,
-        notes: notes || ''
+        notes: notes || '',
+        sessionCount: normalizedSessionCount,
+        sessionsAllocated: 0,
+        sessionsRemaining: 0
     });
 
     // Create notification for the patient
@@ -2260,6 +2325,9 @@ const getAllPaymentsAdmin = asyncHandler(async (req, res) => {
                 dueDate: 1,
                 paidAt: 1,
                 notes: 1,
+                sessionCount: 1,
+                sessionsAllocated: 1,
+                sessionsRemaining: 1,
                 createdAt: 1,
                 patientName: '$patient.name',
                 patientMobile: '$user.mobile_number',
@@ -2298,7 +2366,14 @@ const updatePaymentStatus = asyncHandler(async (req, res) => {
     payment.status = status;
     if (transactionId) payment.transactionId = transactionId;
     if (notes) payment.notes = notes;
-    if (status === 'completed') payment.paidAt = new Date();
+    if (status === 'completed') {
+        payment.paidAt = new Date();
+        const totalSessions = payment.sessionCount || 0;
+        const allocated = payment.sessionsAllocated || 0;
+        payment.sessionsRemaining = totalSessions > 0 ? Math.max(totalSessions - allocated, 0) : 0;
+    } else if (status === 'cancelled') {
+        payment.sessionsRemaining = 0;
+    }
 
     await payment.save();
 
@@ -2319,4 +2394,23 @@ const updatePaymentStatus = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, payment, "Payment updated successfully"));
 });
 
-export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus };
+const getPatientPaymentCredits = asyncHandler(async (req, res) => {
+    const { patientId } = req.params;
+    if (!mongoose.isValidObjectId(patientId)) {
+        throw new ApiError(400, "Invalid patient id");
+    }
+
+    const payments = await Payment.find({
+        patientId,
+        status: 'completed',
+        sessionCount: { $gt: 0 }
+    })
+    .sort({ paidAt: -1, createdAt: -1 })
+    .select('_id amount description sessionCount sessionsAllocated sessionsRemaining paymentType paidAt dueDate notes');
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, payments, "Patient payment credits retrieved successfully"));
+});
+
+export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits };

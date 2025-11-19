@@ -54,8 +54,15 @@ async function updateSessionStatuses() {
                     // Future session - scheduled
                     newStatus = 'scheduled';
                 } else {
-                    // Past session without start time - mark as completed
-                    newStatus = 'completed';
+                    // Past session without start time - check if it should be marked as missed
+                    const sessionEnd = new Date(sessionDate.getTime() + (session.durationMinutes || 60) * 60000);
+                    // If session time has passed and physiotherapist didn't start it, mark as missed
+                    if (now > sessionEnd && !session.startTime) {
+                        newStatus = 'missed';
+                    } else {
+                        // Past session without start time (legacy handling)
+                        newStatus = 'completed';
+                    }
                 }
 
                 // Update session

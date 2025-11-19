@@ -74,6 +74,21 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    sessionCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    sessionsAllocated: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    sessionsRemaining: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   { timestamps: true }
 );

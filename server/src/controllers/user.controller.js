@@ -466,6 +466,30 @@ const getCurrentUser = asyncHandler(async (req, res) => {
                     .select('sessionDate surgeryType doctorId physioId completedSessions totalSessions notes durationMinutes status startTime endTime actualDuration sessionVideo')
                     .sort({ sessionDate: -1 }) // Show most recent first
                     .lean();
+                
+                // Update missed sessions - check if session passed without being started by physiotherapist
+                const now = new Date();
+                for (const session of sessions) {
+                    if (!session.startTime && 
+                        session.status !== 'completed' && 
+                        session.status !== 'cancelled' && 
+                        session.status !== 'missed') {
+                        
+                        const sessionDate = new Date(session.sessionDate);
+                        const sessionEnd = new Date(sessionDate.getTime() + (session.durationMinutes || 60) * 60000);
+                        
+                        // If session time has passed and physiotherapist didn't start it, mark as missed
+                        if (now > sessionEnd) {
+                            try {
+                                await Session.findByIdAndUpdate(session._id, { status: 'missed' });
+                                session.status = 'missed';
+                            } catch (error) {
+                                console.error(`Error updating session ${session._id} to missed:`, error);
+                            }
+                        }
+                    }
+                }
+                
                 userObj.sessions = sessions || [];
             } else {
                 userObj.sessions = [];

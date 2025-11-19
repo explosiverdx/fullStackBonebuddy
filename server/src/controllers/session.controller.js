@@ -6,6 +6,47 @@ import { ApiError } from "../utils/ApiError.js";
 import { Session } from "../models/sessions.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+/**
+ * Helper function to check and update missed sessions
+ * A session is missed if:
+ * - sessionDate has passed
+ * - startTime is not set (physiotherapist didn't start it)
+ * - status is not 'completed', 'cancelled', or already 'missed'
+ */
+const updateMissedSessions = async (sessions) => {
+    const now = new Date();
+    const updates = [];
+
+    for (const session of sessions) {
+        // Check if session should be marked as missed
+        if (!session.startTime && 
+            session.status !== 'completed' && 
+            session.status !== 'cancelled' && 
+            session.status !== 'missed') {
+            
+            const sessionDate = new Date(session.sessionDate);
+            const sessionEnd = new Date(sessionDate.getTime() + (session.durationMinutes || 60) * 60000);
+            
+            // If session time has passed and physiotherapist didn't start it, mark as missed
+            if (now > sessionEnd) {
+                try {
+                    await Session.findByIdAndUpdate(session._id, { status: 'missed' });
+                    session.status = 'missed';
+                    updates.push(session._id);
+                } catch (error) {
+                    console.error(`Error updating session ${session._id} to missed:`, error);
+                }
+            }
+        }
+    }
+
+    if (updates.length > 0) {
+        console.log(`Marked ${updates.length} sessions as missed`);
+    }
+
+    return sessions;
+};
+
 const getMySessions = asyncHandler(async (req, res) => {
     // Only patients should call this to fetch their own sessions
     if (req.user.userType !== 'patient') {
@@ -20,6 +61,9 @@ const getMySessions = asyncHandler(async (req, res) => {
     }
 
     const sessions = await Session.find({ patientId: patient._id }).sort({ sessionDate: 1 }).lean();
+    
+    // Update missed sessions
+    await updateMissedSessions(sessions);
 
     return res.status(200).json(new ApiResponse(200, sessions, 'Sessions fetched successfully'));
 });
@@ -242,8 +286,18 @@ const listSessionsAdmin = asyncHandler(async (req, res) => {
 
     const aggregate = Session.aggregate(pipeline);
     const options = { page: parseInt(page, 10), limit: parseInt(limit, 10) };
-    const sessions = await Session.aggregatePaginate(aggregate, options);
-    return res.status(200).json(new ApiResponse(200, sessions, 'Sessions listed successfully.'));
+    const sessionsResult = await Session.aggregatePaginate(aggregate, options);
+    
+    // Update missed sessions before returning
+    if (sessionsResult.docs && sessionsResult.docs.length > 0) {
+        await updateMissedSessions(sessionsResult.docs);
+        // Re-fetch to get updated statuses
+        const updatedAggregate = Session.aggregate(pipeline);
+        const updatedSessions = await Session.aggregatePaginate(updatedAggregate, options);
+        return res.status(200).json(new ApiResponse(200, updatedSessions, 'Sessions listed successfully.'));
+    }
+    
+    return res.status(200).json(new ApiResponse(200, sessionsResult, 'Sessions listed successfully.'));
 });
 
 // Admin: update a session (editable fields: sessionDate, status, durationMinutes, surgeryType)
@@ -381,8 +435,9 @@ const endSession = asyncHandler(async (req, res) => {
 const uploadSessionVideo = asyncHandler(async (req, res) => {
     const { sessionId, title, description } = req.body;
 
-    if (!['physio', 'physiotherapist'].includes(req.user.userType)) {
-        throw new ApiError(403, "Only physiotherapists can upload session videos.");
+    // Allow both physiotherapists and admins to upload videos
+    if (!['physio', 'physiotherapist', 'admin'].includes(req.user.userType)) {
+        throw new ApiError(403, "Only physiotherapists and admins can upload session videos.");
     }
 
     if (!sessionId) {
@@ -398,17 +453,25 @@ const uploadSessionVideo = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Session not found.");
     }
 
-    // Verify this physiotherapist is assigned to this session
-    const { Physio } = await import('../models/physio.models.js');
-    const physio = await Physio.findOne({ userId: req.user._id });
-    
-    if (!physio || session.physioId.toString() !== physio._id.toString()) {
-        throw new ApiError(403, "You are not authorized to upload video for this session.");
+    // If not admin, verify this physiotherapist is assigned to this session
+    if (req.user.userType !== 'admin') {
+        const { Physio } = await import('../models/physio.models.js');
+        const physio = await Physio.findOne({ userId: req.user._id });
+        
+        if (!physio || session.physioId.toString() !== physio._id.toString()) {
+            throw new ApiError(403, "You are not authorized to upload video for this session.");
+        }
     }
 
     // Check if session is completed
     if (session.status !== 'completed') {
         throw new ApiError(400, "Can only upload videos for completed sessions.");
+    }
+
+    // If there's an existing video, delete it from Cloudinary first
+    if (session.sessionVideo && session.sessionVideo.publicId) {
+        const { deleteFromCloudinary } = await import('../utils/cloudinary.js');
+        await deleteFromCloudinary(session.sessionVideo.publicId, 'video');
     }
 
     // Upload video to Cloudinary
@@ -458,9 +521,8 @@ const deleteSessionVideo = asyncHandler(async (req, res) => {
     // Delete from Cloudinary if publicId exists
     if (session.sessionVideo.publicId) {
         try {
-            const { uploadOnCloudinary } = await import('../utils/cloudinary.js');
-            // Note: You might need to add a delete function in cloudinary.js
-            // For now, we'll just remove from database
+            const { deleteFromCloudinary } = await import('../utils/cloudinary.js');
+            await deleteFromCloudinary(session.sessionVideo.publicId, 'video');
         } catch (error) {
             console.error('Error deleting from cloudinary:', error);
         }

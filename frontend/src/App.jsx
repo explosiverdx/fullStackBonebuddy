@@ -37,6 +37,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginRedirector from './components/LoginRedirector';
 import ScrollToTop from './components/ScrollToTop';
 import FloatingWhatsAppButton from './components/FloatingWhatsAppButton';
+import AIAssistant from './components/AIAssistant';
 
 function App() {
   const location = useLocation();
@@ -85,6 +86,7 @@ function App() {
       </main>
       {!isAdminPage && <Footer />}
       {!isAdminPage && <FloatingWhatsAppButton />}
+      {!isAdminPage && <AIAssistant />}
       <SignIn isOpen={isSignInOpen} onClose={closeSignIn} />
     </div>
   );

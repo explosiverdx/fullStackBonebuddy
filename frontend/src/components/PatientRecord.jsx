@@ -16,7 +16,11 @@ const getMedicalReportUrl = (reportPath) => {
 };
 
 const PatientRecord = () => {
-  const [activeTab, setActiveTab] = useState('patients'); // 'patients' or 'incomplete'
+  // Load active tab from localStorage or default to 'patients'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('patientRecordActiveTab');
+    return savedTab || 'patients';
+  });
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -614,7 +618,11 @@ const PatientRecord = () => {
       <div className="mb-6 border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
-            onClick={() => setActiveTab('patients')}
+            onClick={() => {
+              setActiveTab('patients');
+              // Save active tab to localStorage so it persists on refresh
+              localStorage.setItem('patientRecordActiveTab', 'patients');
+            }}
             className={`${
               activeTab === 'patients'
                 ? 'border-blue-500 text-blue-600'
@@ -627,7 +635,11 @@ const PatientRecord = () => {
             </span>
           </button>
           <button
-            onClick={() => setActiveTab('incomplete')}
+            onClick={() => {
+              setActiveTab('incomplete');
+              // Save active tab to localStorage so it persists on refresh
+              localStorage.setItem('patientRecordActiveTab', 'incomplete');
+            }}
             className={`${
               activeTab === 'incomplete'
                 ? 'border-orange-500 text-orange-600'

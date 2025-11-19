@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useLocation, Routes, Route } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import jsPDF from 'jspdf';
@@ -9,6 +9,7 @@ import DoctorTable from './DoctorTable'; // Assuming these components exist
 import ContactSubmissions from './ContactSubmissions';
 import PhysiotherapistTable from './PhysiotherapistTable'; // Assuming these components exist
 import Payments from './AdminDashboard/Payments';
+import Referrals from './AdminDashboard/Referrals';
 
 // Dashboard component to display stats
 const Dashboard = ({ stats }) => {
@@ -321,7 +322,17 @@ const AllocateSession = ({ authHeaders }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [paymentCredits, setPaymentCredits] = useState([]);
+  const [selectedPaymentId, setSelectedPaymentId] = useState('');
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [creditError, setCreditError] = useState('');
+  const [scheduleWarning, setScheduleWarning] = useState('');
   const clientTimezone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
+
+  const selectedPayment = useMemo(() => {
+    if (!selectedPaymentId) return null;
+    return paymentCredits.find((p) => p?._id === selectedPaymentId) || null;
+  }, [paymentCredits, selectedPaymentId]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -331,6 +342,11 @@ const AllocateSession = ({ authHeaders }) => {
   const handleDisplayChange = async (field, value) => {
     setDisplayNames(prev => ({ ...prev, [field]: value }));
     setFormData(prev => ({ ...prev, [`${field}Id`]: '' }));
+    if (field === 'patient') {
+      setPaymentCredits([]);
+      setSelectedPaymentId('');
+      setCreditError('');
+    }
 
     if (value.trim().length > 1) {
       try {
@@ -361,7 +377,10 @@ const AllocateSession = ({ authHeaders }) => {
     // - doctors: suggestion._id (actual Doctor._id)
     // - physios: suggestion._id (actual Physio._id)
     if (field === 'patient') {
-      setFormData(prev => ({ ...prev, patientId: suggestion.patientId || suggestion._id }));
+      const patientDocId = suggestion.patientId || suggestion._id;
+      setFormData(prev => ({ ...prev, patientId: patientDocId }));
+      setScheduleWarning('');
+      fetchPaymentCredits(patientDocId);
     } else {
       // For doctors and physios, always use suggestion._id which is the correct profile document ID
       setFormData(prev => ({ ...prev, [`${field}Id`]: suggestion._id }));
@@ -369,6 +388,128 @@ const AllocateSession = ({ authHeaders }) => {
     setSuggestions(prev => ({ ...prev, patients: field === 'patient' ? [] : prev.patients, doctors: field === 'doctor' ? [] : prev.doctors, physios: field === 'physio' ? [] : prev.physios }));
     setShowDropdown(prev => ({ ...prev, [field]: false }));
   };
+
+  const fetchPaymentCredits = async (patientDocId) => {
+    if (!patientDocId) return;
+    setCreditLoading(true);
+    setCreditError('');
+    setPaymentCredits([]);
+    setSelectedPaymentId('');
+    try {
+      const response = await fetch(`/api/v1/admin/patients/${patientDocId}/payment-credits`, { headers: authHeaders });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to load payment credits');
+      }
+      const credits = data.data || [];
+      setPaymentCredits(credits);
+      if (credits.length === 1) {
+        setSelectedPaymentId(credits[0]._id);
+      }
+      if (credits.length === 0) {
+        setCreditError('No completed payments with remaining sessions were found for this patient.');
+      }
+    } catch (err) {
+      setCreditError(err.message || 'Unable to load payment credits');
+    } finally {
+      setCreditLoading(false);
+    }
+  };
+
+  const getRemainingForPayment = (payment) => {
+    if (!payment) return 0;
+    const total = Number(payment.sessionCount || 0);
+    const allocated = Number(payment.sessionsAllocated || 0);
+    const stored = typeof payment.sessionsRemaining === 'number' ? Number(payment.sessionsRemaining) : null;
+    const computed = total - allocated;
+    const candidates = [computed];
+    if (stored !== null) candidates.push(stored);
+    return Math.max(...candidates, 0);
+  };
+  const remainingSessions = getRemainingForPayment(selectedPayment);
+  const paymentHasCredits = !!selectedPayment && remainingSessions > 0;
+  const scheduleInputsDisabled = !!selectedPayment && !paymentHasCredits;
+
+  const addDaysSkippingWeekend = (date, days) => {
+    const result = new Date(date);
+    while (days > 0) {
+      result.setDate(result.getDate() + 1);
+      const day = result.getDay();
+      if (day !== 0 && day !== 6) {
+        days--;
+      }
+    }
+    return result;
+  };
+
+  const getMaxAllowedEndDate = (startStr, frequency, remaining) => {
+    const start = new Date(startStr);
+    if (Number.isNaN(start.getTime()) || remaining <= 0) return start;
+    const sessionsToAdd = Math.max(remaining - 1, 0);
+    let maxDate = new Date(start);
+
+    switch (frequency) {
+      case 'weekly':
+        maxDate.setDate(maxDate.getDate() + sessionsToAdd * 7);
+        break;
+      case 'weekdays':
+        maxDate = addDaysSkippingWeekend(start, sessionsToAdd);
+        break;
+      case 'daily':
+      default:
+        maxDate.setDate(maxDate.getDate() + sessionsToAdd);
+    }
+    return maxDate;
+  };
+
+  const formatDateInput = (dateObj) => {
+    if (!dateObj) return '';
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getPaymentById = (id) => paymentCredits.find((p) => p._id === id);
+  const maxRecurringEndDate = useMemo(() => {
+    if (!formData.isRecurring || !selectedPayment || !formData.startDate) return null;
+    if (!remainingSessions) return new Date(formData.startDate);
+    const frequency = formData.frequency || 'daily';
+    return getMaxAllowedEndDate(formData.startDate, frequency, remainingSessions);
+  }, [formData.isRecurring, formData.startDate, formData.frequency, selectedPayment, remainingSessions]);
+  const maxEndDateString = formData.isRecurring && maxRecurringEndDate
+    ? formatDateInput(maxRecurringEndDate)
+    : undefined;
+
+  useEffect(() => {
+    if (!formData.isRecurring) {
+      setScheduleWarning('');
+      return;
+    }
+    if (!selectedPayment || !formData.startDate) {
+      setScheduleWarning('');
+      return;
+    }
+
+    if (!remainingSessions) {
+      setScheduleWarning('No sessions remaining for the selected payment.');
+      return;
+    }
+
+    if (formData.endDate && maxRecurringEndDate) {
+      const currentEnd = new Date(formData.endDate);
+      if (currentEnd > maxRecurringEndDate) {
+        const adjusted = formatDateInput(maxRecurringEndDate);
+        if (adjusted !== formData.endDate) {
+          setFormData(prev => ({ ...prev, endDate: adjusted }));
+        }
+        setScheduleWarning(`Only ${remainingSessions} session(s) available; end date adjusted to include ${remainingSessions} day(s).`);
+        return;
+      }
+    }
+
+    setScheduleWarning('');
+  }, [formData.isRecurring, formData.startDate, formData.endDate, selectedPayment, remainingSessions, maxRecurringEndDate]);
 
   // Helper: generate session datetime slots between start and end dates
   const generateSessions = (startStr, endStr, timeStr, frequency, meta = {}) => {
@@ -421,6 +562,12 @@ const AllocateSession = ({ authHeaders }) => {
       return;
     }
 
+    if (!selectedPayment || !paymentHasCredits) {
+      setError('Please select a payment package with available sessions before scheduling.');
+      setLoading(false);
+      return;
+    }
+
     if (formData.isRecurring) {
       if (!formData.endDate || !formData.frequency) {
         setError('Please fill recurring details');
@@ -469,13 +616,21 @@ const AllocateSession = ({ authHeaders }) => {
   sessions = [{ appointmentDate: localDt.toISOString(), durationMinutes: totalDurationMinutes, timezone: clientTimezone, ...meta }];
       }
 
+      const remainingSessions = getRemainingForPayment(selectedPayment);
+      if (sessions.length > remainingSessions) {
+        setError(`Selected payment only has ${remainingSessions} session(s) remaining. Please reduce the count or choose another payment.`);
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         patientId: formData.patientId,
         doctorId: formData.doctorId,
         physioId: formData.physioId,
         surgeryType: formData.surgeryType,
         totalSessions: sessions.length,
-        sessions
+        sessions,
+        paymentId: selectedPaymentId
       };
 
       console.log('Sending API request with payload:', payload);
@@ -511,6 +666,9 @@ const AllocateSession = ({ authHeaders }) => {
         frequency: 'daily'
       });
       setDisplayNames({ patient: '', doctor: '', physio: '' });
+      setPaymentCredits([]);
+      setSelectedPaymentId('');
+      setCreditError('');
     } catch (err) {
       console.error('Error:', err);
       setError(err.message || 'Failed to allocate session');
@@ -561,6 +719,54 @@ const AllocateSession = ({ authHeaders }) => {
           )}
         </div>
 
+        {/* Payment Credits */}
+        {formData.patientId && (
+          <div className="border border-teal-100 rounded-md p-3 bg-teal-50">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-teal-900">Available Paid Sessions</h4>
+              {creditLoading && <span className="text-xs text-gray-600">Checking credits...</span>}
+            </div>
+            {creditError && <p className="text-sm text-red-600 mb-2">{creditError}</p>}
+            {!creditLoading && paymentCredits.length === 0 && !creditError && (
+              <p className="text-sm text-gray-600">No credits detected. Ask the client to complete a payment request with session count.</p>
+            )}
+            {paymentCredits.length > 0 && (
+              <div className="space-y-2">
+                {paymentCredits.map((credit) => {
+                  const remaining = getRemainingForPayment(credit);
+                  return (
+                    <label key={credit._id} className="flex items-start gap-3 p-2 border rounded-md bg-white cursor-pointer">
+                      <input
+                        type="radio"
+                        name="paymentCredit"
+                        value={credit._id}
+                        checked={selectedPaymentId === credit._id}
+                        onChange={() => setSelectedPaymentId(credit._id)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">
+                          ₹{credit.amount} • {credit.description || credit.paymentType}
+                        </div>
+                        <div className="text-xs text-gray-600">
+                          {credit.sessionCount} sessions paid • {remaining} remaining
+                          {credit.paidAt && ` • Paid on ${new Date(credit.paidAt).toLocaleDateString()}`}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {scheduleInputsDisabled && (
+          <div className="border border-yellow-300 rounded-md p-3 bg-yellow-50 text-sm text-yellow-900">
+            No sessions remaining for the selected payment. Please choose another payment or request additional sessions.
+          </div>
+        )}
+
         {/* Doctor */}
         <div className="relative">
           <label className="block text-gray-700 text-sm font-bold mb-2">Doctor</label>
@@ -609,32 +815,88 @@ const AllocateSession = ({ authHeaders }) => {
 
         {formData.isRecurring ? (
           <>
+            {scheduleWarning && (
+              <div className="p-3 border border-yellow-300 rounded bg-yellow-50 text-sm text-yellow-900">
+                {scheduleWarning}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">Start Date</label>
-                <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                <input
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleInputChange}
+                  required
+                  disabled={scheduleInputsDisabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                />
               </div>
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">End Date</label>
-                <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} required min={formData.startDate} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                <input
+                  type="date"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleInputChange}
+                  required
+                  min={formData.startDate || ''}
+                  max={maxEndDateString}
+                  disabled={scheduleInputsDisabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">Daily Session Time</label>
-                <input type="time" name="sessionTime" value={formData.sessionTime} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                <input
+                  type="time"
+                  name="sessionTime"
+                  value={formData.sessionTime}
+                  onChange={handleInputChange}
+                  required
+                  disabled={scheduleInputsDisabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                />
               </div>
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">Duration</label>
                 <div className="flex gap-2">
-                  <input type="number" name="durationHours" value={formData.durationHours} onChange={handleInputChange} min="0" max="24" className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                  <input type="number" name="durationMinutes" value={formData.durationMinutes} onChange={handleInputChange} min="0" max="59" className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  <input
+                    type="number"
+                    name="durationHours"
+                    value={formData.durationHours}
+                    onChange={handleInputChange}
+                    min="0"
+                    max="24"
+                    disabled={scheduleInputsDisabled}
+                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                  />
+                  <input
+                    type="number"
+                    name="durationMinutes"
+                    value={formData.durationMinutes}
+                    onChange={handleInputChange}
+                    min="0"
+                    max="59"
+                    disabled={scheduleInputsDisabled}
+                    className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                  />
                 </div>
                 <p className="text-sm text-gray-500 mt-1">Hours • Minutes (e.g. 1 and 30 = 1h30m)</p>
               </div>
               <div>
                 <label className="block text-gray-700 text-sm font-bold mb-2">Frequency</label>
-                <select name="frequency" value={formData.frequency} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <select
+                  name="frequency"
+                  value={formData.frequency}
+                  onChange={handleInputChange}
+                  required
+                  disabled={scheduleInputsDisabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                >
                   <option value="daily">Daily</option>
                   <option value="weekdays">Weekdays Only</option>
                   <option value="weekly">Weekly</option>
@@ -646,17 +908,51 @@ const AllocateSession = ({ authHeaders }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">Session Date</label>
-              <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              <input
+                type="date"
+                name="startDate"
+                value={formData.startDate}
+                onChange={handleInputChange}
+                required
+                disabled={scheduleInputsDisabled}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+              />
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">Session Time</label>
-              <input type="time" name="sessionTime" value={formData.sessionTime} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              <input
+                type="time"
+                name="sessionTime"
+                value={formData.sessionTime}
+                onChange={handleInputChange}
+                required
+                disabled={scheduleInputsDisabled}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+              />
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">Duration</label>
               <div className="flex gap-2">
-                <input type="number" name="durationHours" value={formData.durationHours} onChange={handleInputChange} min="0" max="24" className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                <input type="number" name="durationMinutes" value={formData.durationMinutes} onChange={handleInputChange} min="0" max="59" className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                <input
+                  type="number"
+                  name="durationHours"
+                  value={formData.durationHours}
+                  onChange={handleInputChange}
+                  min="0"
+                  max="24"
+                  disabled={scheduleInputsDisabled}
+                  className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                />
+                <input
+                  type="number"
+                  name="durationMinutes"
+                  value={formData.durationMinutes}
+                  onChange={handleInputChange}
+                  min="0"
+                  max="59"
+                  disabled={scheduleInputsDisabled}
+                  className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+                />
               </div>
               <p className="text-sm text-gray-500 mt-1">Hours • Minutes (e.g. 0 and 45 = 45 minutes)</p>
             </div>
@@ -665,7 +961,24 @@ const AllocateSession = ({ authHeaders }) => {
 
         <div>
           <label className="block text-gray-700 text-sm font-bold mb-2">Total Sessions</label>
-          <input type="number" name="totalSessions" value={formData.totalSessions} onChange={handleInputChange} min="1" readOnly={formData.isRecurring} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Enter number of sessions" />
+          <input
+            type="number"
+            name="totalSessions"
+            value={formData.totalSessions}
+            onChange={handleInputChange}
+            min="1"
+            max={!formData.isRecurring && paymentHasCredits ? remainingSessions : undefined}
+            readOnly={formData.isRecurring}
+            disabled={scheduleInputsDisabled}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:bg-gray-100"
+            placeholder={
+              formData.isRecurring
+                ? 'Calculated from schedule'
+                : selectedPayment
+                ? `Max ${remainingSessions} session(s)`
+                : 'Enter number of sessions'
+            }
+          />
           {formData.isRecurring && <p className="text-sm text-gray-500 mt-1">Total sessions will be calculated based on the date range and frequency</p>}
         </div>
 
@@ -691,7 +1004,11 @@ const AllocateSession = ({ authHeaders }) => {
         {error && <p className="text-red-500 text-sm">{error}</p>}
         {success && <p className="text-green-500 text-sm">{success}</p>}
 
-        <button type="submit" disabled={loading || !formData.patientId || !formData.doctorId || !formData.physioId} className="bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50">
+        <button
+          type="submit"
+          disabled={loading || !formData.patientId || !formData.doctorId || !formData.physioId || scheduleInputsDisabled}
+          className="bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50"
+        >
           {loading ? 'Allocating...' : 'Allocate Session'}
         </button>
       </form>
@@ -714,6 +1031,10 @@ const SessionHistory = ({ authHeaders }) => {
   const [editingVideo, setEditingVideo] = useState(null); // video being edited
   const [videoTitle, setVideoTitle] = useState('');
   const [videoDescription, setVideoDescription] = useState('');
+  const [reuploadingVideo, setReuploadingVideo] = useState(null); // session for reuploading video
+  const [reuploadVideoFile, setReuploadVideoFile] = useState(null);
+  const [reuploadTitle, setReuploadTitle] = useState('');
+  const [reuploadDescription, setReuploadDescription] = useState('');
 
   const fetchSessions = async (pg = 1, isInitial = false) => {
     if (isInitial) {
@@ -839,11 +1160,47 @@ const SessionHistory = ({ authHeaders }) => {
     }
   };
 
+  const handleReuploadVideo = async (sessionId) => {
+    if (!reuploadVideoFile) {
+      alert('Please select a video file');
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('video', reuploadVideoFile);
+      formData.append('sessionId', sessionId);
+      formData.append('title', reuploadTitle || 'Session Video');
+      formData.append('description', reuploadDescription || '');
+
+      const res = await fetch('/api/v1/sessions/upload-video', {
+        method: 'POST',
+        headers: authHeaders,
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Reupload failed');
+      
+      alert('✅ Video reuploaded successfully');
+      setReuploadingVideo(null);
+      setReuploadVideoFile(null);
+      setReuploadTitle('');
+      setReuploadDescription('');
+      fetchSessions(page);
+    } catch (err) {
+      alert(`❌ Error: ${err.message || 'Failed to reupload video'}`);
+    }
+  };
+
   const getSessionStatus = (session) => {
     const normalizedStatus = (session.status || '').toLowerCase();
 
     if (normalizedStatus === 'completed') {
       return { text: 'Completed', className: 'bg-gray-100 text-gray-800' };
+    }
+    if (normalizedStatus === 'missed') {
+      return { text: 'Missed', className: 'bg-orange-100 text-orange-800' };
     }
     if (normalizedStatus === 'in-progress' || normalizedStatus === 'ongoing') {
       return { text: 'Ongoing', className: 'bg-green-100 text-green-800 animate-pulse' };
@@ -851,7 +1208,7 @@ const SessionHistory = ({ authHeaders }) => {
     if (normalizedStatus === 'scheduled' || normalizedStatus === 'upcoming') {
       return { text: 'Upcoming', className: 'bg-blue-100 text-blue-800' };
     }
-    if (normalizedStatus === 'canceled') {
+    if (normalizedStatus === 'cancelled' || normalizedStatus === 'canceled') {
       return { text: 'Canceled', className: 'bg-red-100 text-red-800' };
     }
 
@@ -860,6 +1217,11 @@ const SessionHistory = ({ authHeaders }) => {
     const sessionStart = new Date(session.sessionDate);
     const duration = session.durationMinutes || 60;
     const sessionEnd = new Date(sessionStart.getTime() + duration * 60000);
+
+    // Check if session should be marked as missed (no startTime and past end time)
+    if (!session.startTime && now > sessionEnd) {
+      return { text: 'Missed', className: 'bg-orange-100 text-orange-800' };
+    }
 
     if (now >= sessionStart && now <= sessionEnd) {
       return { text: 'Ongoing', className: 'bg-green-100 text-green-800 animate-pulse' };
@@ -918,11 +1280,25 @@ const SessionHistory = ({ authHeaders }) => {
                 <td className="px-3 py-2">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getSessionStatus(s).className}`}>{getSessionStatus(s).text}</span>
                 </td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-2 align-middle" style={{ position: 'relative', padding: '8px 12px' }}>
                   {s.sessionVideo && s.sessionVideo.url ? (
                     <button 
-                      onClick={() => handleViewVideo(s)} 
-                      className="bg-purple-500 text-white px-2 py-1 rounded text-xs hover:bg-purple-600"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleViewVideo(s);
+                      }}
+                      className="bg-purple-500 text-white px-3 py-2 rounded text-xs hover:bg-purple-600 cursor-pointer border-0 relative z-10"
+                      style={{ 
+                        display: 'block', 
+                        width: '100%', 
+                        minHeight: '32px',
+                        lineHeight: 'normal',
+                        position: 'relative',
+                        pointerEvents: 'auto',
+                        userSelect: 'none',
+                        verticalAlign: 'middle'
+                      }}
                     >
                       📹 View
                     </button>
@@ -930,11 +1306,95 @@ const SessionHistory = ({ authHeaders }) => {
                     <span className="text-xs text-gray-400">No video</span>
                   )}
                 </td>
-                <td className="px-3 py-2">
-                  <div className="flex gap-2">
-                    <button onClick={() => startEdit(s)} className="bg-yellow-500 text-white px-2 py-1 rounded text-xs">Edit</button>
-                    <button onClick={() => handleDelete(s._id)} className="bg-red-500 text-white px-2 py-1 rounded text-xs">Delete</button>
-                  </div>
+                <td className="px-3 py-2 align-middle" style={{ position: 'relative', padding: '8px 12px' }}>
+                  {s.status === 'completed' ? (
+                    <div className="flex gap-2 flex-col" style={{ position: 'relative', zIndex: 10 }}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleDeleteVideo(s._id);
+                        }}
+                        className={`px-3 py-2 rounded text-xs text-center cursor-pointer border-0 relative ${
+                          s.sessionVideo?.url 
+                            ? 'bg-red-500 text-white hover:bg-red-600' 
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
+                        }`}
+                        style={{ 
+                          display: 'block', 
+                          width: '100%', 
+                          minHeight: '32px',
+                          lineHeight: 'normal',
+                          pointerEvents: s.sessionVideo?.url ? 'auto' : 'none',
+                          userSelect: 'none',
+                          verticalAlign: 'middle'
+                        }}
+                        disabled={!s.sessionVideo?.url}
+                      >
+                        🗑️ Delete Video
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setReuploadingVideo(s);
+                          setReuploadTitle(s.sessionVideo?.title || '');
+                          setReuploadDescription(s.sessionVideo?.description || '');
+                        }}
+                        className="bg-purple-500 text-white px-3 py-2 rounded text-xs hover:bg-purple-600 text-center cursor-pointer border-0 relative"
+                        style={{ 
+                          display: 'block', 
+                          width: '100%', 
+                          minHeight: '32px',
+                          lineHeight: 'normal',
+                          pointerEvents: 'auto',
+                          userSelect: 'none',
+                          verticalAlign: 'middle'
+                        }}
+                      >
+                        📤 Reupload Video
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2" style={{ position: 'relative', zIndex: 10 }}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          startEdit(s);
+                        }}
+                        className="bg-yellow-500 text-white px-3 py-2 rounded text-xs hover:bg-yellow-600 cursor-pointer border-0 relative"
+                        style={{ 
+                          display: 'inline-block', 
+                          minHeight: '32px',
+                          lineHeight: 'normal',
+                          pointerEvents: 'auto',
+                          userSelect: 'none',
+                          verticalAlign: 'middle'
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleDelete(s._id);
+                        }}
+                        className="bg-red-500 text-white px-3 py-2 rounded text-xs hover:bg-red-600 cursor-pointer border-0 relative"
+                        style={{ 
+                          display: 'inline-block', 
+                          minHeight: '32px',
+                          lineHeight: 'normal',
+                          pointerEvents: 'auto',
+                          userSelect: 'none',
+                          verticalAlign: 'middle'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1073,6 +1533,77 @@ const SessionHistory = ({ authHeaders }) => {
                   className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700"
                 >
                   Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reupload Video Modal */}
+      {reuploadingVideo && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Reupload Session Video</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Patient: {reuploadingVideo.patient?.name || 'N/A'} - {reuploadingVideo.surgeryType}
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Video File *</label>
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setReuploadVideoFile(e.target.files[0])}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+                {reuploadVideoFile && (
+                  <p className="text-xs text-gray-500 mt-1">Selected: {reuploadVideoFile.name}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Title</label>
+                <input
+                  type="text"
+                  value={reuploadTitle}
+                  onChange={(e) => setReuploadTitle(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  placeholder="Video title"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <textarea
+                  value={reuploadDescription}
+                  onChange={(e) => setReuploadDescription(e.target.value)}
+                  className="w-full p-2 border rounded"
+                  rows="3"
+                  placeholder="Video description"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t">
+                <button
+                  onClick={() => {
+                    setReuploadingVideo(null);
+                    setReuploadVideoFile(null);
+                    setReuploadTitle('');
+                    setReuploadDescription('');
+                  }}
+                  className="px-4 py-2 border rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleReuploadVideo(reuploadingVideo._id)}
+                  disabled={!reuploadVideoFile}
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Upload Video
                 </button>
               </div>
             </div>
@@ -2037,6 +2568,7 @@ const AdminDashboard = () => {
             <li><Link to="/admin/doctors" className={pathname.startsWith('/admin/doctors') ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Doctors</Link></li>
             <li><Link to="/admin/physiotherapists" className={pathname.startsWith('/admin/physiotherapists') ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Physiotherapists</Link></li>
             <li><Link to="/admin/payments" className={pathname === '/admin/payments' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Payments</Link></li>
+            <li><Link to="/admin/referrals" className={pathname === '/admin/referrals' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Referrals</Link></li>
             {/* <li><Link to="/admin/services" className={pathname === '/admin/services' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Services</Link></li> */}
             <li><Link to="/admin/contact" className={pathname === '/admin/contact' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Contact Form</Link></li>
             <li><Link to="/admin/change-usertype" className={pathname === '/admin/change-usertype' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Change Role</Link></li>
@@ -2213,6 +2745,7 @@ const AdminDashboard = () => {
             
             <Route path="contact" element={<ContactSubmissions />} />
             <Route path="payments" element={<Payments />} />
+            <Route path="referrals" element={<Referrals />} />
             {/* <Route path="services" element={<p>Content for Services will be added later.</p>} /> */}
             <Route path="change-usertype" element={<p></p>} />
             {/* <Route path="report" element={<p>Content for Report will be added later.</p>} /> */}

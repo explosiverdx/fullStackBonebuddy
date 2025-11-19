@@ -9,23 +9,32 @@ export const AuthProvider = ({ children }) => {
     // Check if user is logged in on app start
     const checkAuth = async () => {
       const token = localStorage.getItem('accessToken');
-      if (token) {
+      // Validate token exists and is not null/undefined/empty string
+      if (token && token !== 'null' && token !== 'undefined' && token.trim() !== '') {
         try {
           const response = await fetch('/api/v1/users/me', {
             headers: {
-              'Authorization': `Bearer ${token}`
+              'Authorization': `Bearer ${token.trim()}`
             },
+            credentials: 'include',
           });
           if (response.ok) {
             const data = await response.json();
             setUser(data.data);
           } else {
-            // Token might be expired, try refresh or clear
+            // Token might be expired or invalid, clear tokens
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
           }
-        } catch {
+        } catch (error) {
           // Auth check failed, clear tokens
+          console.error('Auth check failed:', error);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
+      } else {
+        // No valid token, clear any invalid tokens
+        if (token) {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
         }

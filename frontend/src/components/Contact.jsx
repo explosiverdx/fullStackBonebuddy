@@ -189,7 +189,8 @@ const Contact = () => {
           <div className="space-y-2 text-sm sm:text-base">
             <p><strong>Phone:</strong> +91 92778 01060</p>
             <p><strong>Email:</strong> info@bonebuddy.in</p>
-            <p><strong>Address:</strong> Plot No.44, A-Block, Indira Nagar, Lucknow, 226010</p>
+            <p><strong>Address:</strong> 202, Shelter Grand-1, Plot No.
+            <br />44, A-Block, Indira Nagar, <br />Lucknow, 226016, UP</p>
             <p><strong>Business Hours:</strong> 24/7</p>
           </div>
         </div>

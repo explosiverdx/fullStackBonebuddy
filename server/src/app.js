@@ -53,6 +53,7 @@ import authRouter from './routes/auth.routes.js'
 import reportRouter from './routes/report.routes.js'
 import notificationRouter from './routes/notification.routes.js'
 import blogRouter from './routes/blog.routes.js'
+import referralRouter from './routes/referral.routes.js'
 import { createContactSubmission } from './controllers/user.controller.js'
 
 import { errorHandler } from './utils/errorHandler.js';
@@ -77,6 +78,7 @@ app.use("/api/auth", authRouter)
 app.use("/api/v1/reports", reportRouter)
 app.use("/api/v1/notifications", notificationRouter)
 app.use("/api/v1/blogs", blogRouter)
+app.use("/api/v1/referrals", referralRouter)
 
 // Direct contact route for frontend
 app.post("/api/v1/contact", createContactSubmission);

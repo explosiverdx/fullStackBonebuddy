@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 const PhysiotherapistProfile = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  // Load active tab from localStorage or default to 'overview'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('physiotherapistProfileActiveTab');
+    return savedTab || 'overview';
+  });
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [patients, setPatients] = useState([]);
@@ -190,7 +194,11 @@ const PhysiotherapistProfile = () => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  // Save active tab to localStorage so it persists on refresh
+                  localStorage.setItem('physiotherapistProfileActiveTab', tab.id);
+                }}
                 className={`px-4 py-2 rounded-t-lg font-medium ${
                   activeTab === tab.id
                     ? 'bg-teal-600 text-white'
@@ -601,9 +609,15 @@ const PhysiotherapistProfile = () => {
                                 </div>
                                 <div className="text-right">
                                   <span className={`inline-block px-3 py-1 text-xs rounded-full mb-2 ${
-                                    isSessionActive ? 'bg-yellow-100 text-yellow-800 animate-pulse' : 'bg-green-100 text-green-800'
+                                    isSessionActive ? 'bg-yellow-100 text-yellow-800 animate-pulse' : 
+                                    session.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                    session.status === 'missed' ? 'bg-orange-100 text-orange-800' :
+                                    'bg-gray-100 text-gray-800'
                                   }`}>
-                                    {isSessionActive ? '🔴 LIVE' : session.status === 'completed' ? '✅ Completed' : 'Ongoing'}
+                                    {isSessionActive ? '🔴 LIVE' : 
+                                     session.status === 'completed' ? '✅ Completed' : 
+                                     session.status === 'missed' ? '⚠️ Missed' :
+                                     'Ongoing'}
                                   </span>
                                 </div>
                               </div>

@@ -19,7 +19,8 @@ const Payments = () => {
     description: '',
     paymentType: 'session',
     dueDate: '',
-    notes: ''
+    notes: '',
+    sessionCount: ''
   });
 
   useEffect(() => {
@@ -63,8 +64,21 @@ const Payments = () => {
       return;
     }
 
+    if (formData.paymentType === 'session') {
+      const count = Number(formData.sessionCount);
+      if (!count || count <= 0) {
+        alert('Please specify how many sessions are being covered by this payment');
+        return;
+      }
+    }
+
     try {
-      await apiClient.post('/admin/payments', formData);
+      const payload = {
+        ...formData,
+        amount: Number(formData.amount),
+        sessionCount: formData.paymentType === 'session' ? Number(formData.sessionCount) : 0
+      };
+      await apiClient.post('/admin/payments', payload);
       alert('Payment request sent successfully!');
       setShowModal(false);
       resetForm();
@@ -93,7 +107,8 @@ const Payments = () => {
       description: '',
       paymentType: 'session',
       dueDate: '',
-      notes: ''
+      notes: '',
+      sessionCount: ''
     });
   };
 
@@ -182,6 +197,9 @@ const Payments = () => {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Sessions
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Due Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -210,6 +228,16 @@ const Payments = () => {
                     <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(payment.status)}`}>
                       {payment.status}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {payment.sessionCount > 0 ? (
+                      <>
+                        <div className="font-semibold">{payment.sessionCount} booked</div>
+                        <div className="text-xs text-gray-500">{payment.sessionsRemaining ?? Math.max(payment.sessionCount - (payment.sessionsAllocated || 0), 0)} remaining</div>
+                      </>
+                    ) : (
+                      'N/A'
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {payment.dueDate ? new Date(payment.dueDate).toLocaleDateString() : 'N/A'}
@@ -263,118 +291,152 @@ const Payments = () => {
 
       {/* Create Payment Request Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg max-w-md w-full">
-            <h3 className="text-xl font-bold mb-4">Send Payment Request</h3>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Patient <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={formData.patientId}
-                onChange={handlePatientSelect}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">-- Select Patient --</option>
-                {patients.map((patient) => (
-                  <option key={patient.patientId} value={patient.patientId}>
-                    {patient.name} - {patient.mobileNumber}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount (₹) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                placeholder="Enter amount"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                min="1"
-                required
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Physiotherapy Session Payment"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Payment Type
-              </label>
-              <select
-                value={formData.paymentType}
-                onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="session">Session Fee</option>
-                <option value="consultation">Consultation Fee</option>
-                <option value="report">Report Fee</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Due Date
-              </label>
-              <input
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes
-              </label>
-              <textarea
-                placeholder="Additional notes (optional)"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                rows="3"
-              />
-            </div>
-
-            <div className="flex gap-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[95vh]">
+            <div className="flex items-center justify-between border-b px-5 py-4">
+              <h3 className="text-lg md:text-xl font-bold text-gray-900">Send Payment Request</h3>
               <button
-                type="submit"
-                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700"
-              >
-                Send Request
-              </button>
-              <button
-                type="button"
                 onClick={() => {
                   setShowModal(false);
                   resetForm();
                 }}
-                className="flex-1 bg-gray-500 text-white py-2 rounded-lg hover:bg-gray-600"
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Close payment modal"
               >
-                Cancel
+                ✕
               </button>
             </div>
-          </form>
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    Select Patient <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.patientId}
+                    onChange={handlePatientSelect}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">-- Select Patient --</option>
+                    {patients.map((patient) => (
+                      <option key={patient.patientId} value={patient.patientId}>
+                        {patient.name} - {patient.mobileNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    Amount (₹) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="Enter amount"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    min="1"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col md:col-span-2">
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    Description <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Physiotherapy Session Payment"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    Payment Type
+                  </label>
+                  <select
+                    value={formData.paymentType}
+                    onChange={(e) => setFormData({ ...formData, paymentType: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="session">Session Fee</option>
+                    <option value="consultation">Consultation Fee</option>
+                    <option value="report">Report Fee</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                {formData.paymentType === 'session' && (
+                  <div className="flex flex-col">
+                    <label className="text-sm font-medium text-gray-700 mb-1">
+                      Number of Sessions <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.sessionCount}
+                      onChange={(e) => setFormData({ ...formData, sessionCount: e.target.value })}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="How many sessions does this payment cover?"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Sessions can only be scheduled up to this amount after payment is completed.
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex flex-col">
+                  <label className="text-sm font-medium text-gray-700 mb-1">
+                    Due Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  placeholder="Additional notes (optional)"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[90px]"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition-colors text-center"
+                >
+                  Send Request
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="flex-1 bg-gray-500 text-white py-2.5 rounded-lg hover:bg-gray-600 transition-colors text-center"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -7,7 +7,11 @@ const PatientProfile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
 
-  const [activeTab, setActiveTab] = useState('overview');
+  // Load active tab from localStorage or default to 'overview'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('patientProfileActiveTab');
+    return savedTab || 'overview';
+  });
   const [reports, setReports] = useState([]);
   const [nextSession, setNextSession] = useState(null);
   const [countdown, setCountdown] = useState('');
@@ -99,7 +103,21 @@ const PatientProfile = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setPayments(data.data.docs || data.data || []);
+        const list = Array.isArray(data?.data?.docs)
+          ? data.data.docs
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        const sorted = [...list].sort((a, b) => {
+          const aDate = new Date(a?.paidAt || a?.updatedAt || a?.createdAt || 0);
+          const bDate = new Date(b?.paidAt || b?.updatedAt || b?.createdAt || 0);
+          return bDate - aDate;
+        });
+
+        setPayments(sorted);
       } else {
         setPayments([]);
       }
@@ -821,6 +839,9 @@ const PatientProfile = () => {
                             {session.status === 'completed' && (
                               <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">✅ Completed</span>
                             )}
+                            {session.status === 'missed' && (
+                              <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">⚠️ Missed</span>
+                            )}
                           </div>
                           <p className="text-xs text-gray-500 mt-1">{session.sessionDate ? new Date(session.sessionDate).toLocaleString() : 'No Date'}</p>
                         </div>
@@ -1052,7 +1073,11 @@ const PatientProfile = () => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  // Save active tab to localStorage so it persists on refresh
+                  localStorage.setItem('patientProfileActiveTab', tab.id);
+                }}
                 className={`px-4 py-2 rounded-t-lg font-medium flex items-center space-x-2 ${
                   activeTab === tab.id
                     ? 'bg-teal-600 text-white'

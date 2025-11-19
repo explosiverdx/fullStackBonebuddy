@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
 const DoctorProfile = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  // Load active tab from localStorage or default to 'overview'
+  const [activeTab, setActiveTab] = useState(() => {
+    const savedTab = localStorage.getItem('doctorProfileActiveTab');
+    return savedTab || 'overview';
+  });
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -10,6 +14,21 @@ const DoctorProfile = () => {
   const [sessions, setSessions] = useState([]);
   const [stats, setStats] = useState(null);
   const [dataLoading, setDataLoading] = useState(false);
+  const [showReferModal, setShowReferModal] = useState(false);
+  const [referForm, setReferForm] = useState({
+    patientName: '',
+    patientPhone: '',
+    patientEmail: '',
+    patientAge: '',
+    patientGender: '',
+    condition: '',
+    surgeryType: '',
+    surgeryDate: '',
+    notes: '',
+  });
+  const [referring, setReferring] = useState(false);
+  const [myReferrals, setMyReferrals] = useState([]);
+  const [loadingReferrals, setLoadingReferrals] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -33,9 +52,34 @@ const DoctorProfile = () => {
 
   useEffect(() => {
     if (activeTab !== 'overview') {
-      fetchPatientsAndSessions();
+      if (activeTab === 'referrals') {
+        fetchMyReferrals();
+      } else {
+        fetchPatientsAndSessions();
+      }
     }
   }, [activeTab]);
+
+  const fetchMyReferrals = async () => {
+    setLoadingReferrals(true);
+    try {
+      const response = await fetch('/api/v1/referrals/my-referrals', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setMyReferrals(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching referrals:', error);
+    } finally {
+      setLoadingReferrals(false);
+    }
+  };
 
   const fetchPatientsAndSessions = async () => {
     setDataLoading(true);
@@ -66,6 +110,7 @@ const DoctorProfile = () => {
     { id: 'overview', label: 'Overview' },
     { id: 'patients', label: 'Patients' },
     { id: 'schedule', label: 'Schedule' },
+    { id: 'referrals', label: 'Referred Patients' },
   ];
 
   const handleEditClick = () => {
@@ -135,6 +180,56 @@ const DoctorProfile = () => {
     setEditForm({});
   };
 
+  const handleReferSubmit = async (e) => {
+    e.preventDefault();
+    if (!referForm.patientName || !referForm.patientPhone || !referForm.condition) {
+      alert('Please fill in required fields: Patient Name, Phone, and Condition');
+      return;
+    }
+
+    setReferring(true);
+    try {
+      const response = await fetch('/api/v1/referrals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        credentials: 'include',
+        body: JSON.stringify(referForm),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert('Patient referred successfully!');
+        setShowReferModal(false);
+        setReferForm({
+          patientName: '',
+          patientPhone: '',
+          patientEmail: '',
+          patientAge: '',
+          patientGender: '',
+          condition: '',
+          surgeryType: '',
+          surgeryDate: '',
+          notes: '',
+        });
+        // Refresh referrals if on referrals tab
+        if (activeTab === 'referrals') {
+          fetchMyReferrals();
+        }
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to refer patient');
+      }
+    } catch (error) {
+      console.error('Error referring patient:', error);
+      alert('Error referring patient. Please try again.');
+    } finally {
+      setReferring(false);
+    }
+  };
+
   const handleDayChange = (day) => {
     const currentDays = editForm.availableDays || [];
     if (currentDays.includes(day)) {
@@ -155,7 +250,11 @@ const DoctorProfile = () => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  // Save active tab to localStorage so it persists on refresh
+                  localStorage.setItem('doctorProfileActiveTab', tab.id);
+                }}
                 className={`px-4 py-2 rounded-t-lg font-medium ${
                   activeTab === tab.id
                     ? 'bg-teal-600 text-white'
@@ -353,7 +452,14 @@ const DoctorProfile = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setShowReferModal(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-2"
+                      >
+                        <span>📋</span>
+                        <span>Refer Patient</span>
+                      </button>
                       <button
                         onClick={handleEditClick}
                         className="px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 flex items-center space-x-2"
@@ -589,8 +695,14 @@ const DoctorProfile = () => {
                                   )}
                                 </div>
                                 <div className="text-right">
-                                  <span className="inline-block px-3 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                                    {session.status === 'completed' ? '✅ Completed' : 'Ongoing'}
+                                  <span className={`inline-block px-3 py-1 text-xs rounded-full ${
+                                    session.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                    session.status === 'missed' ? 'bg-orange-100 text-orange-800' :
+                                    'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {session.status === 'completed' ? '✅ Completed' : 
+                                     session.status === 'missed' ? '⚠️ Missed' :
+                                     'Ongoing'}
                                   </span>
                                 </div>
                               </div>
@@ -634,9 +746,279 @@ const DoctorProfile = () => {
                 )}
               </div>
             )}
+
+            {activeTab === 'referrals' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Referred Patients</h2>
+                  <button
+                    onClick={() => setShowReferModal(true)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-2"
+                  >
+                    <span>📋</span>
+                    <span>Refer New Patient</span>
+                  </button>
+                </div>
+
+                {loadingReferrals ? (
+                  <div className="text-center py-8">Loading referrals...</div>
+                ) : myReferrals.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 mb-4">No referrals yet.</p>
+                    <button
+                      onClick={() => setShowReferModal(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Refer Your First Patient
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg shadow overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Condition</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Surgery</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {myReferrals.map((referral) => (
+                          <tr key={referral._id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-sm whitespace-nowrap">
+                              {new Date(referral.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="font-medium">{referral.patientName}</div>
+                              {referral.patientAge && referral.patientGender && (
+                                <div className="text-xs text-gray-500">
+                                  {referral.patientAge} years, {referral.patientGender}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div>{referral.patientPhone}</div>
+                              {referral.patientEmail && (
+                                <div className="text-xs text-gray-500">{referral.patientEmail}</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <div className="font-medium">{referral.condition}</div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {referral.surgeryType && (
+                                <div>{referral.surgeryType}</div>
+                              )}
+                              {referral.surgeryDate && (
+                                <div className="text-xs text-gray-500">
+                                  {new Date(referral.surgeryDate).toLocaleDateString()}
+                                </div>
+                              )}
+                              {!referral.surgeryType && !referral.surgeryDate && (
+                                <span className="text-gray-400">N/A</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                referral.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                referral.status === 'contacted' ? 'bg-blue-100 text-blue-800' :
+                                referral.status === 'registered' ? 'bg-green-100 text-green-800' :
+                                referral.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {referral.status.charAt(0).toUpperCase() + referral.status.slice(1)}
+                              </span>
+                              {referral.contactedAt && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Contacted: {new Date(referral.contactedAt).toLocaleDateString()}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {referral.notes ? (
+                                <button
+                                  onClick={() => alert(`Notes:\n\n${referral.notes}`)}
+                                  className="text-blue-600 hover:text-blue-800 text-xs underline"
+                                >
+                                  View Notes
+                                </button>
+                              ) : (
+                                <span className="text-gray-400 text-xs">No notes</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {myReferrals.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Total Referrals:</strong> {myReferrals.length} | 
+                      <strong> Pending:</strong> {myReferrals.filter(r => r.status === 'pending').length} | 
+                      <strong> Contacted:</strong> {myReferrals.filter(r => r.status === 'contacted').length} | 
+                      <strong> Registered:</strong> {myReferrals.filter(r => r.status === 'registered').length}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Refer Patient Modal */}
+      {showReferModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold">Refer Patient to BoneBuddy</h2>
+              <button
+                onClick={() => setShowReferModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleReferSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Patient Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={referForm.patientName}
+                    onChange={(e) => setReferForm({...referForm, patientName: e.target.value})}
+                    className="w-full p-2 border rounded"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Patient Phone <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={referForm.patientPhone}
+                    onChange={(e) => setReferForm({...referForm, patientPhone: e.target.value})}
+                    className="w-full p-2 border rounded"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Patient Email</label>
+                  <input
+                    type="email"
+                    value={referForm.patientEmail}
+                    onChange={(e) => setReferForm({...referForm, patientEmail: e.target.value})}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Patient Age</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={referForm.patientAge}
+                    onChange={(e) => setReferForm({...referForm, patientAge: e.target.value})}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Gender</label>
+                  <select
+                    value={referForm.patientGender}
+                    onChange={(e) => setReferForm({...referForm, patientGender: e.target.value})}
+                    className="w-full p-2 border rounded"
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Condition <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={referForm.condition}
+                    onChange={(e) => setReferForm({...referForm, condition: e.target.value})}
+                    className="w-full p-2 border rounded"
+                    placeholder="e.g., Knee Replacement, Fracture, etc."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Surgery Type</label>
+                  <input
+                    type="text"
+                    value={referForm.surgeryType}
+                    onChange={(e) => setReferForm({...referForm, surgeryType: e.target.value})}
+                    className="w-full p-2 border rounded"
+                    placeholder="e.g., Total Knee Replacement"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Surgery Date</label>
+                  <input
+                    type="date"
+                    value={referForm.surgeryDate}
+                    onChange={(e) => setReferForm({...referForm, surgeryDate: e.target.value})}
+                    className="w-full p-2 border rounded"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Additional Notes</label>
+                <textarea
+                  value={referForm.notes}
+                  onChange={(e) => setReferForm({...referForm, notes: e.target.value})}
+                  className="w-full p-2 border rounded"
+                  rows="4"
+                  placeholder="Any additional information about the patient..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowReferModal(false)}
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  disabled={referring}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  disabled={referring}
+                >
+                  {referring ? 'Submitting...' : 'Submit Referral'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

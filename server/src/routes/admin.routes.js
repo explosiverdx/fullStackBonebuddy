@@ -1,6 +1,6 @@
 
 import { Router } from "express";
-import { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus } from "../controllers/admin.controller.js";
+import { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits } from "../controllers/admin.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { verifyPermission } from "../middleware/permission.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -16,6 +16,7 @@ router.route("/patients").post(upload.single('medicalReport'), verifyJWT, verify
 router.route("/patients/:id").patch(upload.single('medicalReport'), verifyJWT, verifyPermission(['admin']), updatePatientAdmin);
 router.route("/patients/:id").delete(verifyJWT, verifyPermission(['admin']), deletePatientAdmin);
 router.route("/patients/:id/details").get(verifyJWT, verifyPermission(['admin']), getPatientDetailsAdmin);
+router.route("/patients/:patientId/payment-credits").get(verifyJWT, verifyPermission(['admin']), getPatientPaymentCredits);
 router.route("/patients/export").get(verifyJWT, verifyPermission(['admin']), exportPatientsAdmin);
 router.route("/users-without-patients").get(verifyJWT, verifyPermission(['admin']), getUsersWithoutPatients);
 router.route("/users/:id").delete(verifyJWT, verifyPermission(['admin']), deleteUserAdmin);
