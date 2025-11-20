@@ -5,13 +5,13 @@ const Analytics = () => {
   return (
     <Helmet>
       {/* Google tag (gtag.js) */}
-      <script async src="https://www.googletagmanager.com/gtag/js?id=G-MQNZP6M44N"></script>
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-SBV793GJ31"></script>
       <script>
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
-          gtag('config', 'G-MQNZP6M44N');
+           gtag('config', 'G-SBV793GJ31');
         `}
       </script>
     </Helmet>
