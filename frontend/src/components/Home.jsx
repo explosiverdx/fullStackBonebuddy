@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
 
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -17,11 +16,12 @@ const Home = () => {
   const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
+  
   const slides = [
-    { src: "/assets/carousel1.jpeg", alt: "Physiotherapy Treatment" },
-    { src: "/assets/carousel2.jpeg", alt: "Physiotherapy Image 1" },
-    { src: "/assets/carousel3.jpg", alt: "Physiotherapy Image 2" },
-    { src: "/assets/carousel4.jpg", alt: "Additional Physiotherapy Image" },
+    { src: "/assets/carousel/carousel1.jpeg", alt: "Physiotherapy Treatment" },
+    { src: "/assets/carousel/carousel2.jpeg", alt: "Physiotherapy Image 1" },
+    { src: "/assets/carousel/carousel3.jpg", alt: "Physiotherapy Image 2" },
+    { src: "/assets/carousel/carousel4.jpg", alt: "Additional Physiotherapy Image" },
   ];
 
   const physiotherapists = [
@@ -79,9 +79,10 @@ const Home = () => {
   };
 
   useEffect(() => {
-    const slideInterval = setInterval(nextSlide, 2000); // Auto slide every 2 seconds
+    const slideInterval = setInterval(nextSlide, 3000); // Auto slide every 3 seconds
     return () => clearInterval(slideInterval);
-  }, [slides.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleFeedbackChange = (e) => {
     const { name, value } = e.target;
@@ -244,7 +245,7 @@ const Home = () => {
         <div className="slider">
           {slides.map((slide, index) => (
             <div key={index} className={`slide ${index === currentSlide ? 'active' : ''}`}>
-              <img src={slide.src} alt={slide.alt} loading="lazy" className="w-full h-full object-cover sm:object-contain md:object-cover" />
+              <img src={slide.src} alt={slide.alt} loading="lazy" className="w-full h-full object-contain" />
             </div>
           ))}
         </div>
@@ -260,7 +261,7 @@ const Home = () => {
         </div>
       </div>
 
-      <main className="main-content pt-20">
+      <main className="main-content">
 
       {/* Empower Your Healing Journey */}
       <section id="treatments-services" className="section px-4 sm:px-6 lg:px-8">
