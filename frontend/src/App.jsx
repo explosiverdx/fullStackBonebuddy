@@ -55,7 +55,7 @@ function App() {
       <Analytics />
       <ScrollToTop />
       {!isAdminPage && <Header />}
-      <main className={`flex-grow ${!isAdminPage ? 'md:pt-20' : ''}`}>
+      <main className={`flex-grow ${!isAdminPage ? 'pt-14 sm:pt-16 md:pt-20' : ''}`}>
         <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
