@@ -442,23 +442,11 @@ a {
   margin-bottom: 0;
 }
 
-/* Remove padding-top from main.pt-20 */
-main.pt-20 {
-  padding-top: 0 !important;
-}
-
 /* Remove horizontal padding on mobile */
 @media (max-width: 767px) {
   .main-content {
     padding: 0 0 0; /* Removed bottom padding completely */
     margin-top: 0;
-  }
-}
-
-/* Further reduce on smaller mobile devices */
-@media (max-width: 480px) {
-  main.pt-20 {
-    padding-top: 0 !important;
   }
 }
 

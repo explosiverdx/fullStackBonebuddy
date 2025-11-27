@@ -29,15 +29,15 @@ const KneeReplacementRehab = () => {
             <section>
               <br />
               <h2 className="wrist-h2">Who Should Choose BoneBuddy for Knee Replacement Recovery?</h2>
-              <h3 className="wrist-h3">Primary Audience</h3>
+              {/* <h3 className="wrist-h3">Primary Audience</h3> */}
               <ul>
-                <li>Patients in the immediate post-operative phase after knee replacement surgery</li>
+                <li>Patients recovering from knee replacement surgery</li>
                 <li>Elderly people for whom hospital visits are difficult</li>
                 <li>Working professionals preferring home-based physiotherapy</li>
                 <li>Patients seeking insurance-backed recovery with digital progress tracking</li>
               </ul>
-              <br />
-              <h3 className="wrist-h3">Secondary Audience</h3>
+             
+              {/* <h3 className="wrist-h3">Secondary Audience</h3> */}
               <ul>
                 <li>Orthopaedic surgeons and rehabilitation doctors</li>
                 <li>Physiatrists and clinic managers looking for a tech-enabled partner</li>
