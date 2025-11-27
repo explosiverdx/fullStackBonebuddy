@@ -45,6 +45,7 @@ function App() {
   const navigate = useNavigate();
   const isSignInOpen = location.pathname === '/signUp';
   const isAdminPage = location.pathname.startsWith('/admin');
+  const isHomePage = location.pathname === '/';
 
   const closeSignIn = () => {
     navigate(-1);
@@ -55,7 +56,7 @@ function App() {
       <Analytics />
       <ScrollToTop />
       {!isAdminPage && <Header />}
-      <main className={`flex-grow ${!isAdminPage ? 'pt-14 sm:pt-16 md:pt-20' : ''}`}>
+      <main className={`flex-grow ${!isAdminPage && !isHomePage ? 'pt-14 sm:pt-16 md:pt-20' : ''}`}>
         <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
