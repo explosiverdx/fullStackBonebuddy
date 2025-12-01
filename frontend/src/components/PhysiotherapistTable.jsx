@@ -1,6 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-const PhysiotherapistTable = () => {
+import { useAuth } from '../hooks/useAuth';
+
+// Helper function to check if a section is read-only for the current admin
+const isSectionReadOnly = (user, sectionKey) => {
+  if (!user || !user.adminPermissions) {
+    console.log('isSectionReadOnly: No user or adminPermissions', { user: !!user, hasAdminPermissions: !!user?.adminPermissions });
+    return false;
+  }
+  const isRohitKumar = user.Fullname === 'Rohit kumar' || user.Fullname === 'Rohit Kumar';
+  if (isRohitKumar) return false; // Rohit Kumar has full access
+  
+  const sectionPerm = user.adminPermissions.sectionPermissions?.[sectionKey];
+  const isReadOnly = sectionPerm?.readOnly === true;
+  console.log('isSectionReadOnly check:', { sectionKey, sectionPerm, isReadOnly, adminPermissions: user.adminPermissions });
+  return isReadOnly;
+};
+
+const PhysiotherapistTable = ({ user: userProp }) => {
+  const { user: userFromAuth } = useAuth();
+  const user = userProp || userFromAuth;
   const [physios, setPhysios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -513,12 +532,14 @@ const PhysiotherapistTable = () => {
           >
             Export CSV
           </button>
-          <button
-            onClick={handleAddNew}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-          >
-            Add New Physiotherapist
-          </button>
+          {!isSectionReadOnly(user, 'physiotherapists') && (
+            <button
+              onClick={handleAddNew}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Add New Physiotherapist
+            </button>
+          )}
         </div>
       </div>
 
@@ -649,18 +670,25 @@ const PhysiotherapistTable = () => {
                       >
                         👁️
                       </button>
-                      <button
-                        onClick={() => handleEdit(physio)}
-                        className="text-yellow-600 hover:text-yellow-900"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleDelete(physio._id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        🗑️
-                      </button>
+                      {!isSectionReadOnly(user, 'physiotherapists') && (
+                        <>
+                          <button
+                            onClick={() => handleEdit(physio)}
+                            className="text-yellow-600 hover:text-yellow-900"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDelete(physio._id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      )}
+                      {isSectionReadOnly(user, 'physiotherapists') && (
+                        <span className="text-gray-400 text-xs">Read-only</span>
+                      )}
                     </div>
                   </td>
                 </tr>

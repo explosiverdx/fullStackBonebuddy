@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../api/apiClient';
+import { useAuth } from '../hooks/useAuth';
 
 // Helper function to construct medical report URL
 const getMedicalReportUrl = (reportPath) => {
@@ -15,7 +16,19 @@ const getMedicalReportUrl = (reportPath) => {
   return `${window.location.origin}${reportPath.startsWith('/') ? reportPath : '/' + reportPath}`;
 };
 
-const PatientRecord = () => {
+// Helper function to check if a section is read-only for the current admin
+const isSectionReadOnly = (user, sectionKey) => {
+  if (!user || !user.adminPermissions) return false;
+  const isRohitKumar = user.Fullname === 'Rohit kumar' || user.Fullname === 'Rohit Kumar';
+  if (isRohitKumar) return false; // Rohit Kumar has full access
+  
+  const sectionPerm = user.adminPermissions.sectionPermissions?.[sectionKey];
+  return sectionPerm?.readOnly === true;
+};
+
+const PatientRecord = ({ user: userProp }) => {
+  const { user: userFromAuth } = useAuth();
+  const user = userProp || userFromAuth;
   // Load active tab from localStorage or default to 'patients'
   const [activeTab, setActiveTab] = useState(() => {
     const savedTab = localStorage.getItem('patientRecordActiveTab');
@@ -698,7 +711,9 @@ const PatientRecord = () => {
 
       {/* Actions */}
       <div className="mb-4 flex flex-col sm:flex-row gap-4 flex-wrap">
-        <button onClick={handleAdd} className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto">Add Patient</button>
+        {!isSectionReadOnly(user, 'patients') && (
+          <button onClick={handleAdd} className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto">Add Patient</button>
+        )}
         <button onClick={handleExportPDF} className="bg-green-500 text-white px-4 py-2 rounded w-full sm:w-auto">Export PDF</button>
         <button onClick={handleExportExcel} className="bg-green-500 text-white px-4 py-2 rounded w-full sm:w-auto">Export Excel</button>
       </div>
@@ -761,8 +776,15 @@ const PatientRecord = () => {
                     {patient.isProfileComplete ? (
                       <>
                         <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleViewDetails(patient.patientId); }} className="text-blue-500 mr-1 sm:mr-2 text-xs sm:text-sm">View</button>
-                        <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleEdit(patient); }} className="text-yellow-500 mr-1 sm:mr-2 text-xs sm:text-sm">Edit</button>
-                        <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleDelete(patient); }} className="text-red-500 text-xs sm:text-sm">Delete</button>
+                        {!isSectionReadOnly(user, 'patients') && (
+                          <>
+                            <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleEdit(patient); }} className="text-yellow-500 mr-1 sm:mr-2 text-xs sm:text-sm">Edit</button>
+                            <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleDelete(patient); }} className="text-red-500 text-xs sm:text-sm">Delete</button>
+                          </>
+                        )}
+                        {isSectionReadOnly(user, 'patients') && (
+                          <span className="text-gray-400 text-xs sm:text-sm">Read-only</span>
+                        )}
                       </>
                     ) : (
                       <span className="text-gray-400 italic text-xs sm:text-sm">No actions available</span>
@@ -1089,9 +1111,14 @@ const PatientRecord = () => {
               </label>
               <input
                 type="tel"
-                placeholder="Enter mobile number"
+                placeholder="10 digits only"
                 value={formData.mobileNumber}
-                onChange={(e) => setFormData({ ...formData, mobileNumber: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setFormData({ ...formData, mobileNumber: value });
+                }}
+                maxLength="10"
+                pattern="[0-9]{10}"
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -1183,9 +1210,14 @@ const PatientRecord = () => {
               </label>
               <input
                 type="tel"
-                placeholder="Enter emergency contact number"
+                placeholder="10 digits only"
                 value={formData.emergencyContactNumber}
-                onChange={(e) => setFormData({ ...formData, emergencyContactNumber: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setFormData({ ...formData, emergencyContactNumber: value });
+                }}
+                maxLength="10"
+                pattern="[0-9]{10}"
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
                 required
               />

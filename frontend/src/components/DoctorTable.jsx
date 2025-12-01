@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../api/apiClient';
+import { useAuth } from '../hooks/useAuth';
 
-const DoctorTable = ({ selectedItem }) => {
+// Helper function to check if a section is read-only for the current admin
+const isSectionReadOnly = (user, sectionKey) => {
+  if (!user || !user.adminPermissions) return false;
+  const isRohitKumar = user.Fullname === 'Rohit kumar' || user.Fullname === 'Rohit Kumar';
+  if (isRohitKumar) return false; // Rohit Kumar has full access
+  
+  const sectionPerm = user.adminPermissions.sectionPermissions?.[sectionKey];
+  return sectionPerm?.readOnly === true;
+};
+
+const DoctorTable = ({ selectedItem, user: userProp }) => {
+  const { user: userFromAuth } = useAuth();
+  const user = userProp || userFromAuth;
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -320,12 +333,14 @@ const DoctorTable = ({ selectedItem }) => {
           >
             Export CSV
           </button>
-          <button
-            onClick={handleAddNew}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-          >
-            Add New Doctor
-          </button>
+          {!isSectionReadOnly(user, 'doctors') && (
+            <button
+              onClick={handleAddNew}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Add New Doctor
+            </button>
+          )}
         </div>
       </div>
 
@@ -423,15 +438,20 @@ const DoctorTable = ({ selectedItem }) => {
                       <button
                         onClick={() => handleEdit(doctor)}
                         className="text-yellow-600 hover:text-yellow-900"
+                        style={{ display: isSectionReadOnly(user, 'doctors') ? 'none' : 'inline-block' }}
                       >
                         ✏️
                       </button>
                       <button
                         onClick={() => handleDelete(doctor.doctorId || doctor._id)}
                         className="text-red-600 hover:text-red-900"
+                        style={{ display: isSectionReadOnly(user, 'doctors') ? 'none' : 'inline-block' }}
                       >
                         🗑️
                       </button>
+                      {isSectionReadOnly(user, 'doctors') && (
+                        <span className="text-gray-400 text-xs">Read-only</span>
+                      )}
                     </div>
                   </td>
                 </tr>

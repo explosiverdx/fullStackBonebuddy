@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 const AdminProfile = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     username: '',
@@ -128,28 +130,54 @@ const AdminProfile = () => {
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Username *</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Username *
+              {user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar' && (
+                <span className="text-gray-500 text-xs ml-2">(Read-only)</span>
+              )}
+            </label>
             <input
               type="text"
               name="username"
               value={formData.username}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+              readOnly={user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar'}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar'
+                  ? 'bg-gray-100 cursor-not-allowed'
+                  : ''
+              }`}
               placeholder="e.g., admin_123456"
               required
+              title={user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar'
+                ? 'Username cannot be changed. Only Rohit kumar can change this.'
+                : ''}
             />
           </div>
 
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Email *</label>
+            <label className="block text-gray-700 text-sm font-bold mb-2">
+              Email *
+              {user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar' && (
+                <span className="text-gray-500 text-xs ml-2">(Read-only)</span>
+              )}
+            </label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+              readOnly={user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar'}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar'
+                  ? 'bg-gray-100 cursor-not-allowed'
+                  : ''
+              }`}
               placeholder="e.g., admin@bonebuddy.in"
               required
+              title={user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar'
+                ? 'Email cannot be changed. Only Rohit kumar can change this.'
+                : ''}
             />
           </div>
 

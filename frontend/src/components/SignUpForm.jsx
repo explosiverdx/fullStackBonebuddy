@@ -95,10 +95,15 @@ const SignUpForm = () => {
                     name="phone"
                     type="tel"
                     required
+                    maxLength="10"
+                    pattern="[0-9]{10}"
                     className="appearance-none rounded-none relative block w-full px-3 py-2 pl-12 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                    placeholder="Phone Number"
+                    placeholder="10 digits only"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setPhoneNumber(value);
+                    }}
                   />
                 </div>
               </div>

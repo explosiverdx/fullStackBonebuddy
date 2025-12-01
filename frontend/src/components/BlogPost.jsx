@@ -234,7 +234,8 @@ const BlogPost = () => {
               <img
                 src={blog.featuredImage.url}
                 alt={blog.title}
-                className="w-full h-64 sm:h-96 object-cover"
+                className="w-full h-auto max-h-[600px] object-contain"
+                style={{ maxWidth: '100%', height: 'auto' }}
               />
             </div>
           )}

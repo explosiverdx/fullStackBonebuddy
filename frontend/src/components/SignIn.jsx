@@ -265,9 +265,14 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
                           type="tel"
                           id="phone"
                           value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setPhoneNumber(value);
+                          }}
+                          maxLength="10"
+                          pattern="[0-9]{10}"
                           className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
-                          placeholder="Mobile Number"
+                          placeholder="10 digits only"
                           required
                         />
                       </div>
@@ -353,9 +358,14 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
                           type="tel"
                           id="phone-password"
                           value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setPhoneNumber(value);
+                          }}
+                          maxLength="10"
+                          pattern="[0-9]{10}"
                           className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
-                          placeholder="Mobile Number"
+                          placeholder="10 digits only"
                           required
                         />
                       </div>
@@ -504,9 +514,14 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
                           type="tel"
                           id="forgot-phone"
                           value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                            setPhoneNumber(value);
+                          }}
+                          maxLength="10"
+                          pattern="[0-9]{10}"
                           className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
-                          placeholder="Mobile Number"
+                          placeholder="10 digits only"
                           required
                         />
                       </div>
@@ -597,9 +612,14 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
                         type="tel"
                         id="admin-mobile"
                         value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                          setPhoneNumber(value);
+                        }}
+                        maxLength="10"
+                        pattern="[0-9]{10}"
                         className="w-full p-2 pl-12 border-b-2 border-gray-300 focus:border-teal-500 hover:border-teal-400 outline-none transition-colors"
-                        placeholder="Admin Mobile Number"
+                        placeholder="10 digits only"
                         required
                       />
                     </div>

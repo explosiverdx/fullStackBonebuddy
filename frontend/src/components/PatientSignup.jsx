@@ -400,9 +400,14 @@ const PatientSignup = () => {
         <input
           type="tel"
           name="contact"
-          placeholder="Contact (Mobile)"
+          placeholder="10 digits only"
           value={formData.contact || ''}
-          onChange={handleChange}
+          onChange={(e) => {
+            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+            handleChange({ ...e, target: { ...e.target, value } });
+          }}
+          maxLength="10"
+          pattern="[0-9]{10}"
           required
           disabled={!!formData.contact}
           className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500 ${formData.contact ? 'bg-gray-100 cursor-not-allowed' : ''}`}
@@ -466,9 +471,14 @@ const PatientSignup = () => {
               <input
                 type="tel"
                 name="emergencyContactNumber"
-                placeholder="Emergency contact number"
+                placeholder="10 digits only"
                 value={formData.emergencyContactNumber}
-                onChange={handleChange}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  handleChange({ ...e, target: { ...e.target, value } });
+                }}
+                maxLength="10"
+                pattern="[0-9]{10}"
                 required={selectedRole === 'patient'}
                 className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
               />

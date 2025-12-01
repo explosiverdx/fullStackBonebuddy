@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../../api/apiClient';
+import { useAuth } from '../../hooks/useAuth';
 
-const Payments = () => {
+// Helper function to check if a section is read-only for the current admin
+const isSectionReadOnly = (user, sectionKey) => {
+  if (!user || !user.adminPermissions) return false;
+  const isRohitKumar = user.Fullname === 'Rohit kumar' || user.Fullname === 'Rohit Kumar';
+  if (isRohitKumar) return false; // Rohit Kumar has full access
+  
+  const sectionPerm = user.adminPermissions.sectionPermissions?.[sectionKey];
+  return sectionPerm?.readOnly === true;
+};
+
+const Payments = ({ user: userProp }) => {
+  const { user: userFromAuth } = useAuth();
+  const user = userProp || userFromAuth;
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -137,12 +150,14 @@ const Payments = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Payment Management</h2>
-        <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          + Send Payment Request
-        </button>
+        {!isSectionReadOnly(user, 'payments') && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            + Send Payment Request
+          </button>
+        )}
       </div>
 
       {error && (
@@ -245,18 +260,24 @@ const Payments = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {payment.status === 'pending' && (
                       <>
-                        <button
-                          onClick={() => handleStatusUpdate(payment._id, 'completed')}
-                          className="text-green-600 hover:text-green-900 mr-3"
-                        >
-                          Mark Paid
-                        </button>
-                        <button
-                          onClick={() => handleStatusUpdate(payment._id, 'cancelled')}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Cancel
-                        </button>
+                        {!isSectionReadOnly(user, 'payments') ? (
+                          <>
+                            <button
+                              onClick={() => handleStatusUpdate(payment._id, 'completed')}
+                              className="text-green-600 hover:text-green-900 mr-3"
+                            >
+                              Mark Paid
+                            </button>
+                            <button
+                              onClick={() => handleStatusUpdate(payment._id, 'cancelled')}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-gray-400 text-xs">Read-only</span>
+                        )}
                       </>
                     )}
                     {payment.status === 'completed' && (

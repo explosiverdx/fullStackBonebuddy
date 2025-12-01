@@ -10,6 +10,7 @@ import ContactSubmissions from './ContactSubmissions';
 import PhysiotherapistTable from './PhysiotherapistTable'; // Assuming these components exist
 import Payments from './AdminDashboard/Payments';
 import Referrals from './AdminDashboard/Referrals';
+import ImageCropper from './ImageCropper';
 
 // Dashboard component to display stats
 const Dashboard = ({ stats }) => {
@@ -300,7 +301,9 @@ const PendingSessions = ({ authHeaders }) => {
   );
 };
 
-const AllocateSession = ({ authHeaders }) => {
+const AllocateSession = ({ authHeaders, user: userProp }) => {
+  const { user: userFromAuth } = useAuth();
+  const user = userProp || userFromAuth;
   const [formData, setFormData] = useState({
     patientId: '',
     doctorId: '',
@@ -693,6 +696,11 @@ const AllocateSession = ({ authHeaders }) => {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-4">Allocate Session</h2>
+      {isSectionReadOnly(user, 'sessions') && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded mb-4">
+          This section is read-only. You cannot allocate sessions.
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Patient */}
         <div className="relative">
@@ -1006,7 +1014,7 @@ const AllocateSession = ({ authHeaders }) => {
 
         <button
           type="submit"
-          disabled={loading || !formData.patientId || !formData.doctorId || !formData.physioId || scheduleInputsDisabled}
+          disabled={loading || !formData.patientId || !formData.doctorId || !formData.physioId || scheduleInputsDisabled || isSectionReadOnly(user, 'sessions')}
           className="bg-teal-500 text-white py-2 px-4 rounded-md hover:bg-teal-600 disabled:opacity-50"
         >
           {loading ? 'Allocating...' : 'Allocate Session'}
@@ -1016,8 +1024,20 @@ const AllocateSession = ({ authHeaders }) => {
   );
 };
 
+// Helper function to check if a section is read-only for the current admin
+const isSectionReadOnly = (user, sectionKey) => {
+  if (!user || !user.adminPermissions) return false;
+  const isRohitKumar = user.Fullname === 'Rohit kumar' || user.Fullname === 'Rohit Kumar';
+  if (isRohitKumar) return false; // Rohit Kumar has full access
+  
+  const sectionPerm = user.adminPermissions.sectionPermissions?.[sectionKey];
+  return sectionPerm?.readOnly === true;
+};
+
 // Session History (admin) - list, edit, delete
-const SessionHistory = ({ authHeaders }) => {
+const SessionHistory = ({ authHeaders, user: userProp }) => {
+  const { user: userFromAuth } = useAuth();
+  const user = userProp || userFromAuth;
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
@@ -1357,42 +1377,49 @@ const SessionHistory = ({ authHeaders }) => {
                     </div>
                   ) : (
                     <div className="flex gap-2" style={{ position: 'relative', zIndex: 10 }}>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          startEdit(s);
-                        }}
-                        className="bg-yellow-500 text-white px-3 py-2 rounded text-xs hover:bg-yellow-600 cursor-pointer border-0 relative"
-                        style={{ 
-                          display: 'inline-block', 
-                          minHeight: '32px',
-                          lineHeight: 'normal',
-                          pointerEvents: 'auto',
-                          userSelect: 'none',
-                          verticalAlign: 'middle'
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          handleDelete(s._id);
-                        }}
-                        className="bg-red-500 text-white px-3 py-2 rounded text-xs hover:bg-red-600 cursor-pointer border-0 relative"
-                        style={{ 
-                          display: 'inline-block', 
-                          minHeight: '32px',
-                          lineHeight: 'normal',
-                          pointerEvents: 'auto',
-                          userSelect: 'none',
-                          verticalAlign: 'middle'
-                        }}
-                      >
-                        Delete
-                      </button>
+                      {!isSectionReadOnly(user, 'sessions') && (
+                        <>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              startEdit(s);
+                            }}
+                            className="bg-yellow-500 text-white px-3 py-2 rounded text-xs hover:bg-yellow-600 cursor-pointer border-0 relative"
+                            style={{ 
+                              display: 'inline-block', 
+                              minHeight: '32px',
+                              lineHeight: 'normal',
+                              pointerEvents: 'auto',
+                              userSelect: 'none',
+                              verticalAlign: 'middle'
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleDelete(s._id);
+                            }}
+                            className="bg-red-500 text-white px-3 py-2 rounded text-xs hover:bg-red-600 cursor-pointer border-0 relative"
+                            style={{ 
+                              display: 'inline-block', 
+                              minHeight: '32px',
+                              lineHeight: 'normal',
+                              pointerEvents: 'auto',
+                              userSelect: 'none',
+                              verticalAlign: 'middle'
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      {isSectionReadOnly(user, 'sessions') && (
+                        <span className="text-xs text-gray-500">Read-only</span>
+                      )}
                     </div>
                   )}
                 </td>
@@ -1632,6 +1659,8 @@ const BlogManagement = ({ authHeaders }) => {
     metaDescription: ''
   });
   const [featuredImage, setFeaturedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [page, setPage] = useState(1);
   const [stats, setStats] = useState(null);
@@ -1817,7 +1846,58 @@ const BlogManagement = ({ authHeaders }) => {
       metaDescription: ''
     });
     setFeaturedImage(null);
+    setImagePreview(null);
+    setShowCropper(false);
     setCurrentBlog(null);
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+        setShowCropper(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropComplete = (croppedFile) => {
+    setFeaturedImage(croppedFile);
+    setShowCropper(false);
+    // Create preview for the cropped image
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(croppedFile);
+  };
+
+  const handleUseFullPhoto = () => {
+    // Use the original image without cropping
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput && fileInput.files[0]) {
+      setFeaturedImage(fileInput.files[0]);
+      setShowCropper(false);
+      // Create preview for the full image
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(fileInput.files[0]);
+    }
+  };
+
+  const handleCancelCrop = () => {
+    setShowCropper(false);
+    setImagePreview(null);
+    setFeaturedImage(null);
+    // Reset file input
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput) {
+      fileInput.value = '';
+    }
   };
 
   const categories = ['Physiotherapy', 'Recovery Tips', 'Success Stories', 'News', 'Health & Wellness', 'Exercise', 'Other'];
@@ -2002,8 +2082,19 @@ const BlogManagement = ({ authHeaders }) => {
         )}
       </div>
 
+      {/* Image Cropper Modal */}
+      {showCropper && imagePreview && (
+        <ImageCropper
+          image={imagePreview}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCancelCrop}
+          onUseFullPhoto={handleUseFullPhoto}
+          aspectRatio={null}
+        />
+      )}
+
       {/* Create/Edit Modal */}
-      {(showCreateModal || showEditModal) && (
+      {(showCreateModal || showEditModal) && !showCropper && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-lg w-full max-w-4xl my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
@@ -2113,14 +2204,42 @@ const BlogManagement = ({ authHeaders }) => {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => setFeaturedImage(e.target.files[0])}
+                    onChange={handleImageSelect}
                     className="w-full p-2 border rounded text-sm"
                   />
                   {featuredImage && (
-                    <p className="text-xs text-gray-500 mt-1 truncate">Selected: {featuredImage.name}</p>
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2 truncate">Selected: {featuredImage.name}</p>
+                      {imagePreview && (
+                        <img 
+                          src={imagePreview} 
+                          alt="Preview" 
+                          className="w-full max-w-md h-48 object-cover rounded border border-gray-300" 
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFeaturedImage(null);
+                          setImagePreview(null);
+                          const fileInput = document.querySelector('input[type="file"]');
+                          if (fileInput) fileInput.value = '';
+                        }}
+                        className="mt-2 text-sm text-red-600 hover:text-red-700"
+                      >
+                        Remove Image
+                      </button>
+                    </div>
                   )}
-                  {currentBlog?.featuredImage?.url && (
-                    <img src={currentBlog.featuredImage.url} alt="Current" className="mt-2 w-24 h-24 sm:w-32 sm:h-32 object-cover rounded" />
+                  {currentBlog?.featuredImage?.url && !featuredImage && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-2">Current Image:</p>
+                      <img 
+                        src={currentBlog.featuredImage.url} 
+                        alt="Current" 
+                        className="w-full max-w-md h-48 object-cover rounded border border-gray-300" 
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -2184,12 +2303,804 @@ const BlogManagement = ({ authHeaders }) => {
   );
 };
 
+// Admin List Component
+const AdminList = ({ authHeaders }) => {
+  const { user } = useAuth();
+  const [admins, setAdmins] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState(null);
+  const [formData, setFormData] = useState({
+    username: '',
+    password: '',
+    Fullname: '',
+    email: '',
+    mobile_number: '',
+    adminPermissions: {
+      visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+      sectionPermissions: {
+        patients: { visible: true, readOnly: false },
+        doctors: { visible: true, readOnly: false },
+        physiotherapists: { visible: true, readOnly: false },
+        sessions: { visible: true, readOnly: false },
+        payments: { visible: true, readOnly: false }
+      },
+      fieldPermissions: {
+        username: { visible: true, readOnly: false },
+        email: { visible: true, readOnly: false },
+        Fullname: { visible: true, readOnly: false },
+        mobile_number: { visible: true, readOnly: true }
+      }
+    }
+  });
+
+  const isRohitKumar = user?.Fullname === 'Rohit kumar' || user?.Fullname === 'Rohit Kumar';
+
+  useEffect(() => {
+    if (isRohitKumar) {
+      fetchAdmins();
+    }
+  }, [isRohitKumar]);
+
+  const fetchAdmins = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/v1/admin/admins?limit=100`, {
+        headers: authHeaders,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Response error:', response.status, errorText);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        setAdmins(data.data.admins || []);
+      } else {
+        throw new Error(data.message || 'Failed to fetch admins');
+      }
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+      alert('Failed to fetch admins: ' + (error.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateAdmin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/v1/admin/admins`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        alert('Admin created successfully!');
+        setShowCreateModal(false);
+        resetForm();
+        fetchAdmins();
+      } else {
+        alert(data.message || 'Failed to create admin');
+      }
+    } catch (error) {
+      console.error('Error creating admin:', error);
+      alert('Failed to create admin: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleEditAdmin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`/api/v1/admin/admins/${editingAdmin._id}`, {
+        method: 'PATCH',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+          Fullname: formData.Fullname,
+          email: formData.email,
+          mobile_number: formData.mobile_number,
+          adminPermissions: formData.adminPermissions
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        alert('Admin updated successfully!');
+        setShowEditModal(false);
+        setEditingAdmin(null);
+        resetForm();
+        fetchAdmins();
+      } else {
+        alert(data.message || 'Failed to update admin');
+      }
+    } catch (error) {
+      console.error('Error updating admin:', error);
+      alert('Failed to update admin: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleDeleteAdmin = async (adminId) => {
+    if (!confirm('Are you sure you want to delete this admin? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/v1/admin/admins/${adminId}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.success) {
+        alert('Admin deleted successfully!');
+        fetchAdmins();
+      } else {
+        alert(data.message || 'Failed to delete admin');
+      }
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      alert('Failed to delete admin: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const openEditModal = (admin) => {
+    setEditingAdmin(admin);
+    setFormData({
+      username: admin.username || '',
+      password: '', // Don't show password
+      Fullname: admin.Fullname || '',
+      email: admin.email || '',
+      mobile_number: admin.mobile_number || '',
+      adminPermissions: admin.adminPermissions || {
+        visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+        sectionPermissions: {
+          patients: { visible: true, readOnly: false },
+          doctors: { visible: true, readOnly: false },
+          physiotherapists: { visible: true, readOnly: false },
+          sessions: { visible: true, readOnly: false },
+          payments: { visible: true, readOnly: false }
+        },
+        fieldPermissions: {
+          username: { visible: true, readOnly: false },
+          email: { visible: true, readOnly: false },
+          Fullname: { visible: true, readOnly: false },
+          mobile_number: { visible: true, readOnly: true }
+        }
+      }
+    });
+    setShowEditModal(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      username: '',
+      password: '',
+      Fullname: '',
+      email: '',
+      mobile_number: '',
+      adminPermissions: {
+        visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+        sectionPermissions: {
+          patients: { visible: true, readOnly: false },
+          doctors: { visible: true, readOnly: false },
+          physiotherapists: { visible: true, readOnly: false },
+          sessions: { visible: true, readOnly: false },
+          payments: { visible: true, readOnly: false }
+        },
+        fieldPermissions: {
+          username: { visible: true, readOnly: false },
+          email: { visible: true, readOnly: false },
+          Fullname: { visible: true, readOnly: false },
+          mobile_number: { visible: true, readOnly: true }
+        }
+      }
+    });
+  };
+
+  if (!isRohitKumar) {
+    return (
+      <div className="p-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <strong>Access Denied:</strong> Only "Rohit kumar" can access this page.
+        </div>
+      </div>
+    );
+  }
+
+  const filteredAdmins = admins.filter(admin => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      (admin.username || '').toLowerCase().includes(search) ||
+      (admin.Fullname || '').toLowerCase().includes(search) ||
+      (admin.email || '').toLowerCase().includes(search) ||
+      (admin.mobile_number || '').toLowerCase().includes(search)
+    );
+  });
+
+  if (loading) {
+    return <div className="p-4">Loading admins...</div>;
+  }
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">All Admins</h1>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search admins..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+          />
+          <button
+            onClick={() => {
+              resetForm();
+              setShowCreateModal(true);
+            }}
+            className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+          >
+            + Create Admin
+          </button>
+          <button
+            onClick={fetchAdmins}
+            className="px-4 py-2 bg-teal-500 text-white rounded-md hover:bg-teal-600"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white border border-gray-300">
+          <thead className="bg-teal-600 text-white">
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-semibold">#</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Username</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Full Name</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Email</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Mobile</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Permissions</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Created At</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Last Login</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAdmins.length === 0 ? (
+              <tr>
+                <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
+                  {searchTerm ? 'No admins found matching your search.' : 'No admins found.'}
+                </td>
+              </tr>
+            ) : (
+              filteredAdmins.map((admin, index) => {
+                const visibleSections = admin.adminPermissions?.visibleSections || [];
+                const readOnlySections = admin.adminPermissions?.sectionPermissions 
+                  ? Object.entries(admin.adminPermissions.sectionPermissions)
+                      .filter(([_, perm]) => perm.readOnly)
+                      .map(([section, _]) => section)
+                  : [];
+                const readOnlyFields = admin.adminPermissions?.fieldPermissions 
+                  ? Object.entries(admin.adminPermissions.fieldPermissions)
+                      .filter(([_, perm]) => perm.readOnly)
+                      .map(([field, _]) => field)
+                  : [];
+                
+                return (
+                  <tr key={admin._id} className="border-b border-gray-200 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm">{index + 1}</td>
+                    <td className="px-4 py-3 text-sm font-medium">{admin.username || '(not set)'}</td>
+                    <td className="px-4 py-3 text-sm">{admin.Fullname || '(not set)'}</td>
+                    <td className="px-4 py-3 text-sm">{admin.email || '(not set)'}</td>
+                    <td className="px-4 py-3 text-sm">{admin.mobile_number || '(not set)'}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="space-y-1">
+                        <div className="text-xs">
+                          <span className="font-medium">Sections:</span> {visibleSections.length > 0 ? visibleSections.length : 'All'}
+                        </div>
+                        {readOnlySections.length > 0 && (
+                          <div className="text-xs text-blue-600">
+                            <span className="font-medium">Read-only sections:</span> {readOnlySections.join(', ')}
+                          </div>
+                        )}
+                        {readOnlyFields.length > 0 && (
+                          <div className="text-xs text-orange-600">
+                            <span className="font-medium">Read-only fields:</span> {readOnlyFields.join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {admin.createdAt ? new Date(admin.createdAt).toLocaleString() : '(unknown)'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString() : 'Never'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEditModal(admin)}
+                          className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteAdmin(admin._id)}
+                          className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 text-sm text-gray-600">
+        Showing {filteredAdmins.length} of {admins.length} admin(s)
+      </div>
+
+      {/* Create Admin Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg w-full max-w-2xl my-8">
+            <h2 className="text-2xl font-bold mb-4">Create New Admin</h2>
+            <form onSubmit={handleCreateAdmin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Username *</label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Password *</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={formData.Fullname}
+                  onChange={(e) => setFormData({...formData, Fullname: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Mobile Number *</label>
+                <input
+                  type="tel"
+                  value={formData.mobile_number}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({...formData, mobile_number: value});
+                  }}
+                  maxLength="10"
+                  pattern="[0-9]{10}"
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                  placeholder="10 digits only"
+                />
+              </div>
+
+              {/* Admin Permissions Section */}
+              <div className="border-t pt-4 mt-4">
+                <details className="cursor-pointer">
+                  <summary className="text-lg font-semibold mb-3">Admin Permissions & Visibility Settings</summary>
+                  
+                  <div className="mt-4 space-y-4">
+                    {/* Visible Dashboard Sections */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Visible Dashboard Sections</label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'dashboard', label: 'Dashboard', canBeReadOnly: false },
+                          { key: 'patients', label: 'Patients', canBeReadOnly: true },
+                          { key: 'doctors', label: 'Doctors', canBeReadOnly: true },
+                          { key: 'physiotherapists', label: 'Physiotherapists', canBeReadOnly: true },
+                          { key: 'sessions', label: 'Sessions', canBeReadOnly: true },
+                          { key: 'payments', label: 'Payments', canBeReadOnly: true },
+                          { key: 'referrals', label: 'Referrals', canBeReadOnly: false },
+                          { key: 'contact', label: 'Contact', canBeReadOnly: false },
+                          { key: 'blog', label: 'Blog', canBeReadOnly: false }
+                        ].map((section) => (
+                          <div key={section.key} className="flex items-center justify-between p-2 border rounded">
+                            <label className="flex items-center space-x-2 cursor-pointer flex-1">
+                              <input
+                                type="checkbox"
+                                checked={formData.adminPermissions.visibleSections.includes(section.key)}
+                                onChange={(e) => {
+                                  const sections = e.target.checked
+                                    ? [...formData.adminPermissions.visibleSections, section.key]
+                                    : formData.adminPermissions.visibleSections.filter(s => s !== section.key);
+                                  setFormData({
+                                    ...formData,
+                                    adminPermissions: {
+                                      ...formData.adminPermissions,
+                                      visibleSections: sections,
+                                      // Remove section permission if section is unchecked
+                                      sectionPermissions: e.target.checked 
+                                        ? formData.adminPermissions.sectionPermissions
+                                        : Object.fromEntries(
+                                            Object.entries(formData.adminPermissions.sectionPermissions || {}).filter(([key]) => key !== section.key)
+                                          )
+                                    }
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="text-sm font-medium">{section.label}</span>
+                            </label>
+                            {section.canBeReadOnly && formData.adminPermissions.visibleSections.includes(section.key) && (
+                              <label className="flex items-center space-x-2 cursor-pointer ml-4">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.adminPermissions.sectionPermissions?.[section.key]?.readOnly || false}
+                                  onChange={(e) => {
+                                    setFormData({
+                                      ...formData,
+                                      adminPermissions: {
+                                        ...formData.adminPermissions,
+                                        sectionPermissions: {
+                                          ...formData.adminPermissions.sectionPermissions,
+                                          [section.key]: {
+                                            visible: true,
+                                            readOnly: e.target.checked
+                                          }
+                                        }
+                                      }
+                                    });
+                                  }}
+                                  className="rounded"
+                                />
+                                <span className="text-xs text-gray-600">Read-Only</span>
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Field Permissions */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Field Permissions (Read-Only Settings)</label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'username', label: 'Username' },
+                          { key: 'email', label: 'Email' },
+                          { key: 'Fullname', label: 'Full Name' },
+                          { key: 'mobile_number', label: 'Mobile Number' }
+                        ].map((field) => (
+                          <div key={field.key} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm font-medium">{field.label}</span>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.adminPermissions.fieldPermissions[field.key]?.readOnly || false}
+                                onChange={(e) => {
+                                  setFormData({
+                                    ...formData,
+                                    adminPermissions: {
+                                      ...formData.adminPermissions,
+                                      fieldPermissions: {
+                                        ...formData.adminPermissions.fieldPermissions,
+                                        [field.key]: {
+                                          visible: true,
+                                          readOnly: e.target.checked
+                                        }
+                                      }
+                                    }
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="text-xs text-gray-600">Read-Only</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Admin Modal */}
+      {showEditModal && editingAdmin && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg w-full max-w-2xl my-8">
+            <h2 className="text-2xl font-bold mb-4">Edit Admin</h2>
+            <form onSubmit={handleEditAdmin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Username *</label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">New Password (leave blank to keep current)</label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                  minLength={6}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  value={formData.Fullname}
+                  onChange={(e) => setFormData({...formData, Fullname: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="w-full px-3 py-2 border rounded"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Mobile Number *</label>
+                <input
+                  type="tel"
+                  value={formData.mobile_number}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setFormData({...formData, mobile_number: value});
+                  }}
+                  maxLength="10"
+                  pattern="[0-9]{10}"
+                  className="w-full px-3 py-2 border rounded"
+                  required
+                  placeholder="10 digits only"
+                />
+              </div>
+
+              {/* Admin Permissions Section */}
+              <div className="border-t pt-4 mt-4">
+                <details className="cursor-pointer" open>
+                  <summary className="text-lg font-semibold mb-3">Admin Permissions & Visibility Settings</summary>
+                  
+                  <div className="mt-4 space-y-4">
+                    {/* Visible Dashboard Sections */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Visible Dashboard Sections</label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'dashboard', label: 'Dashboard', canBeReadOnly: false },
+                          { key: 'patients', label: 'Patients', canBeReadOnly: true },
+                          { key: 'doctors', label: 'Doctors', canBeReadOnly: true },
+                          { key: 'physiotherapists', label: 'Physiotherapists', canBeReadOnly: true },
+                          { key: 'sessions', label: 'Sessions', canBeReadOnly: true },
+                          { key: 'payments', label: 'Payments', canBeReadOnly: true },
+                          { key: 'referrals', label: 'Referrals', canBeReadOnly: false },
+                          { key: 'contact', label: 'Contact', canBeReadOnly: false },
+                          { key: 'blog', label: 'Blog', canBeReadOnly: false }
+                        ].map((section) => (
+                          <div key={section.key} className="flex items-center justify-between p-2 border rounded">
+                            <label className="flex items-center space-x-2 cursor-pointer flex-1">
+                              <input
+                                type="checkbox"
+                                checked={formData.adminPermissions?.visibleSections?.includes(section.key) || false}
+                                onChange={(e) => {
+                                  const sections = e.target.checked
+                                    ? [...(formData.adminPermissions?.visibleSections || []), section.key]
+                                    : (formData.adminPermissions?.visibleSections || []).filter(s => s !== section.key);
+                                  setFormData({
+                                    ...formData,
+                                    adminPermissions: {
+                                      ...formData.adminPermissions,
+                                      visibleSections: sections,
+                                      // Remove section permission if section is unchecked
+                                      sectionPermissions: e.target.checked 
+                                        ? formData.adminPermissions?.sectionPermissions
+                                        : Object.fromEntries(
+                                            Object.entries(formData.adminPermissions?.sectionPermissions || {}).filter(([key]) => key !== section.key)
+                                          )
+                                    }
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="text-sm font-medium">{section.label}</span>
+                            </label>
+                            {section.canBeReadOnly && formData.adminPermissions?.visibleSections?.includes(section.key) && (
+                              <label className="flex items-center space-x-2 cursor-pointer ml-4">
+                                <input
+                                  type="checkbox"
+                                  checked={formData.adminPermissions?.sectionPermissions?.[section.key]?.readOnly || false}
+                                  onChange={(e) => {
+                                    setFormData({
+                                      ...formData,
+                                      adminPermissions: {
+                                        ...formData.adminPermissions,
+                                        sectionPermissions: {
+                                          ...formData.adminPermissions?.sectionPermissions,
+                                          [section.key]: {
+                                            visible: true,
+                                            readOnly: e.target.checked
+                                          }
+                                        }
+                                      }
+                                    });
+                                  }}
+                                  className="rounded"
+                                />
+                                <span className="text-xs text-gray-600">Read-Only</span>
+                              </label>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Field Permissions */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Field Permissions (Read-Only Settings)</label>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'username', label: 'Username' },
+                          { key: 'email', label: 'Email' },
+                          { key: 'Fullname', label: 'Full Name' },
+                          { key: 'mobile_number', label: 'Mobile Number' }
+                        ].map((field) => (
+                          <div key={field.key} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm font-medium">{field.label}</span>
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={formData.adminPermissions?.fieldPermissions?.[field.key]?.readOnly || false}
+                                onChange={(e) => {
+                                  setFormData({
+                                    ...formData,
+                                    adminPermissions: {
+                                      ...formData.adminPermissions,
+                                      fieldPermissions: {
+                                        ...formData.adminPermissions?.fieldPermissions,
+                                        [field.key]: {
+                                          visible: true,
+                                          readOnly: e.target.checked
+                                        }
+                                      }
+                                    }
+                                  });
+                                }}
+                                className="rounded"
+                              />
+                              <span className="text-xs text-gray-600">Read-Only</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingAdmin(null);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 border rounded hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600"
+                >
+                  Update
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Main Admin Dashboard Component ---
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const authHeaders = { Authorization: `Bearer ${localStorage.getItem('accessToken')}` };
   const [dateRange, setDateRange] = useState({
     startDate: '',
@@ -2426,26 +3337,62 @@ const AdminDashboard = () => {
             </div>
 
             <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">Username <span className="text-red-500">*</span></label>
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Username <span className="text-red-500">*</span>
+                {(() => {
+                  const isReadOnly = (user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                    (user?.adminPermissions?.fieldPermissions?.username?.readOnly === true);
+                  return isReadOnly ? <span className="text-gray-500 text-xs ml-2">(Read-only)</span> : null;
+                })()}
+              </label>
               <input
                 type="text"
                 name="username"
                 value={formData.username || ''}
                 onChange={handleInputChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                readOnly={(user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                  (user?.adminPermissions?.fieldPermissions?.username?.readOnly === true)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  ((user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                  (user?.adminPermissions?.fieldPermissions?.username?.readOnly === true))
+                    ? 'bg-gray-100 cursor-not-allowed'
+                    : ''
+                }`}
+                title={((user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                  (user?.adminPermissions?.fieldPermissions?.username?.readOnly === true))
+                  ? 'Username cannot be changed. Only Rohit kumar can change this.'
+                  : ''}
               />
             </div>
 
             <div className="mb-4">
-              <label className="block text-gray-700 text-sm font-bold mb-2">Email <span className="text-red-500">*</span></label>
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Email <span className="text-red-500">*</span>
+                {(() => {
+                  const isReadOnly = (user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                    (user?.adminPermissions?.fieldPermissions?.email?.readOnly === true);
+                  return isReadOnly ? <span className="text-gray-500 text-xs ml-2">(Read-only)</span> : null;
+                })()}
+              </label>
               <input
                 type="email"
                 name="email"
                 value={formData.email || ''}
                 onChange={handleInputChange}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
+                readOnly={(user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                  (user?.adminPermissions?.fieldPermissions?.email?.readOnly === true)}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 ${
+                  ((user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                  (user?.adminPermissions?.fieldPermissions?.email?.readOnly === true))
+                    ? 'bg-gray-100 cursor-not-allowed'
+                    : ''
+                }`}
+                title={((user?.userType === 'admin' && user?.Fullname !== 'Rohit kumar' && user?.Fullname !== 'Rohit Kumar') ||
+                  (user?.adminPermissions?.fieldPermissions?.email?.readOnly === true))
+                  ? 'Email cannot be changed. Only Rohit kumar can change this.'
+                  : ''}
               />
             </div>
 
@@ -2520,7 +3467,7 @@ const AdminDashboard = () => {
                          file:bg-teal-50 file:text-teal-700
                          hover:file:bg-teal-100"
               />
-              <p className="text-xs text-gray-500 mt-2">Recommended: Square image (512x512 pixels)</p>
+              {/* <p className="text-xs text-gray-500 mt-2">Recommended: Square image (512x512 pixels)</p> */}
             </div>
           </div>
         </form>
@@ -2561,21 +3508,58 @@ const AdminDashboard = () => {
         </div>
         <nav className="flex-1 overflow-y-auto"> {/* Added overflow-y-auto to sidebar nav */}
           <ul className="space-y-2">
-            <li><Link to="/admin" className={pathname === '/admin' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Dashboard</Link></li>
-            <li><Link to="/admin/patients" className={pathname.startsWith('/admin/patients') ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Patient Record</Link></li>
-            <li><Link to="/admin/session-history" className={pathname === '/admin/session-history' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Session</Link></li>
-            <li><Link to="/admin/allocate-session" className={pathname === '/admin/allocate-session' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Allocate Session</Link></li>
-            <li><Link to="/admin/doctors" className={pathname.startsWith('/admin/doctors') ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Doctors</Link></li>
-            <li><Link to="/admin/physiotherapists" className={pathname.startsWith('/admin/physiotherapists') ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Physiotherapists</Link></li>
-            <li><Link to="/admin/payments" className={pathname === '/admin/payments' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Payments</Link></li>
-            <li><Link to="/admin/referrals" className={pathname === '/admin/referrals' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Referrals</Link></li>
-            {/* <li><Link to="/admin/services" className={pathname === '/admin/services' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Services</Link></li> */}
-            <li><Link to="/admin/contact" className={pathname === '/admin/contact' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Contact Form</Link></li>
-            <li><Link to="/admin/change-usertype" className={pathname === '/admin/change-usertype' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Change Role</Link></li>
-            {/* <li><Link to="/admin/report" className={pathname === '/admin/report' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Report</Link></li> */}
+            {/* Get visible sections from user permissions, or show all for Rohit Kumar */}
+            {(() => {
+              const isRohitKumar = user?.Fullname === 'Rohit kumar' || user?.Fullname === 'Rohit Kumar';
+              const visibleSections = isRohitKumar 
+                ? ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog', 'admins']
+                : (user?.adminPermissions?.visibleSections || ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog']);
+              
+              const navigationItems = [
+                { key: 'dashboard', path: '/admin', label: 'Dashboard', exact: true },
+                { key: 'patients', path: '/admin/patients', label: 'Patient Record', startsWith: true },
+                { key: 'sessions', path: '/admin/session-history', label: 'Session', exact: true },
+                { key: 'sessions', path: '/admin/allocate-session', label: 'Allocate Session', exact: true },
+                { key: 'doctors', path: '/admin/doctors', label: 'Doctors', startsWith: true },
+                { key: 'physiotherapists', path: '/admin/physiotherapists', label: 'Physiotherapists', startsWith: true },
+                { key: 'payments', path: '/admin/payments', label: 'Payments', exact: true },
+                { key: 'referrals', path: '/admin/referrals', label: 'Referrals', exact: true },
+                { key: 'contact', path: '/admin/contact', label: 'Contact Form', exact: true },
+                { key: 'blog', path: '/admin/blog', label: 'Blog', exact: true }
+              ];
+
+              return navigationItems
+                .filter(item => visibleSections.includes(item.key))
+                .map((item) => {
+                  const isActive = item.startsWith 
+                    ? pathname.startsWith(item.path)
+                    : item.exact
+                    ? pathname === item.path
+                    : pathname.startsWith(item.path);
+                  
+                  return (
+                    <li key={item.path}>
+                      <Link 
+                        to={item.path} 
+                        className={isActive ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} 
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                });
+            })()}
+            
+            {/* Always show these */}
             <li><Link to="/admin/profile" className={pathname === '/admin/profile' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Profile</Link></li>
+            <li><Link to="/admin/change-usertype" className={pathname === '/admin/change-usertype' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Change Role</Link></li>
             <li><Link to="/admin/support" className={pathname === '/admin/support' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Support</Link></li>
-            <li><Link to="/admin/blog" className={pathname === '/admin/blog' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>Blog</Link></li>
+            
+            {/* Only show for Rohit Kumar */}
+            {user?.Fullname === 'Rohit kumar' || user?.Fullname === 'Rohit Kumar' ? (
+              <li><Link to="/admin/admins" className={pathname === '/admin/admins' ? 'block py-2 px-4 rounded bg-teal-600' : 'block py-2 px-4 rounded hover:bg-teal-600'} onClick={() => setSidebarOpen(false)}>All Admins</Link></li>
+            ) : null}
           </ul>
         </nav>
       </aside>
@@ -2729,28 +3713,29 @@ const AdminDashboard = () => {
 
             <Route index element={<Dashboard stats={dashboardStats} />} />
             
-            <Route path="patients" element={<PatientRecord authHeaders={authHeaders} />} />
-            <Route path="patients/:patientId" element={<RouteWrapper component={PatientRecord} componentProps={{ authHeaders: authHeaders }} />} />
+            <Route path="patients" element={<PatientRecord authHeaders={authHeaders} user={user} />} />
+            <Route path="patients/:patientId" element={<RouteWrapper component={PatientRecord} componentProps={{ authHeaders: authHeaders, user: user }} />} />
 
-            <Route path="doctors" element={<DoctorTable authHeaders={authHeaders} />} />
-            <Route path="doctors/:doctorId" element={<RouteWrapper component={DoctorTable} componentProps={{ authHeaders: authHeaders }} />} />
+            <Route path="doctors" element={<DoctorTable authHeaders={authHeaders} user={user} />} />
+            <Route path="doctors/:doctorId" element={<RouteWrapper component={DoctorTable} componentProps={{ authHeaders: authHeaders, user: user }} />} />
 
-            <Route path="physiotherapists" element={<PhysiotherapistTable authHeaders={authHeaders} />} />
-            <Route path="physiotherapists/:physioId" element={<RouteWrapper component={PhysiotherapistTable} componentProps={{ authHeaders: authHeaders }} />} />
+            <Route path="physiotherapists" element={<PhysiotherapistTable authHeaders={authHeaders} user={user} />} />
+            <Route path="physiotherapists/:physioId" element={<RouteWrapper component={PhysiotherapistTable} componentProps={{ authHeaders: authHeaders, user: user }} />} />
             
-            <Route path="sessions" element={<PendingSessions authHeaders={authHeaders} />} />
-            <Route path="session-history" element={<SessionHistory authHeaders={authHeaders} />} />
-            <Route path="allocate-session" element={<AllocateSession authHeaders={authHeaders} />} />
+            <Route path="sessions" element={<PendingSessions authHeaders={authHeaders} user={user} />} />
+            <Route path="session-history" element={<SessionHistory authHeaders={authHeaders} user={user} />} />
+            <Route path="allocate-session" element={<AllocateSession authHeaders={authHeaders} user={user} />} />
             <Route path="profile" element={renderAdminProfile()} />
             
             <Route path="contact" element={<ContactSubmissions />} />
-            <Route path="payments" element={<Payments />} />
+            <Route path="payments" element={<Payments user={user} />} />
             <Route path="referrals" element={<Referrals />} />
             {/* <Route path="services" element={<p>Content for Services will be added later.</p>} /> */}
             <Route path="change-usertype" element={<p></p>} />
             {/* <Route path="report" element={<p>Content for Report will be added later.</p>} /> */}
             <Route path="support" element={<p></p>} />
             <Route path="blog" element={<BlogManagement authHeaders={authHeaders} />} />
+            <Route path="admins" element={<AdminList authHeaders={authHeaders} />} />
             
             <Route path="*" element={<p>404: Page not found. Content for **{pathname.split('/').pop().replace('-', ' ')}** will be added later.</p>} />
           </Routes>

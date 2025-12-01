@@ -127,11 +127,13 @@ const Blog = () => {
                 {blogs.map(blog => (
                   <div key={blog._id} className="bg-white rounded-lg shadow-md overflow-hidden transform hover:scale-105 transition-transform duration-300">
                     {blog.featuredImage?.url ? (
-                      <img 
-                        src={blog.featuredImage.url} 
-                        alt={blog.title} 
-                        className="w-full h-48 object-cover"
-                      />
+                      <div className="w-full h-48 overflow-hidden bg-gray-100 flex items-center justify-center">
+                        <img 
+                          src={blog.featuredImage.url} 
+                          alt={blog.title} 
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
                     ) : (
                       <div className="w-full h-48 bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center">
                         <span className="text-white text-4xl">📝</span>

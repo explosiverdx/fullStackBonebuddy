@@ -31,3 +31,11 @@ export const verifyAdminOtp = async (phoneNumber, otp) => {
   });
   return response.data;
 };
+
+export const loginAdmin = async (username, password) => {
+  const response = await apiClient.post('/admin/login', {
+    username,
+    password,
+  });
+  return response.data;
+};

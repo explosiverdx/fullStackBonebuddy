@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { sendAdminOtp, verifyAdminOtp } from '../api/auth.js';
+import { sendAdminOtp, verifyAdminOtp, loginAdmin } from '../api/auth.js';
 
 const AdminLoginGate = ({ children }) => {
   const { user, loading, login } = useAuth();
   const navigate = useNavigate();
-  const [step, setStep] = useState('phone'); // 'phone' or 'otp'
+  const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
+  const [step, setStep] = useState('phone'); // 'phone' or 'otp' (for OTP method)
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otp, setOtp] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   // Show loading state
   if (loading) {
@@ -63,6 +67,34 @@ const AdminLoginGate = ({ children }) => {
       setOtp('');
     };
 
+    const handlePasswordLogin = async (e) => {
+      e.preventDefault();
+      if (!username || !password) {
+        alert('Please enter both username and password');
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await loginAdmin(username, password);
+        const { user, accessToken, refreshToken } = response.data;
+        console.log('Admin login successful');
+        login(user, accessToken, refreshToken);
+        navigate('/admin', { state: { user: user } });
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to login';
+        if (errorMessage.includes('Admin does not exist') || errorMessage.includes('not authorized')) {
+          alert('Invalid username or password. You are not authorized as an admin.');
+        } else if (errorMessage.includes('Invalid admin credentials')) {
+          alert('Invalid username or password.');
+        } else {
+          alert(`Error: ${errorMessage}`);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 to-teal-600">
         <div className="max-w-md w-full m-4">
@@ -78,7 +110,87 @@ const AdminLoginGate = ({ children }) => {
               <p className="text-gray-600">Secure access for administrators only</p>
             </div>
 
-            {step === 'phone' ? (
+            {/* Login Method Toggle */}
+            <div className="mb-6 flex gap-2 bg-gray-100 p-1 rounded-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('password');
+                  setUsername('');
+                  setPassword('');
+                }}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  loginMethod === 'password'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Username & Password
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('otp');
+                  setStep('phone');
+                  setPhoneNumber('');
+                  setOtp('');
+                }}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  loginMethod === 'otp'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                OTP Login
+              </button>
+            </div>
+
+            {loginMethod === 'password' ? (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter your username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Logging in...' : 'Login'}
+                </button>
+                <div className="text-center mt-4">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="text-sm text-gray-600 hover:text-gray-800"
+                  >
+                    ← Back to Home
+                  </button>
+                </div>
+              </form>
+            ) : step === 'phone' ? (
               <form onSubmit={handleAdminOtp} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
