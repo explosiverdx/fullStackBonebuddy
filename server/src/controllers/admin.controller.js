@@ -147,6 +147,38 @@ const verifyAdminOTP = asyncHandler(async (req, res) => {
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(admin._id);
 
     const loggedInAdmin = await User.findById(admin._id).select("-password -refreshToken");
+    
+    // Convert adminPermissions Maps to plain objects for JSON serialization
+    if (loggedInAdmin && loggedInAdmin.adminPermissions) {
+        const adminPerms = loggedInAdmin.toObject ? loggedInAdmin.toObject() : loggedInAdmin;
+        
+        // Convert sectionPermissions Map to plain object
+        if (adminPerms.adminPermissions?.sectionPermissions && adminPerms.adminPermissions.sectionPermissions instanceof Map) {
+            const sectionPermsObj = {};
+            adminPerms.adminPermissions.sectionPermissions.forEach((value, key) => {
+                sectionPermsObj[key] = value;
+            });
+            adminPerms.adminPermissions.sectionPermissions = sectionPermsObj;
+        } else if (adminPerms.adminPermissions?.sectionPermissions && typeof adminPerms.adminPermissions.sectionPermissions === 'object') {
+            adminPerms.adminPermissions.sectionPermissions = { ...adminPerms.adminPermissions.sectionPermissions };
+        }
+
+        // Convert fieldPermissions Map to plain object
+        if (adminPerms.adminPermissions?.fieldPermissions && adminPerms.adminPermissions.fieldPermissions instanceof Map) {
+            const fieldPermsObj = {};
+            adminPerms.adminPermissions.fieldPermissions.forEach((value, key) => {
+                fieldPermsObj[key] = value;
+            });
+            adminPerms.adminPermissions.fieldPermissions = fieldPermsObj;
+        } else if (adminPerms.adminPermissions?.fieldPermissions && typeof adminPerms.adminPermissions.fieldPermissions === 'object') {
+            adminPerms.adminPermissions.fieldPermissions = { ...adminPerms.adminPermissions.fieldPermissions };
+        }
+        
+        // Update loggedInAdmin with converted permissions
+        if (loggedInAdmin.toObject) {
+            Object.assign(loggedInAdmin, adminPerms);
+        }
+    }
 
     const options = {
         httpOnly: true,
@@ -1395,6 +1427,38 @@ const loginAdmin = asyncHandler(async (req, res) => {
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
     const loggedInAdmin = await User.findById(user._id).select("-password -refreshToken");
+    
+    // Convert adminPermissions Maps to plain objects for JSON serialization
+    if (loggedInAdmin && loggedInAdmin.adminPermissions) {
+        const adminPerms = loggedInAdmin.toObject ? loggedInAdmin.toObject() : loggedInAdmin;
+        
+        // Convert sectionPermissions Map to plain object
+        if (adminPerms.adminPermissions?.sectionPermissions && adminPerms.adminPermissions.sectionPermissions instanceof Map) {
+            const sectionPermsObj = {};
+            adminPerms.adminPermissions.sectionPermissions.forEach((value, key) => {
+                sectionPermsObj[key] = value;
+            });
+            adminPerms.adminPermissions.sectionPermissions = sectionPermsObj;
+        } else if (adminPerms.adminPermissions?.sectionPermissions && typeof adminPerms.adminPermissions.sectionPermissions === 'object') {
+            adminPerms.adminPermissions.sectionPermissions = { ...adminPerms.adminPermissions.sectionPermissions };
+        }
+
+        // Convert fieldPermissions Map to plain object
+        if (adminPerms.adminPermissions?.fieldPermissions && adminPerms.adminPermissions.fieldPermissions instanceof Map) {
+            const fieldPermsObj = {};
+            adminPerms.adminPermissions.fieldPermissions.forEach((value, key) => {
+                fieldPermsObj[key] = value;
+            });
+            adminPerms.adminPermissions.fieldPermissions = fieldPermsObj;
+        } else if (adminPerms.adminPermissions?.fieldPermissions && typeof adminPerms.adminPermissions.fieldPermissions === 'object') {
+            adminPerms.adminPermissions.fieldPermissions = { ...adminPerms.adminPermissions.fieldPermissions };
+        }
+        
+        // Update loggedInAdmin with converted permissions
+        if (loggedInAdmin.toObject) {
+            Object.assign(loggedInAdmin, adminPerms);
+        }
+    }
 
     const options = {
         httpOnly: true,
@@ -1499,6 +1563,246 @@ const resetAdminPassword = asyncHandler(async (req, res) => {
     await user.save({ validateBeforeSave: true });
 
     return res.status(200).json(new ApiResponse(200, {}, "Admin password has been reset successfully."));
+});
+
+const getAllAdmins = asyncHandler(async (req, res) => {
+    // Check if requester is "Rohit kumar"
+    const requester = req.user;
+    if (requester.Fullname !== 'Rohit kumar' && requester.Fullname !== 'Rohit Kumar') {
+        throw new ApiError(403, "Access denied. Only 'Rohit kumar' can access this resource.");
+    }
+
+    const { search, page = 1, limit = 50, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+
+    const query = { 
+        userType: 'admin',
+        _id: { $ne: requester._id } // Exclude the current user (Rohit Kumar)
+    };
+    
+    if (search) {
+        query.$or = [
+            { username: { $regex: search, $options: 'i' } },
+            { Fullname: { $regex: search, $options: 'i' } },
+            { email: { $regex: search, $options: 'i' } },
+            { mobile_number: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const sortOptions = {};
+    sortOptions[sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    const admins = await User.find(query)
+        .select('-password -refreshToken -otp -otpExpires')
+        .sort(sortOptions)
+        .limit(parseInt(limit))
+        .skip((parseInt(page) - 1) * parseInt(limit));
+
+    const total = await User.countDocuments(query);
+
+    return res.status(200).json(new ApiResponse(200, {
+        admins,
+        pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            pages: Math.ceil(total / parseInt(limit))
+        }
+    }, "Admins retrieved successfully."));
+});
+
+const createAdmin = asyncHandler(async (req, res) => {
+    // Check if requester is "Rohit kumar"
+    const requester = req.user;
+    if (requester.Fullname !== 'Rohit kumar' && requester.Fullname !== 'Rohit Kumar') {
+        throw new ApiError(403, "Access denied. Only 'Rohit kumar' can create admins.");
+    }
+
+    const { username, password, Fullname, email, mobile_number, adminPermissions } = req.body;
+
+    if (!username || !password || !Fullname || !mobile_number) {
+        throw new ApiError(400, "Username, password, Fullname, and mobile_number are required");
+    }
+
+    if (password.length < 6) {
+        throw new ApiError(400, "Password must be at least 6 characters long");
+    }
+
+    // Check if username or mobile_number already exists
+    const existingUser = await User.findOne({
+        $or: [
+            { username },
+            { mobile_number }
+        ]
+    });
+
+    if (existingUser) {
+        throw new ApiError(409, "Username or mobile number already exists");
+    }
+
+    // Convert sectionPermissions and fieldPermissions objects to Map format for MongoDB
+    let sectionPermissionsMap = {};
+    if (adminPermissions && adminPermissions.sectionPermissions) {
+        Object.keys(adminPermissions.sectionPermissions).forEach(key => {
+            sectionPermissionsMap[key] = adminPermissions.sectionPermissions[key];
+        });
+    }
+
+    let fieldPermissionsMap = {};
+    if (adminPermissions && adminPermissions.fieldPermissions) {
+        Object.keys(adminPermissions.fieldPermissions).forEach(key => {
+            fieldPermissionsMap[key] = adminPermissions.fieldPermissions[key];
+        });
+    }
+
+    const newAdmin = await User.create({
+        username,
+        password,
+        userType: 'admin',
+        Fullname,
+        email: email || undefined,
+        mobile_number,
+        gender: 'Other',
+        dateOfBirth: new Date('1990-01-01'),
+        age: 34,
+        address: 'Unknown',
+        adminPermissions: adminPermissions ? {
+            visibleSections: adminPermissions.visibleSections || ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+            sectionPermissions: sectionPermissionsMap,
+            fieldPermissions: fieldPermissionsMap
+        } : undefined
+    });
+
+    const adminData = await User.findById(newAdmin._id).select('-password -refreshToken -otp -otpExpires');
+
+    return res.status(201).json(new ApiResponse(201, adminData, "Admin created successfully."));
+});
+
+const updateAdmin = asyncHandler(async (req, res) => {
+    // Check if requester is "Rohit kumar"
+    const requester = req.user;
+    if (requester.Fullname !== 'Rohit kumar' && requester.Fullname !== 'Rohit Kumar') {
+        throw new ApiError(403, "Access denied. Only 'Rohit kumar' can update admins.");
+    }
+
+    const { id } = req.params;
+    const { username, password, Fullname, email, mobile_number, adminPermissions } = req.body;
+
+    const admin = await User.findById(id);
+    if (!admin) {
+        throw new ApiError(404, "Admin not found");
+    }
+
+    if (admin.userType !== 'admin') {
+        throw new ApiError(400, "User is not an admin");
+    }
+
+    // Check if username or mobile_number is being changed and conflicts with another user
+    if (username && username !== admin.username) {
+        const existingUser = await User.findOne({ username, _id: { $ne: id } });
+        if (existingUser) {
+            throw new ApiError(409, "Username already exists");
+        }
+        admin.username = username;
+    }
+
+    if (mobile_number && mobile_number !== admin.mobile_number) {
+        const existingUser = await User.findOne({ mobile_number, _id: { $ne: id } });
+        if (existingUser) {
+            throw new ApiError(409, "Mobile number already exists");
+        }
+        admin.mobile_number = mobile_number;
+    }
+
+    if (Fullname) admin.Fullname = Fullname;
+    if (email !== undefined) admin.email = email;
+    if (password && password.trim() !== '') {
+        if (password.length < 6) {
+            throw new ApiError(400, "Password must be at least 6 characters long");
+        }
+        admin.password = password;
+    }
+
+    // Update admin permissions if provided
+    if (adminPermissions) {
+        try {
+            // Convert sectionPermissions and fieldPermissions objects to Map format for MongoDB
+            let sectionPermissionsMap = {};
+            if (adminPermissions.sectionPermissions && typeof adminPermissions.sectionPermissions === 'object') {
+                Object.keys(adminPermissions.sectionPermissions).forEach(key => {
+                    sectionPermissionsMap[key] = adminPermissions.sectionPermissions[key];
+                });
+            }
+
+            let fieldPermissionsMap = {};
+            if (adminPermissions.fieldPermissions && typeof adminPermissions.fieldPermissions === 'object') {
+                Object.keys(adminPermissions.fieldPermissions).forEach(key => {
+                    fieldPermissionsMap[key] = adminPermissions.fieldPermissions[key];
+                });
+            }
+
+            // Get existing permissions or use defaults
+            // Convert Mongoose subdocument to plain object if needed
+            let existingPermissions = {};
+            if (admin.adminPermissions) {
+                if (typeof admin.adminPermissions.toObject === 'function') {
+                    existingPermissions = admin.adminPermissions.toObject();
+                } else {
+                    existingPermissions = admin.adminPermissions;
+                }
+            }
+            
+            const existingVisibleSections = existingPermissions.visibleSections || ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'];
+            const existingSectionPermissions = existingPermissions.sectionPermissions || {};
+            const existingFieldPermissions = existingPermissions.fieldPermissions || {};
+
+            // Only update if we have new data
+            if (adminPermissions.visibleSections || Object.keys(sectionPermissionsMap).length > 0 || Object.keys(fieldPermissionsMap).length > 0) {
+                admin.adminPermissions = {
+                    visibleSections: adminPermissions.visibleSections || existingVisibleSections,
+                    sectionPermissions: Object.keys(sectionPermissionsMap).length > 0 ? sectionPermissionsMap : existingSectionPermissions,
+                    fieldPermissions: Object.keys(fieldPermissionsMap).length > 0 ? fieldPermissionsMap : existingFieldPermissions
+                };
+            }
+        } catch (error) {
+            console.error('Error updating admin permissions:', error);
+            // Don't fail the entire update if permissions update fails
+            // Just log the error and continue
+        }
+    }
+
+    await admin.save({ validateBeforeSave: false });
+
+    const updatedAdmin = await User.findById(id).select('-password -refreshToken -otp -otpExpires');
+
+    return res.status(200).json(new ApiResponse(200, updatedAdmin, "Admin updated successfully."));
+});
+
+const deleteAdmin = asyncHandler(async (req, res) => {
+    // Check if requester is "Rohit kumar"
+    const requester = req.user;
+    if (requester.Fullname !== 'Rohit kumar' && requester.Fullname !== 'Rohit Kumar') {
+        throw new ApiError(403, "Access denied. Only 'Rohit kumar' can delete admins.");
+    }
+
+    const { id } = req.params;
+
+    // Prevent deleting self
+    if (id === requester._id.toString()) {
+        throw new ApiError(400, "You cannot delete your own account");
+    }
+
+    const admin = await User.findById(id);
+    if (!admin) {
+        throw new ApiError(404, "Admin not found");
+    }
+
+    if (admin.userType !== 'admin') {
+        throw new ApiError(400, "User is not an admin");
+    }
+
+    await User.findByIdAndDelete(id);
+
+    return res.status(200).json(new ApiResponse(200, {}, "Admin deleted successfully."));
 });
 
 const getContactSubmissions = asyncHandler(async (req, res) => {
@@ -2413,4 +2717,4 @@ const getPatientPaymentCredits = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, payments, "Patient payment credits retrieved successfully"));
 });
 
-export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits };
+export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits };

@@ -1,6 +1,6 @@
 
 import { Router } from "express";
-import { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits } from "../controllers/admin.controller.js";
+import { sendAdminOTP, verifyAdminOTP, loginAdmin, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits } from "../controllers/admin.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { verifyPermission } from "../middleware/permission.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -9,6 +9,11 @@ const router = Router();
 
 router.route("/send-otp").post(sendAdminOTP);
 router.route("/verify-otp").post(verifyAdminOTP);
+router.route("/login").post(loginAdmin);
+router.route("/admins").get(verifyJWT, verifyPermission(['admin']), getAllAdmins);
+router.route("/admins").post(verifyJWT, verifyPermission(['admin']), createAdmin);
+router.route("/admins/:id").patch(verifyJWT, verifyPermission(['admin']), updateAdmin);
+router.route("/admins/:id").delete(verifyJWT, verifyPermission(['admin']), deleteAdmin);
 
 router.route("/patients").get(verifyJWT, verifyPermission(['admin']), getAllPatientsAdmin);
 router.route("/patients/stats").get(verifyJWT, verifyPermission(['admin']), getPatientsStats);

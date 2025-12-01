@@ -149,6 +149,35 @@ const userSchema=new mongoose.Schema({
         type: String,
         required: false,
     },
+    // Admin-specific permissions and visibility settings
+    adminPermissions: {
+        type: {
+            // Dashboard sections visibility
+            visibleSections: {
+                type: [String],
+                default: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog']
+            },
+            // Section-level permissions (read-only or editable for each section)
+            sectionPermissions: {
+                type: Map,
+                of: {
+                    visible: { type: Boolean, default: true },
+                    readOnly: { type: Boolean, default: false }
+                },
+                default: {}
+            },
+            // Field-level permissions (read-only or editable)
+            fieldPermissions: {
+                type: Map,
+                of: {
+                    visible: { type: Boolean, default: true },
+                    readOnly: { type: Boolean, default: false }
+                },
+                default: {}
+            }
+        },
+        required: false
+    },
 },{timestamps:true})
 
 userSchema.pre("save",async function(next){

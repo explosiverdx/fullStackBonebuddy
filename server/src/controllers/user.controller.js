@@ -454,6 +454,33 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     // Base user object (already selected without password/refreshToken by middleware)
     const userObj = req.user && typeof req.user.toObject === 'function' ? req.user.toObject() : req.user;
 
+    // Convert adminPermissions Maps to plain objects for JSON serialization
+    if (userObj && userObj.adminPermissions) {
+        // Convert sectionPermissions Map to plain object
+        if (userObj.adminPermissions.sectionPermissions && userObj.adminPermissions.sectionPermissions instanceof Map) {
+            const sectionPermsObj = {};
+            userObj.adminPermissions.sectionPermissions.forEach((value, key) => {
+                sectionPermsObj[key] = value;
+            });
+            userObj.adminPermissions.sectionPermissions = sectionPermsObj;
+        } else if (userObj.adminPermissions.sectionPermissions && typeof userObj.adminPermissions.sectionPermissions === 'object') {
+            // Already an object, but ensure it's a plain object (not a Map instance)
+            userObj.adminPermissions.sectionPermissions = { ...userObj.adminPermissions.sectionPermissions };
+        }
+
+        // Convert fieldPermissions Map to plain object
+        if (userObj.adminPermissions.fieldPermissions && userObj.adminPermissions.fieldPermissions instanceof Map) {
+            const fieldPermsObj = {};
+            userObj.adminPermissions.fieldPermissions.forEach((value, key) => {
+                fieldPermsObj[key] = value;
+            });
+            userObj.adminPermissions.fieldPermissions = fieldPermsObj;
+        } else if (userObj.adminPermissions.fieldPermissions && typeof userObj.adminPermissions.fieldPermissions === 'object') {
+            // Already an object, but ensure it's a plain object (not a Map instance)
+            userObj.adminPermissions.fieldPermissions = { ...userObj.adminPermissions.fieldPermissions };
+        }
+    }
+
     // If the user is a patient, attach session data (history + upcoming) for the profile UI
     if (userObj && userObj.userType === 'patient') {
         try {
@@ -530,19 +557,40 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
 const updateUserAccount = asyncHandler(async (req, res) => {
     const { Fullname, email, username } = req.body;
+    const currentUser = req.user;
 
     if (!Fullname || !email || !username) {
         throw new ApiError(400, "All fields are required");
     }
 
-    // Check if username is unique
-    const existingUser = await User.findOne({ username, _id: { $ne: req.user?._id } });
+    // If user is an admin and not "Rohit kumar", prevent changing username and email
+    if (currentUser.userType === 'admin' && 
+        currentUser.Fullname !== 'Rohit kumar' && 
+        currentUser.Fullname !== 'Rohit Kumar') {
+        // Only allow Fullname to be updated, keep username and email unchanged
+        const user = await User.findByIdAndUpdate(
+            currentUser._id,
+            {
+                $set: {
+                    Fullname
+                }
+            },
+            { new: true }
+        ).select("-password");
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, user, "Account details updated successfully (username and email cannot be changed)"));
+    }
+
+    // Check if username is unique (only for non-admin users or Rohit kumar)
+    const existingUser = await User.findOne({ username, _id: { $ne: currentUser._id } });
     if (existingUser) {
         throw new ApiError(409, "Username already in use");
     }
 
     const user = await User.findByIdAndUpdate(
-        req.user?._id,
+        currentUser._id,
         {
             $set: {
                 Fullname,
