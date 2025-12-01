@@ -2680,8 +2680,8 @@ const AdminList = ({ authHeaders }) => {
 
       {/* Create Admin Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white p-6 rounded-lg w-full max-w-2xl my-8">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] overflow-y-auto p-2 sm:p-4">
+          <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-2xl my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Create New Admin</h2>
             <form onSubmit={handleCreateAdmin} className="space-y-4">
               <div>
@@ -2887,8 +2887,8 @@ const AdminList = ({ authHeaders }) => {
 
       {/* Edit Admin Modal */}
       {showEditModal && editingAdmin && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white p-6 rounded-lg w-full max-w-2xl my-8">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] overflow-y-auto p-2 sm:p-4">
+          <div className="bg-white p-4 sm:p-6 rounded-lg w-full max-w-2xl my-4 sm:my-8 max-h-[95vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Edit Admin</h2>
             <form onSubmit={handleEditAdmin} className="space-y-4">
               <div>
@@ -3566,9 +3566,9 @@ const AdminDashboard = () => {
 
       {/* Main Content */}
       {/* Fixed: Changed overflow-y-hidden to overflow-y-auto to allow scrolling */}
-      <main className="flex-1 flex flex-col p-2 md:p-6 h-screen overflow-y-auto"> 
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto md:ml-0"> 
         {/* Topbar */}
-        <div className="bg-white rounded-lg shadow-md p-2 md:p-4 mb-4 md:mb-6 flex justify-between items-center sticky top-0 z-30">
+        <div className="bg-white rounded-lg shadow-md p-2 md:p-4 mb-4 md:mb-6 flex justify-between items-center sticky top-0 z-30 mx-2 md:mx-0 mt-2 md:mt-6">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="md:hidden mr-4 text-gray-600 hover:text-gray-800"
@@ -3689,7 +3689,7 @@ const AdminDashboard = () => {
         
         {/* Main Content Area */}
         {/* FIX 2: Added flex-1 to make this container take all remaining height and overflow-y-auto to make it scroll */}
-        <div className="w-full bg-white rounded-lg shadow-md p-4 md:p-6 flex-1 overflow-y-auto"> 
+        <div className="w-full bg-white rounded-lg shadow-md p-2 md:p-6 flex-1 overflow-y-auto mx-2 md:mx-0"> 
           {pathname === '/admin' && (
             <div className="mb-4 p-4 border rounded-lg bg-gray-50 flex flex-wrap items-center gap-4">
               <div>
