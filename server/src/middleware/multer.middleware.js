@@ -1,9 +1,14 @@
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
+
+// Get absolute path to upload directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, "../public/uploads");
 
 // Ensure upload directory exists and is writable
-const uploadDir = "./public/uploads";
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
   console.log('✅ Created upload directory:', uploadDir);
@@ -23,6 +28,7 @@ const storage = multer.diskStorage({
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
+      console.log('📁 Saving file to:', uploadDir);
       cb(null, uploadDir);
     },
     filename: function (req, file, cb) {

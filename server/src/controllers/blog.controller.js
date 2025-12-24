@@ -214,6 +214,18 @@ const updateBlogPost = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { title, content, excerpt, category, tags, status, metaTitle, metaDescription } = req.body;
 
+    console.log('📝 Blog update request received:', {
+        blogId: id,
+        hasFile: !!req.file,
+        fileInfo: req.file ? {
+            originalName: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            path: req.file.path
+        } : 'No file',
+        updateFields: { title: !!title, content: !!content, category: !!category }
+    });
+
     const blog = await Blog.findById(id);
     if (!blog) {
         throw new ApiError(404, "Blog post not found.");
