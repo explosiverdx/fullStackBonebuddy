@@ -1741,10 +1741,21 @@ const BlogManagement = ({ authHeaders }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create blog post');
+        const errorMessage = errorData.message || 'Failed to create blog post';
+        console.error('Blog creation error:', errorData);
+        throw new Error(errorMessage);
       }
 
-      alert('✅ Blog post created successfully!');
+      const result = await response.json();
+      
+      // Check if image was uploaded successfully
+      if (featuredImage && (!result.data?.featuredImage || !result.data.featuredImage.url)) {
+        console.warn('⚠️ Blog created but image upload may have failed');
+        alert('⚠️ Blog post created, but image upload failed. Please edit the post to add an image.');
+      } else {
+        alert('✅ Blog post created successfully!');
+      }
+      
       setShowCreateModal(false);
       resetForm();
       fetchBlogs();
@@ -1785,10 +1796,21 @@ const BlogManagement = ({ authHeaders }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update blog post');
+        const errorMessage = errorData.message || 'Failed to update blog post';
+        console.error('Blog update error:', errorData);
+        throw new Error(errorMessage);
       }
 
-      alert('✅ Blog post updated successfully!');
+      const result = await response.json();
+      
+      // Check if image was uploaded successfully
+      if (featuredImage && (!result.data?.featuredImage || !result.data.featuredImage.url)) {
+        console.warn('⚠️ Blog updated but image upload may have failed');
+        alert('⚠️ Blog post updated, but image upload failed. Please try uploading the image again.');
+      } else {
+        alert('✅ Blog post updated successfully!');
+      }
+      
       setShowEditModal(false);
       resetForm();
       fetchBlogs();

@@ -22,11 +22,36 @@ const getResourceType = (filePath) => {
 
 const uploadOnCloudinary = async (localFilePath) => {
   try {
-    if (!localFilePath) return null;
+    if (!localFilePath) {
+      console.error('❌ Cloudinary upload: No file path provided');
+      return null;
+    }
+
+    // Validate Cloudinary configuration
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('❌ Cloudinary configuration missing:', {
+        cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: !!process.env.CLOUDINARY_API_KEY,
+        api_secret: !!process.env.CLOUDINARY_API_SECRET
+      });
+      throw new Error('Cloudinary configuration is incomplete. Please check environment variables.');
+    }
+
+    // Check if file exists
+    if (!fs.existsSync(localFilePath)) {
+      console.error('❌ Cloudinary upload: File does not exist at path:', localFilePath);
+      return null;
+    }
 
     const stats = fs.statSync(localFilePath);
     const fileSizeInMB = stats.size / (1024 * 1024);
     const resourceType = getResourceType(localFilePath);
+
+    console.log('📤 Uploading to Cloudinary:', {
+      path: localFilePath,
+      size: `${fileSizeInMB.toFixed(2)} MB`,
+      resourceType: resourceType
+    });
 
     const uploadOptions = {
       resource_type: resourceType,
@@ -43,14 +68,37 @@ const uploadOnCloudinary = async (localFilePath) => {
 
     const response = await cloudinary.uploader.upload(localFilePath, uploadOptions);
 
-    console.log('File uploaded to Cloudinary:', response.secure_url || response.url);
-    fs.unlinkSync(localFilePath);
-    return response;
-  } catch (error) {
-    console.error('Cloudinary upload error:', error);
+    if (!response || !response.secure_url) {
+      console.error('❌ Cloudinary upload: Invalid response received');
+      return null;
+    }
+
+    console.log('✅ File uploaded to Cloudinary successfully:', response.secure_url || response.url);
+    
+    // Clean up local file
     if (fs.existsSync(localFilePath)) {
       fs.unlinkSync(localFilePath);
+      console.log('🗑️ Local file cleaned up:', localFilePath);
     }
+    
+    return response;
+  } catch (error) {
+    console.error('❌ Cloudinary upload error:', {
+      message: error.message,
+      stack: error.stack,
+      filePath: localFilePath
+    });
+    
+    // Clean up local file on error
+    if (localFilePath && fs.existsSync(localFilePath)) {
+      try {
+        fs.unlinkSync(localFilePath);
+        console.log('🗑️ Local file cleaned up after error:', localFilePath);
+      } catch (cleanupError) {
+        console.error('❌ Error cleaning up file:', cleanupError);
+      }
+    }
+    
     return null;
   }
 };

@@ -22,19 +22,39 @@ const createBlogPost = asyncHandler(async (req, res) => {
     // Handle featured image upload if provided
     let featuredImage = null;
     if (req.file) {
-        const imageResult = await uploadOnCloudinary(req.file.path);
-        if (imageResult) {
-            // Always use secure_url (HTTPS) for images to prevent mixed content issues
-            const imageUrl = imageResult.secure_url || imageResult.url;
-            // Ensure HTTPS even if secure_url is not available
-            const httpsUrl = imageUrl?.startsWith('http://') 
-                ? imageUrl.replace('http://', 'https://') 
-                : imageUrl;
-            featuredImage = {
-                url: httpsUrl,
-                publicId: imageResult.public_id,
-            };
+        console.log('📸 Blog image upload started:', {
+            originalName: req.file.originalname,
+            path: req.file.path,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+
+        // Check if file exists before uploading
+        const fs = await import('fs');
+        if (!fs.existsSync(req.file.path)) {
+            console.error('❌ File does not exist at path:', req.file.path);
+            throw new ApiError(400, "Uploaded file not found. Please try uploading again.");
         }
+
+        const imageResult = await uploadOnCloudinary(req.file.path);
+        
+        if (!imageResult) {
+            console.error('❌ Cloudinary upload failed for blog image');
+            throw new ApiError(500, "Failed to upload image to Cloudinary. Please check server logs and Cloudinary configuration.");
+        }
+
+        console.log('✅ Blog image uploaded successfully:', imageResult.secure_url || imageResult.url);
+        
+        // Always use secure_url (HTTPS) for images to prevent mixed content issues
+        const imageUrl = imageResult.secure_url || imageResult.url;
+        // Ensure HTTPS even if secure_url is not available
+        const httpsUrl = imageUrl?.startsWith('http://') 
+            ? imageUrl.replace('http://', 'https://') 
+            : imageUrl;
+        featuredImage = {
+            url: httpsUrl,
+            publicId: imageResult.public_id,
+        };
     }
 
     // Parse tags if it's a string
@@ -188,19 +208,39 @@ const updateBlogPost = asyncHandler(async (req, res) => {
 
     // Handle featured image upload if provided
     if (req.file) {
-        const imageResult = await uploadOnCloudinary(req.file.path);
-        if (imageResult) {
-            // Always use secure_url (HTTPS) for images to prevent mixed content issues
-            const imageUrl = imageResult.secure_url || imageResult.url;
-            // Ensure HTTPS even if secure_url is not available
-            const httpsUrl = imageUrl?.startsWith('http://') 
-                ? imageUrl.replace('http://', 'https://') 
-                : imageUrl;
-            blog.featuredImage = {
-                url: httpsUrl,
-                publicId: imageResult.public_id,
-            };
+        console.log('📸 Blog image update upload started:', {
+            originalName: req.file.originalname,
+            path: req.file.path,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+
+        // Check if file exists before uploading
+        const fs = await import('fs');
+        if (!fs.existsSync(req.file.path)) {
+            console.error('❌ File does not exist at path:', req.file.path);
+            throw new ApiError(400, "Uploaded file not found. Please try uploading again.");
         }
+
+        const imageResult = await uploadOnCloudinary(req.file.path);
+        
+        if (!imageResult) {
+            console.error('❌ Cloudinary upload failed for blog image update');
+            throw new ApiError(500, "Failed to upload image to Cloudinary. Please check server logs and Cloudinary configuration.");
+        }
+
+        console.log('✅ Blog image updated successfully:', imageResult.secure_url || imageResult.url);
+        
+        // Always use secure_url (HTTPS) for images to prevent mixed content issues
+        const imageUrl = imageResult.secure_url || imageResult.url;
+        // Ensure HTTPS even if secure_url is not available
+        const httpsUrl = imageUrl?.startsWith('http://') 
+            ? imageUrl.replace('http://', 'https://') 
+            : imageUrl;
+        blog.featuredImage = {
+            url: httpsUrl,
+            publicId: imageResult.public_id,
+        };
     }
 
     // Update fields

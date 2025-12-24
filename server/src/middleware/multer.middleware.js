@@ -1,9 +1,29 @@
 import multer from "multer";
 import path from "path";
+import fs from "fs";
+
+// Ensure upload directory exists and is writable
+const uploadDir = "./public/uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('✅ Created upload directory:', uploadDir);
+}
+
+// Check if directory is writable
+try {
+  fs.accessSync(uploadDir, fs.constants.W_OK);
+  console.log('✅ Upload directory is writable:', uploadDir);
+} catch (error) {
+  console.error('❌ Upload directory is not writable:', uploadDir, error);
+}
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, "./public/uploads")
+      // Ensure directory exists before saving
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
