@@ -68,12 +68,22 @@ const uploadOnCloudinary = async (localFilePath) => {
 
     const response = await cloudinary.uploader.upload(localFilePath, uploadOptions);
 
-    if (!response || !response.secure_url) {
-      console.error('❌ Cloudinary upload: Invalid response received');
+    if (!response) {
+      console.error('❌ Cloudinary upload: No response received');
       return null;
     }
 
-    console.log('✅ File uploaded to Cloudinary successfully:', response.secure_url || response.url);
+    // Check if we have a valid URL (either secure_url or url)
+    if (!response.secure_url && !response.url) {
+      console.error('❌ Cloudinary upload: Invalid response - no URL found', {
+        responseKeys: Object.keys(response),
+        response: response
+      });
+      return null;
+    }
+
+    const imageUrl = response.secure_url || response.url;
+    console.log('✅ File uploaded to Cloudinary successfully:', imageUrl);
     
     // Clean up local file
     if (fs.existsSync(localFilePath)) {
@@ -85,9 +95,24 @@ const uploadOnCloudinary = async (localFilePath) => {
   } catch (error) {
     console.error('❌ Cloudinary upload error:', {
       message: error.message,
+      name: error.name,
+      code: error.http_code || error.status || 'N/A',
+      error: error.error || 'N/A',
       stack: error.stack,
       filePath: localFilePath
     });
+    
+    // Provide more specific error information
+    let errorMessage = 'Unknown error';
+    if (error.http_code === 401) {
+      errorMessage = 'Cloudinary authentication failed. Please check your API credentials.';
+    } else if (error.http_code === 400) {
+      errorMessage = `Cloudinary upload failed: ${error.message || 'Invalid request'}`;
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    
+    console.error('❌ Error details:', errorMessage);
     
     // Clean up local file on error
     if (localFilePath && fs.existsSync(localFilePath)) {

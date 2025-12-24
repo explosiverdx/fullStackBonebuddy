@@ -45,7 +45,7 @@ cloudinary.config({
   api_secret: apiSecret
 });
 
-// Test connection by getting account details
+// Test connection by pinging Cloudinary
 try {
   console.log('Testing Cloudinary connection...');
   const result = await cloudinary.api.ping();
@@ -53,16 +53,22 @@ try {
   console.log('  Status:', result.status);
   console.log('');
   
-  // Get account details
-  const account = await cloudinary.api.account();
-  console.log('Account Information:');
-  console.log('  Cloud Name:', account.cloud_name);
-  console.log('  Plan:', account.plan);
-  console.log('  Resource Limits:');
-  console.log('    - Max Image Size:', account.limits?.max_image_size || 'N/A');
-  console.log('    - Max Video Size:', account.limits?.max_video_size || 'N/A');
-  console.log('    - Max Raw Size:', account.limits?.max_raw_size || 'N/A');
-  console.log('');
+  // Try to get usage information (if available)
+  try {
+    const usage = await cloudinary.api.usage();
+    console.log('Account Usage Information:');
+    console.log('  Plan:', usage.plan || 'N/A');
+    console.log('  Credits:');
+    console.log('    - Used:', usage.credits?.used || 'N/A');
+    console.log('    - Limit:', usage.credits?.limit || 'N/A');
+    console.log('  Bandwidth:');
+    console.log('    - Used:', usage.bandwidth?.used || 'N/A');
+    console.log('    - Limit:', usage.bandwidth?.limit || 'N/A');
+    console.log('');
+  } catch (usageError) {
+    console.log('ℹ️  Usage information not available (this is normal for some account types)');
+    console.log('');
+  }
   
   // Test upload directory
   const fs = await import('fs');

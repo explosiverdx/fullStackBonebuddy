@@ -13,6 +13,16 @@ const createBlogPost = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Only admins can create blog posts.");
     }
 
+    console.log('📝 Blog creation request received:', {
+        hasFile: !!req.file,
+        fileInfo: req.file ? {
+            originalName: req.file.originalname,
+            mimetype: req.file.mimetype,
+            size: req.file.size,
+            path: req.file.path
+        } : 'No file'
+    });
+
     const { title, content, excerpt, category, tags, status, metaTitle, metaDescription } = req.body;
 
     if (!title || !content) {
@@ -40,7 +50,10 @@ const createBlogPost = asyncHandler(async (req, res) => {
         
         if (!imageResult) {
             console.error('❌ Cloudinary upload failed for blog image');
-            throw new ApiError(500, "Failed to upload image to Cloudinary. Please check server logs and Cloudinary configuration.");
+            console.error('   File path:', req.file.path);
+            console.error('   File size:', req.file.size);
+            console.error('   File mimetype:', req.file.mimetype);
+            throw new ApiError(500, "Failed to upload image to Cloudinary. Please check server logs for details. Common issues: invalid Cloudinary credentials, network connectivity, or file size limits.");
         }
 
         console.log('✅ Blog image uploaded successfully:', imageResult.secure_url || imageResult.url);
