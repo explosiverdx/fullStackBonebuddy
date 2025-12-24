@@ -1,19 +1,55 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import dotenv from 'dotenv';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+
+// Get directory path for .env file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Reload .env file to ensure env vars are available (PM2 issue)
+const envPath = resolve(__dirname, '../../.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath, override: true });
+  console.log('🔄 Reloaded .env file for Razorpay');
+} else {
+  console.warn('⚠️  .env file not found at:', envPath);
+}
 
 // Initialize Razorpay instance only if credentials are present
 let razorpayInstance = null;
 
-if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
-  razorpayInstance = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-  });
-  console.log('✅ Razorpay configured successfully');
-} else {
-  console.warn('⚠️  Razorpay credentials not found. Payment features will be disabled.');
-  console.warn('⚠️  Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file.');
-}
+// Function to initialize Razorpay (can be called multiple times)
+const initializeRazorpay = () => {
+  // Reload env vars each time to handle PM2 issues
+  dotenv.config({ path: envPath, override: true });
+  
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  
+  if (keyId && keySecret) {
+    razorpayInstance = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
+    console.log('✅ Razorpay configured successfully');
+    return true;
+  } else {
+    console.warn('⚠️  Razorpay credentials not found. Payment features will be disabled.');
+    console.warn('⚠️  Add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file.');
+    console.warn('⚠️  Current env check:', { 
+      hasKeyId: !!keyId, 
+      hasKeySecret: !!keySecret 
+    });
+    razorpayInstance = null;
+    return false;
+  }
+};
+
+// Initialize on module load
+initializeRazorpay();
 
 /**
  * Create a Razorpay order
@@ -24,8 +60,34 @@ if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
  * @returns {Promise<Object>} - Razorpay order object
  */
 export const createRazorpayOrder = async (amount, currency = 'INR', receipt, notes = {}) => {
+  // CRITICAL: Reload .env file before each operation (PM2 issue)
+  // Same fix as Cloudinary - PM2 doesn't persist env vars at runtime
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: true });
+    console.log('🔄 Reloaded .env file for Razorpay order creation');
+  }
+  
+  // Try to reinitialize if instance is null (handles PM2/env loading issues)
   if (!razorpayInstance) {
-    throw new Error('Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file.');
+    console.log('🔄 Razorpay instance is null, attempting to reinitialize...');
+    const initialized = initializeRazorpay();
+    if (!initialized || !razorpayInstance) {
+      console.error('❌ Razorpay configuration missing:', {
+        has_key_id: !!process.env.RAZORPAY_KEY_ID,
+        has_key_secret: !!process.env.RAZORPAY_KEY_SECRET,
+        env_file_path: envPath,
+        env_file_exists: fs.existsSync(envPath)
+      });
+      throw new Error('Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file and restart the server.');
+    }
+  }
+  
+  // Also reinitialize if credentials might have changed
+  const currentKeyId = process.env.RAZORPAY_KEY_ID;
+  const currentKeySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (currentKeyId && currentKeySecret && (!razorpayInstance || razorpayInstance.key_id !== currentKeyId)) {
+    console.log('🔄 Reinitializing Razorpay with fresh credentials...');
+    initializeRazorpay();
   }
 
   try {
@@ -53,9 +115,20 @@ export const createRazorpayOrder = async (amount, currency = 'INR', receipt, not
  */
 export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
   try {
+    // Reload .env to ensure secret is available
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath, override: true });
+    }
+    
+    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    if (!keySecret) {
+      console.error('❌ RAZORPAY_KEY_SECRET not found for signature verification');
+      return false;
+    }
+    
     const text = `${orderId}|${paymentId}`;
     const generatedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .createHmac('sha256', keySecret)
       .update(text)
       .digest('hex');
 
@@ -72,8 +145,16 @@ export const verifyRazorpaySignature = (orderId, paymentId, signature) => {
  * @returns {Promise<Object>} - Payment details
  */
 export const fetchPaymentDetails = async (paymentId) => {
+  // Reload .env before operation
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: true });
+  }
+  
   if (!razorpayInstance) {
-    throw new Error('Razorpay is not configured.');
+    const initialized = initializeRazorpay();
+    if (!initialized || !razorpayInstance) {
+      throw new Error('Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file and restart the server.');
+    }
   }
 
   try {
@@ -92,8 +173,16 @@ export const fetchPaymentDetails = async (paymentId) => {
  * @returns {Promise<Object>} - Refund details
  */
 export const initiateRefund = async (paymentId, amount = null) => {
+  // Reload .env before operation
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath, override: true });
+  }
+  
   if (!razorpayInstance) {
-    throw new Error('Razorpay is not configured.');
+    const initialized = initializeRazorpay();
+    if (!initialized || !razorpayInstance) {
+      throw new Error('Razorpay is not configured. Please add RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to .env file and restart the server.');
+    }
   }
 
   try {
