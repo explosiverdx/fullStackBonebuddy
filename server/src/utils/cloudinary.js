@@ -14,12 +14,18 @@ const configureCloudinary = () => {
       api_key: apiKey,
       api_secret: apiSecret
     });
+    console.log('🔧 Cloudinary configured:', { cloud_name: cloudName, api_key: apiKey ? '***' + apiKey.slice(-4) : 'missing' });
     return true;
   }
+  console.error('❌ Cloudinary configuration incomplete:', {
+    cloud_name: !!cloudName,
+    api_key: !!apiKey,
+    api_secret: !!apiSecret
+  });
   return false;
 };
 
-// Initial configuration
+// Initial configuration (may not have env vars yet, will reconfigure on use)
 configureCloudinary();
 
 const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'];
@@ -42,14 +48,52 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
 
     // Reconfigure Cloudinary to ensure env vars are loaded (important for PM2)
-    if (!configureCloudinary()) {
-      console.error('❌ Cloudinary configuration missing:', {
-        cloud_name: !!process.env.CLOUDINARY_CLOUD_NAME,
-        api_key: !!process.env.CLOUDINARY_API_KEY,
-        api_secret: !!process.env.CLOUDINARY_API_SECRET
+    // This is critical because PM2 might not have loaded env vars when module was first imported
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    
+    console.log('🔍 Checking Cloudinary config before upload:', {
+      has_cloud_name: !!cloudName,
+      has_api_key: !!apiKey,
+      has_api_secret: !!apiSecret,
+      cloud_name: cloudName || 'MISSING',
+      api_key: apiKey ? '***' + apiKey.slice(-4) : 'MISSING'
+    });
+    
+    if (!cloudName || !apiKey || !apiSecret) {
+      console.error('❌ Cloudinary configuration missing at upload time:', {
+        cloud_name: !!cloudName,
+        api_key: !!apiKey,
+        api_secret: !!apiSecret,
+        all_env_keys: Object.keys(process.env).filter(k => k.includes('CLOUDINARY'))
       });
       throw new Error('Cloudinary configuration is incomplete. Please check environment variables.');
     }
+    
+    // Force reconfigure Cloudinary with current env vars
+    // Clear any existing config first
+    cloudinary.config({
+      cloud_name: undefined,
+      api_key: undefined,
+      api_secret: undefined
+    });
+    
+    // Set new config
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret
+    });
+    
+    // Verify config was set
+    const currentConfig = cloudinary.config();
+    console.log('✅ Cloudinary reconfigured for upload:', {
+      config_cloud_name: currentConfig.cloud_name || 'NOT SET',
+      config_has_api_key: !!currentConfig.api_key,
+      env_cloud_name: cloudName,
+      env_has_api_key: !!apiKey
+    });
 
     // Check if file exists
     if (!fs.existsSync(localFilePath)) {
@@ -72,13 +116,24 @@ const uploadOnCloudinary = async (localFilePath) => {
       chunk_size: 6000000,
       timeout: 120000,
       use_filename: true,
-      unique_filename: true
+      unique_filename: true,
+      // Explicitly pass credentials in options as backup
+      api_key: apiKey,
+      api_secret: apiSecret,
+      cloud_name: cloudName
     };
 
     if (resourceType === 'video' && fileSizeInMB > 20) {
       uploadOptions.eager_async = true;
       uploadOptions.eager = [{ quality: 'auto' }];
     }
+
+    console.log('🚀 Attempting Cloudinary upload with config:', {
+      cloud_name: cloudName,
+      has_api_key: !!apiKey,
+      has_api_secret: !!apiSecret,
+      file_path: localFilePath
+    });
 
     const response = await cloudinary.uploader.upload(localFilePath, uploadOptions);
 
