@@ -1,6 +1,12 @@
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs';
 import path from 'path';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+
+// Get the directory path for .env file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configure Cloudinary - will be reconfigured if needed
 const configureCloudinary = () => {
@@ -47,8 +53,17 @@ const uploadOnCloudinary = async (localFilePath) => {
       return null;
     }
 
-    // Reconfigure Cloudinary to ensure env vars are loaded (important for PM2)
-    // This is critical because PM2 might not have loaded env vars when module was first imported
+    // CRITICAL: Reload .env file to ensure env vars are available (PM2 issue)
+    // PM2 sometimes doesn't persist env vars at runtime, so we reload them explicitly
+    const envPath = path.join(__dirname, '../../.env');
+    if (fs.existsSync(envPath)) {
+      const envResult = dotenv.config({ path: envPath, override: true });
+      console.log('🔄 Reloaded .env file:', envResult.error ? 'ERROR' : 'SUCCESS');
+    } else {
+      console.warn('⚠️  .env file not found at:', envPath);
+    }
+    
+    // Now get env vars (after reloading)
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
@@ -58,7 +73,8 @@ const uploadOnCloudinary = async (localFilePath) => {
       has_api_key: !!apiKey,
       has_api_secret: !!apiSecret,
       cloud_name: cloudName || 'MISSING',
-      api_key: apiKey ? '***' + apiKey.slice(-4) : 'MISSING'
+      api_key: apiKey ? '***' + apiKey.slice(-4) : 'MISSING',
+      env_file_path: envPath
     });
     
     if (!cloudName || !apiKey || !apiSecret) {
@@ -66,7 +82,9 @@ const uploadOnCloudinary = async (localFilePath) => {
         cloud_name: !!cloudName,
         api_key: !!apiKey,
         api_secret: !!apiSecret,
-        all_env_keys: Object.keys(process.env).filter(k => k.includes('CLOUDINARY'))
+        all_env_keys: Object.keys(process.env).filter(k => k.includes('CLOUDINARY')),
+        env_file_exists: fs.existsSync(envPath),
+        env_file_path: envPath
       });
       throw new Error('Cloudinary configuration is incomplete. Please check environment variables.');
     }
