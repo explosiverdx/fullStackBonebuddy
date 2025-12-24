@@ -369,4 +369,56 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
     );
 });
 
-export { createPhysioProfile, getPhysioProfile, getAllPhysios, updatePhysioProfile, deletePhysio, adminCreatePhysio, adminUpdatePhysio, getMyPatientsAndSessions };
+/**
+ * Public endpoint to get all physiotherapists (no authentication required)
+ * For use on public pages like home page
+ */
+const getPublicPhysios = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 50, search = '', sortBy = 'name', sortOrder = 'asc' } = req.query;
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    const match = { userType: { $in: ['physio', 'physiotherapist'] } };
+    if (search) {
+        match.$or = [
+            { Fullname: { $regex: search, $options: 'i' } },
+            { specialization: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const sort = {};
+    sort[sortBy === 'name' ? 'Fullname' : sortBy] = sortOrder === 'asc' ? 1 : -1;
+
+    // Public endpoint - only return public information (no sensitive data)
+    const physios = await User.find(match)
+        .select('_id Fullname qualification specialization experience avatar bio')
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum);
+
+    const totalPhysios = await User.countDocuments(match);
+
+    const result = {
+        docs: physios.map((physio) => ({
+            _id: physio._id,
+            name: physio.Fullname,
+            qualification: physio.qualification,
+            specialization: physio.specialization,
+            experience: physio.experience,
+            profilePhoto: physio.avatar,
+            physioProfilePhoto: physio.avatar,
+            bio: physio.bio,
+        })),
+        totalDocs: totalPhysios,
+        limit: limitNum,
+        page: pageNum,
+        totalPages: Math.ceil(totalPhysios / limitNum),
+    };
+
+    return res.status(200).json(
+        new ApiResponse(200, result, "Physios retrieved successfully.")
+    );
+});
+
+export { createPhysioProfile, getPhysioProfile, getAllPhysios, getPublicPhysios, updatePhysioProfile, deletePhysio, adminCreatePhysio, adminUpdatePhysio, getMyPatientsAndSessions };

@@ -41,8 +41,17 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // Skip token refresh for admin OTP endpoints - these are login endpoints that should return 401 on failure
+    const isAdminOtpEndpoint = originalRequest?.url?.includes('/admin/verify-otp') || 
+                                originalRequest?.url?.includes('/admin/send-otp');
+
     // If error is 401 and we haven't tried to refresh yet
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't try to refresh token for admin OTP endpoints - just return the error
+      if (isAdminOtpEndpoint) {
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         // If already refreshing, queue this request
         return new Promise((resolve, reject) => {
@@ -67,7 +76,10 @@ apiClient.interceptors.response.use(
         isRefreshing = false;
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/';
+        // Don't redirect if this is an admin OTP endpoint
+        if (!isAdminOtpEndpoint) {
+          window.location.href = '/';
+        }
         return Promise.reject(error);
       }
 
@@ -104,7 +116,10 @@ apiClient.interceptors.response.use(
         // Refresh failed, logout user
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
-        window.location.href = '/';
+        // Don't redirect if this is an admin OTP endpoint
+        if (!isAdminOtpEndpoint) {
+          window.location.href = '/';
+        }
         
         return Promise.reject(refreshError);
       }

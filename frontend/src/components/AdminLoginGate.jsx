@@ -13,6 +13,8 @@ const AdminLoginGate = ({ children }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isResendingOtp, setIsResendingOtp] = useState(false);
 
   // Show loading state
   if (loading) {
@@ -30,22 +32,46 @@ const AdminLoginGate = ({ children }) => {
     // Not logged in as admin - show admin login page
     const handleAdminOtp = async (e) => {
       e.preventDefault();
+      setError('');
+      setIsResendingOtp(false);
       try {
         await sendAdminOtp(phoneNumber);
         setStep('otp');
-        alert('OTP sent to your phone');
+        setError('');
       } catch (error) {
         const errorMessage = error.response?.data?.message || error.message || 'Failed to send OTP';
         if (errorMessage.includes('Admin not found') || errorMessage.includes('not authorized')) {
-          alert('You are not authorized as an admin.');
+          setError('You are not authorized as an admin.');
         } else {
-          alert(`Error: ${errorMessage}`);
+          setError(`Error: ${errorMessage}`);
         }
+      }
+    };
+
+    const handleResendOtp = async () => {
+      setError('');
+      setIsResendingOtp(true);
+      try {
+        await sendAdminOtp(phoneNumber);
+        setOtp(''); // Clear the current OTP input
+        setError('');
+        alert('New OTP sent to your phone');
+      } catch (error) {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to resend OTP';
+        if (errorMessage.includes('Admin not found') || errorMessage.includes('not authorized')) {
+          setError('You are not authorized as an admin.');
+        } else {
+          setError(`Error: ${errorMessage}`);
+        }
+      } finally {
+        setIsResendingOtp(false);
       }
     };
 
     const handleAdminLogin = async (e) => {
       e.preventDefault();
+      setError('');
+      setIsLoading(true);
       try {
         const response = await verifyAdminOtp(phoneNumber, otp);
         const { user, accessToken, refreshToken } = response.data;
@@ -53,18 +79,31 @@ const AdminLoginGate = ({ children }) => {
         login(user, accessToken, refreshToken);
         navigate('/admin', { state: { user: user } });
       } catch (error) {
+        // Prevent default error handling that might cause redirect
         const errorMessage = error.response?.data?.message || error.message || 'Failed to verify OTP';
+        
+        // Clear OTP input on error
+        setOtp('');
+        
         if (errorMessage.includes('Admin not found') || errorMessage.includes('not authorized')) {
-          alert('You are not authorized as an admin.');
+          setError('You are not authorized as an admin.');
+        } else if (errorMessage.includes('Invalid OTP') || errorMessage.includes('OTP expired')) {
+          setError('Invalid or expired OTP. Please try again or request a new OTP.');
         } else {
-          alert(`Error: ${errorMessage}`);
+          setError(`Error: ${errorMessage}`);
         }
+        
+        // Prevent the error from propagating to avoid redirect
+        return;
+      } finally {
+        setIsLoading(false);
       }
     };
 
     const handleBack = () => {
       setStep('phone');
       setOtp('');
+      setError('');
     };
 
     const handlePasswordLogin = async (e) => {
@@ -204,13 +243,21 @@ const AdminLoginGate = ({ children }) => {
                       type="tel"
                       placeholder="Enter 10-digit number"
                       value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value);
+                        setError('');
+                      }}
                       className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       maxLength="10"
                       required
                     />
                   </div>
                 </div>
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
                 <button
                   type="submit"
                   className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -237,7 +284,10 @@ const AdminLoginGate = ({ children }) => {
                     type="text"
                     placeholder="Enter 6-digit OTP"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
+                    onChange={(e) => {
+                      setOtp(e.target.value);
+                      setError('');
+                    }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest"
                     maxLength="6"
                     required
@@ -246,11 +296,25 @@ const AdminLoginGate = ({ children }) => {
                     OTP sent to +91{phoneNumber}
                   </p>
                 </div>
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                    {error}
+                  </div>
+                )}
                 <button
                   type="submit"
-                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
-                  Verify & Login
+                  {isLoading ? 'Verifying...' : 'Verify & Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={isResendingOtp}
+                  className="w-full bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium disabled:bg-gray-300 disabled:cursor-not-allowed"
+                >
+                  {isResendingOtp ? 'Sending...' : 'Resend OTP'}
                 </button>
                 <button
                   type="button"

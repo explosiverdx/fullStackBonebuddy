@@ -11,6 +11,7 @@ import PhysiotherapistTable from './PhysiotherapistTable'; // Assuming these com
 import Payments from './AdminDashboard/Payments';
 import Referrals from './AdminDashboard/Referrals';
 import ImageCropper from './ImageCropper';
+import { ensureHttps } from '../utils/imageUrl';
 
 // Dashboard component to display stats
 const Dashboard = ({ stats }) => {
@@ -1990,7 +1991,7 @@ const BlogManagement = ({ authHeaders }) => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {blog.featuredImage?.url && (
-                            <img src={blog.featuredImage.url} alt="" className="w-12 h-12 rounded object-cover mr-3 flex-shrink-0" />
+                            <img src={ensureHttps(blog.featuredImage.url)} alt="" className="w-12 h-12 rounded object-cover mr-3 flex-shrink-0" />
                           )}
                           <div className="max-w-xs">
                             <p className="font-medium text-gray-900 truncate">{blog.title}</p>
@@ -2040,7 +2041,7 @@ const BlogManagement = ({ authHeaders }) => {
                 <div key={blog._id} className="p-4 space-y-3">
                   <div className="flex items-start gap-3">
                     {blog.featuredImage?.url && (
-                      <img src={blog.featuredImage.url} alt="" className="w-16 h-16 rounded object-cover flex-shrink-0" />
+                      <img src={ensureHttps(blog.featuredImage.url)} alt="" className="w-16 h-16 rounded object-cover flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900">{blog.title}</p>
@@ -2235,7 +2236,7 @@ const BlogManagement = ({ authHeaders }) => {
                     <div className="mt-2">
                       <p className="text-xs text-gray-500 mb-2">Current Image:</p>
                       <img 
-                        src={currentBlog.featuredImage.url} 
+                        src={ensureHttps(currentBlog.featuredImage.url)} 
                         alt="Current" 
                         className="w-full max-w-md h-48 object-cover rounded border border-gray-300" 
                       />

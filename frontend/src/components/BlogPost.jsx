@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { AuthContext } from '../context/AuthContextValue';
+import { ensureHttps } from '../utils/imageUrl';
 
 const BlogPost = () => {
   const { slug } = useParams();
@@ -232,7 +233,7 @@ const BlogPost = () => {
           {blog.featuredImage?.url && (
             <div className="mb-8 rounded-lg overflow-hidden shadow-lg">
               <img
-                src={blog.featuredImage.url}
+                src={ensureHttps(blog.featuredImage.url)}
                 alt={blog.title}
                 className="w-full h-auto max-h-[600px] object-contain"
                 style={{ maxWidth: '100%', height: 'auto' }}
@@ -314,7 +315,7 @@ const BlogPost = () => {
               <div className="flex items-center gap-4">
                 {blog.author.avatar ? (
                   <img
-                    src={blog.author.avatar}
+                    src={ensureHttps(blog.author.avatar)}
                     alt={blog.author.Fullname || 'Author'}
                     className="w-16 h-16 rounded-full object-cover border-2 border-teal-600"
                   />
@@ -387,7 +388,7 @@ const BlogPost = () => {
                 >
                   {post.featuredImage?.url ? (
                     <img
-                      src={post.featuredImage.url}
+                      src={ensureHttps(post.featuredImage.url)}
                       alt={post.title}
                       className="w-full h-48 object-cover"
                     />

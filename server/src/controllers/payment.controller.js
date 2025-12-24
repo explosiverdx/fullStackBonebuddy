@@ -253,8 +253,14 @@ const verifyRazorpayPayment = asyncHandler(async (req, res) => {
  * Get Razorpay key for frontend
  */
 const getRazorpayKey = asyncHandler(async (req, res) => {
+    const razorpayKey = process.env.RAZORPAY_KEY_ID;
+    
+    if (!razorpayKey || razorpayKey.trim() === '') {
+        throw new ApiError(500, "Razorpay is not configured. Please add RAZORPAY_KEY_ID to .env file and restart the server.");
+    }
+    
     return res.status(200).json(
-        new ApiResponse(200, { key: process.env.RAZORPAY_KEY_ID }, "Razorpay key retrieved successfully.")
+        new ApiResponse(200, { key: razorpayKey }, "Razorpay key retrieved successfully.")
     );
 });
 

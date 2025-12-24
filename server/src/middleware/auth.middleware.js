@@ -4,6 +4,51 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import jwt from "jsonwebtoken";
 import { generateAccessAndRefreshTokens } from "../utils/auth.utils.js";
 
+/**
+ * Optional authentication middleware - doesn't fail if no token provided
+ * Sets req.user if token is valid, otherwise req.user remains undefined
+ */
+export const optionalAuth = asyncHandler(async(req, res, next) => {
+    try {
+        // Get token from cookies or Authorization header
+        let token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
+        
+        // If no token, just continue without setting req.user
+        if (!token || token === "undefined" || token === "null" || token === "") {
+            return next();
+        }
+        
+        // Trim whitespace if token exists
+        token = token.trim();
+        
+        // Basic JWT format validation
+        const tokenParts = token.split('.');
+        if (tokenParts.length !== 3) {
+            return next(); // Invalid format, continue without auth
+        }
+    
+        try {
+            // Try to verify and decode the token
+            const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+            
+            // Find user by ID from decoded token
+            const user = await User.findById(decodedToken?._id).select("-password -refreshToken");
+        
+            if (user) {
+                req.user = user;
+            }
+        } catch (verifyError) {
+            // Token invalid or expired, continue without auth
+            // Don't throw error, just don't set req.user
+        }
+        
+        next();
+    } catch (error) {
+        // If any error occurs, continue without authentication
+        next();
+    }
+});
+
 export const verifyJWT = asyncHandler(async(req, res, next) => {
     try {
         // Get token from cookies or Authorization header

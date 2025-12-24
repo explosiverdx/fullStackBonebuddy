@@ -24,8 +24,14 @@ const createBlogPost = asyncHandler(async (req, res) => {
     if (req.file) {
         const imageResult = await uploadOnCloudinary(req.file.path);
         if (imageResult) {
+            // Always use secure_url (HTTPS) for images to prevent mixed content issues
+            const imageUrl = imageResult.secure_url || imageResult.url;
+            // Ensure HTTPS even if secure_url is not available
+            const httpsUrl = imageUrl?.startsWith('http://') 
+                ? imageUrl.replace('http://', 'https://') 
+                : imageUrl;
             featuredImage = {
-                url: imageResult.secure_url || imageResult.url,
+                url: httpsUrl,
                 publicId: imageResult.public_id,
             };
         }
@@ -184,8 +190,14 @@ const updateBlogPost = asyncHandler(async (req, res) => {
     if (req.file) {
         const imageResult = await uploadOnCloudinary(req.file.path);
         if (imageResult) {
+            // Always use secure_url (HTTPS) for images to prevent mixed content issues
+            const imageUrl = imageResult.secure_url || imageResult.url;
+            // Ensure HTTPS even if secure_url is not available
+            const httpsUrl = imageUrl?.startsWith('http://') 
+                ? imageUrl.replace('http://', 'https://') 
+                : imageUrl;
             blog.featuredImage = {
-                url: imageResult.secure_url || imageResult.url,
+                url: httpsUrl,
                 publicId: imageResult.public_id,
             };
         }

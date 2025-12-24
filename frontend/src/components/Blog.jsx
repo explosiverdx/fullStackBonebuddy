@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContextValue';
+import { ensureHttps } from '../utils/imageUrl';
 
 const Blog = () => {
   const { user } = useContext(AuthContext);
@@ -129,7 +130,7 @@ const Blog = () => {
                     {blog.featuredImage?.url ? (
                       <div className="w-full h-48 overflow-hidden bg-gray-100 flex items-center justify-center">
                         <img 
-                          src={blog.featuredImage.url} 
+                          src={ensureHttps(blog.featuredImage.url)} 
                           alt={blog.title} 
                           className="w-full h-full object-contain"
                         />
