@@ -24,6 +24,16 @@ if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
     console.log('✅ Razorpay credentials loaded successfully');
 }
 
+// Verify Cloudinary configuration on startup
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    console.error('❌ ERROR: Cloudinary credentials not found in environment variables.');
+    console.error('❌ Image upload features will NOT work.');
+    console.error('❌ Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to server/.env file.');
+} else {
+    console.log('✅ Cloudinary credentials loaded successfully');
+    console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME);
+}
+
 connectDB()
 .then(()=>{
     app.listen(process.env.PORT || 8000, '0.0.0.0', ()=>{
