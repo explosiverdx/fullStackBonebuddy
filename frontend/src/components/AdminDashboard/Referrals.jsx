@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Referrals = () => {
+  const navigate = useNavigate();
   const [referrals, setReferrals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -202,10 +204,35 @@ const Referrals = () => {
                           </button>
                         </>
                       )}
+                      {(referral.status === 'pending' || referral.status === 'contacted') && (
+                        <button
+                          onClick={() => {
+                            // Navigate to patient record with referral data
+                            const referralData = encodeURIComponent(JSON.stringify({
+                              referralId: referral._id,
+                              patientName: referral.patientName,
+                              patientPhone: referral.patientPhone,
+                              patientEmail: referral.patientEmail,
+                              patientAge: referral.patientAge,
+                              patientGender: referral.patientGender,
+                              condition: referral.condition,
+                              surgeryType: referral.surgeryType,
+                              surgeryDate: referral.surgeryDate,
+                              notes: referral.notes,
+                              doctorId: referral.doctorId,
+                              doctorName: referral.doctorName || referral.doctor?.name
+                            }));
+                            navigate(`/admin/patients?referral=${referralData}`);
+                          }}
+                          className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                        >
+                          Register Patient
+                        </button>
+                      )}
                       {referral.status === 'contacted' && (
                         <button
                           onClick={() => handleStatusUpdate(referral._id, 'registered')}
-                          className="px-2 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
+                          className="px-2 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
                         >
                           Mark Registered
                         </button>

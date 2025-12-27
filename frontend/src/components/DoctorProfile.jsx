@@ -29,6 +29,16 @@ const DoctorProfile = () => {
   const [referring, setReferring] = useState(false);
   const [myReferrals, setMyReferrals] = useState([]);
   const [loadingReferrals, setLoadingReferrals] = useState(false);
+  const [selectedPatientDetail, setSelectedPatientDetail] = useState(null);
+  const [showPatientModal, setShowPatientModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSurgeryType, setFilterSurgeryType] = useState('all');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -59,6 +69,15 @@ const DoctorProfile = () => {
       }
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Check on mount
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const fetchMyReferrals = async () => {
     setLoadingReferrals(true);
@@ -93,12 +112,39 @@ const DoctorProfile = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        setPatients(data.data.patients || []);
-        setSessions(data.data.sessions || []);
-        setStats(data.data.stats || null);
+        console.log('[DEBUG] Full API Response:', data);
+        console.log('[DEBUG] Response data:', data.data);
+        console.log('[DEBUG] Patients array:', data.data?.patients);
+        console.log('[DEBUG] Patients count:', data.data?.patients?.length);
+        console.log('[DEBUG] Stats:', data.data?.stats);
+        console.log('[DEBUG] Sessions count:', data.data?.sessions?.length);
+        
+        const patientsList = Array.isArray(data.data?.patients) ? data.data.patients : [];
+        console.log('[DEBUG] Setting patients list (length):', patientsList.length);
+        if (patientsList.length > 0) {
+          console.log('[DEBUG] First patient full object:', JSON.stringify(patientsList[0], null, 2));
+          console.log('[DEBUG] First patient _id:', patientsList[0]._id);
+          console.log('[DEBUG] First patient userId:', patientsList[0].userId);
+          console.log('[DEBUG] First patient name:', patientsList[0].name || patientsList[0].userId?.Fullname);
+          console.log('[DEBUG] First patient totalSessions:', patientsList[0].totalSessions);
+          console.log('[DEBUG] First patient isVirtual:', patientsList[0].isVirtual);
+        }
+        
+        setPatients(patientsList);
+        setSessions(data.data?.sessions || []);
+        setStats(data.data?.stats || null);
+        
+        if (patientsList.length === 0) {
+          console.warn('[WARNING] No patients returned from API');
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[ERROR] Failed to fetch patients:', response.status, response.statusText, errorData);
+        alert(`Failed to load patients: ${errorData.message || response.statusText}`);
       }
     } catch (error) {
-      console.error('Error fetching patients and sessions:', error);
+      console.error('[ERROR] Exception fetching patients and sessions:', error);
+      alert(`Error loading patients: ${error.message}`);
     } finally {
       setDataLoading(false);
     }
@@ -178,6 +224,67 @@ const DoctorProfile = () => {
   const handleCancel = () => {
     setIsEditing(false);
     setEditForm({});
+    setAvatarFile(null);
+    setAvatarPreview(null);
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatarFile(file);
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) {
+      alert('Please select an image file');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', avatarFile);
+
+      const response = await fetch('/api/v1/users/avatar', {
+        method: 'PATCH',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert('Profile picture updated successfully!');
+        // Refresh profile data
+        const profileResponse = await fetch('/api/v1/users/me', {
+          method: 'GET',
+          credentials: 'include',
+        });
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          setProfile(profileData.data);
+        }
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        // Reset file input
+        const fileInput = document.getElementById('avatar-upload');
+        if (fileInput) fileInput.value = '';
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to upload profile picture');
+      }
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Error uploading profile picture. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleReferSubmit = async (e) => {
@@ -343,6 +450,62 @@ const DoctorProfile = () => {
                           />
                         </div>
                         <div>
+                          <label className="block text-sm font-medium mb-1">Profile Photo</label>
+                          <div className="flex flex-col items-start gap-3">
+                            {/* Current Avatar */}
+                            <div className="flex items-center gap-3">
+                              {avatarPreview ? (
+                                <img src={avatarPreview} alt="Preview" className="w-20 h-20 rounded-full object-cover border-2 border-gray-300" />
+                              ) : profile?.avatar ? (
+                                <img src={profile.avatar} alt="Profile" className="w-20 h-20 rounded-full object-cover border-2 border-gray-300" />
+                              ) : (
+                                <div className="w-20 h-20 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
+                                  <span className="text-gray-400 text-2xl">👤</span>
+                                </div>
+                              )}
+                            </div>
+                            {/* Upload Controls */}
+                            <div className="flex flex-col gap-2">
+                              <label htmlFor="avatar-upload-edit" className="cursor-pointer">
+                                <input
+                                  id="avatar-upload-edit"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleAvatarChange}
+                                  className="hidden"
+                                />
+                                <span className="px-4 py-2 bg-teal-600 text-white text-sm rounded hover:bg-teal-700 inline-block">
+                                  {avatarFile ? 'Change Photo' : 'Upload Photo'}
+                                </span>
+                              </label>
+                              {avatarFile && (
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleAvatarUpload}
+                                    disabled={uploadingAvatar}
+                                    className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                  >
+                                    {uploadingAvatar ? 'Uploading...' : 'Save Photo'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setAvatarFile(null);
+                                      setAvatarPreview(null);
+                                      const fileInput = document.getElementById('avatar-upload-edit');
+                                      if (fileInput) fileInput.value = '';
+                                    }}
+                                    className="px-4 py-2 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div>
                           <label className="block text-sm font-medium mb-1">Specialization</label>
                           <input
                             type="text"
@@ -498,9 +661,11 @@ const DoctorProfile = () => {
                         <div>
                           <label className="block font-semibold mb-1">Profile Photo</label>
                           {profile?.avatar ? (
-                            <img src={profile.avatar} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
+                            <img src={profile.avatar} alt="Profile" className="w-20 h-20 rounded-full object-cover border-2 border-gray-300" />
                           ) : (
-                            <p className="text-gray-700">No photo uploaded</p>
+                            <div className="w-20 h-20 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
+                              <span className="text-gray-400 text-2xl">👤</span>
+                            </div>
                           )}
                         </div>
                         <div>
@@ -572,48 +737,311 @@ const DoctorProfile = () => {
                 </div>
 
                 {dataLoading ? (
-                  <div className="text-center py-8">Loading patients...</div>
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+                    <p className="mt-2 text-gray-600">Loading patients...</p>
+                  </div>
                 ) : patients.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No patients assigned yet.</p>
+                    <p className="text-lg mb-2">No patients assigned yet.</p>
+                    <p className="text-sm">Patients will appear here once they are assigned to you or registered from referrals.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                    {patients.map((patient) => (
-                      <div key={patient._id} className="border p-3 sm:p-4 rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-start mb-3 gap-2">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-base sm:text-lg text-gray-900">
-                              {patient.name || patient.userId?.Fullname || 'N/A'}
-                            </h4>
-                            <p className="text-xs sm:text-sm text-gray-500">Patient ID: {patient._id.toString().substring(0, 8)}...</p>
+                  <>
+                    {/* Search and Filters */}
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-4">
+                      <div className="space-y-4">
+                        {/* Search Bar */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Search Patients</label>
+                          <input
+                            type="text"
+                            placeholder="Search by name, phone, or email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                          />
                           </div>
-                          <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full whitespace-nowrap">
-                            {patient.totalSessions} sessions
-                          </span>
+                        
+                        {/* Filters */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Surgery Type</label>
+                            <select
+                              value={filterSurgeryType}
+                              onChange={(e) => setFilterSurgeryType(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            >
+                              <option value="all">All Types</option>
+                              <option value="Fracture">Fracture</option>
+                              <option value="Knee Replacement">Knee Replacement</option>
+                              <option value="Hip Replacement">Hip Replacement</option>
+                              <option value="Spine Surgery">Spine Surgery</option>
+                              <option value="knee">Knee</option>
+                              <option value="Shoulder">Shoulder</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
                         </div>
-                        <div className="space-y-1 text-xs sm:text-sm">
-                          <p><strong>Phone:</strong> {patient.userId?.mobile_number || patient.mobile_number || 'N/A'}</p>
-                          <p><strong>Email:</strong> <span className="break-all">{patient.userId?.email || patient.email || 'N/A'}</span></p>
-                          <p><strong>Surgery:</strong> {patient.surgeryType || 'N/A'}</p>
-                          <div className="mt-3 pt-3 border-t grid grid-cols-3 gap-2 text-center">
-                            <div>
-                              <div className="font-semibold text-teal-600">{patient.totalSessions}</div>
-                              <div className="text-xs text-gray-500">Total</div>
-                            </div>
-                            <div>
-                              <div className="font-semibold text-green-600">{patient.completedSessions}</div>
-                              <div className="text-xs text-gray-500">Completed</div>
-                            </div>
-                            <div>
-                              <div className="font-semibold text-blue-600">{patient.upcomingSessions}</div>
-                              <div className="text-xs text-gray-500">Upcoming</div>
-                            </div>
+                        {/* Date Range Filter */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Date From (Surgery Date)</label>
+                            <input
+                              type="date"
+                              value={filterDateFrom}
+                              onChange={(e) => setFilterDateFrom(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Date To (Surgery Date)</label>
+                            <input
+                              type="date"
+                              value={filterDateTo}
+                              onChange={(e) => setFilterDateTo(e.target.value)}
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                            />
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+
+                    {/* Filtered Patients List */}
+                    {(() => {
+                      // Filter patients based on search and filters
+                      const filteredPatients = patients.filter(patient => {
+                        const name = patient.name || patient.userId?.Fullname || '';
+                        // Prioritize Patient document's mobileNumber over userId.mobile_number (which might be from referral)
+                        const phone = patient.mobileNumber || patient.userId?.mobile_number || '';
+                        // Prioritize Patient document's email over userId.email (which might be from referral)
+                        const email = patient.email || patient.userId?.email || '';
+                        const searchLower = searchQuery.toLowerCase();
+                        
+                        const matchesSearch = !searchQuery || 
+                          name.toLowerCase().includes(searchLower) ||
+                          phone.includes(searchQuery) ||
+                          email.toLowerCase().includes(searchLower);
+                        
+                        const matchesSurgery = filterSurgeryType === 'all' || 
+                          (patient.surgeryType || '').toLowerCase() === filterSurgeryType.toLowerCase();
+                        
+                        const matchesDateRange = (() => {
+                          if (!filterDateFrom && !filterDateTo) return true; // No date filter applied
+                          if (!patient.surgeryDate) return false; // Patient has no surgery date
+                          
+                          const surgeryDate = new Date(patient.surgeryDate);
+                          surgeryDate.setHours(0, 0, 0, 0); // Reset time to start of day
+                          
+                          if (filterDateFrom && filterDateTo) {
+                            // Both dates provided - check if surgery date is within range
+                            const fromDate = new Date(filterDateFrom);
+                            fromDate.setHours(0, 0, 0, 0);
+                            const toDate = new Date(filterDateTo);
+                            toDate.setHours(23, 59, 59, 999); // End of day
+                            return surgeryDate >= fromDate && surgeryDate <= toDate;
+                          } else if (filterDateFrom) {
+                            // Only "from" date provided - check if surgery date is on or after
+                            const fromDate = new Date(filterDateFrom);
+                            fromDate.setHours(0, 0, 0, 0);
+                            return surgeryDate >= fromDate;
+                          } else if (filterDateTo) {
+                            // Only "to" date provided - check if surgery date is on or before
+                            const toDate = new Date(filterDateTo);
+                            toDate.setHours(23, 59, 59, 999);
+                            return surgeryDate <= toDate;
+                          }
+                          return true;
+                        })();
+                        
+                        return matchesSearch && matchesSurgery && matchesDateRange;
+                      });
+
+                      console.log('[DEBUG] Filtered patients for rendering:', filteredPatients.length);
+                      
+                      return (
+                        <>
+                          <div className="mb-4 text-sm text-gray-600">
+                            Showing {filteredPatients.length} of {patients.length} patient{patients.length !== 1 ? 's' : ''}
+                          </div>
+                          
+                          {filteredPatients.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                              <p>No patients match your search criteria.</p>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Mobile View - Cards */}
+                              <div className="md:hidden space-y-4">
+                                {filteredPatients.map((patient, index) => {
+                                  const patientKey = patient._id?.toString() || patient.userId?._id?.toString() || `patient-${index}`;
+                                  const patientUserId = patient.userId?._id?.toString() || patient.userId?.toString();
+                                  const patientId = patient._id?.toString();
+                                  
+                                  const patientSessions = sessions.filter(s => {
+                                    if (!s.patientId) return false;
+                                    const sessionPatientId = s.patientId?._id?.toString() || s.patientId?.toString();
+                                    const sessionPatientUserId = s.patientId?.userId?.toString();
+                                    return sessionPatientId === patientId || sessionPatientUserId === patientUserId;
+                                  });
+                                  
+                                  const patientName = patient.name || patient.userId?.Fullname || 'Unknown Patient';
+                                  // Prioritize Patient document's mobileNumber over userId.mobile_number (which might be from referral)
+                                  const patientPhone = patient.mobileNumber || patient.userId?.mobile_number || 'N/A';
+                                  // Prioritize Patient document's email over userId.email (which might be from referral)
+                                  const patientEmail = patient.email || patient.userId?.email || 'N/A';
+                                  
+                                  return (
+                                    <div
+                                      key={patientKey}
+                                      className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow"
+                                      onClick={() => {
+                                        setSelectedPatientDetail({ ...patient, sessions: patientSessions });
+                                        setShowPatientModal(true);
+                                      }}
+                                    >
+                                      <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                          <h4 className="font-semibold text-gray-900">{patientName}</h4>
+                                          <p className="text-xs text-gray-500">ID: {(patient._id?.toString() || patient.userId?._id?.toString() || 'N/A').substring(0, 8)}...</p>
+                                        </div>
+                                        <span className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded-full">
+                                          {patient.totalSessions || 0} sessions
+                          </span>
+                        </div>
+                                      <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                                        <div><span className="text-gray-600">Phone:</span> <span className="text-gray-900">{patientPhone}</span></div>
+                                        <div><span className="text-gray-600">Surgery:</span> <span className="text-gray-900">{patient.surgeryType || 'N/A'}</span></div>
+                                        <div><span className="text-gray-600">Condition:</span> <span className="text-gray-900">{patient.currentCondition || 'N/A'}</span></div>
+                                        <div><span className="text-gray-600">Sessions:</span> <span className="text-gray-900">{patient.totalSessions || 0}</span></div>
+                                      </div>
+                                      <button 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedPatientDetail({ ...patient, sessions: patientSessions });
+                                          setShowPatientModal(true);
+                                        }}
+                                        className="w-full px-3 py-1.5 bg-teal-600 text-white text-sm rounded hover:bg-teal-700"
+                                      >
+                                        View Details
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Desktop View - Table - Hidden on mobile, visible on md+ screens */}
+                              {isDesktop && (
+                              <div 
+                                className="w-full mt-4" 
+                                data-testid="desktop-patient-table"
+                              >
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
+                                  <table className="w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Patient Name</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Contact</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Surgery</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Condition</th>
+                                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Sessions</th>
+                                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {filteredPatients.length > 0 ? filteredPatients.map((patient, index) => {
+                                      const patientKey = patient._id?.toString() || patient.userId?._id?.toString() || `patient-${index}`;
+                                      const patientUserId = patient.userId?._id?.toString() || patient.userId?.toString();
+                                      const patientId = patient._id?.toString();
+                                      
+                                      const patientSessions = sessions.filter(s => {
+                                        if (!s.patientId) return false;
+                                        const sessionPatientId = s.patientId?._id?.toString() || s.patientId?.toString();
+                                        const sessionPatientUserId = s.patientId?.userId?.toString();
+                                        return sessionPatientId === patientId || sessionPatientUserId === patientUserId;
+                                      });
+                                      
+                                      const patientName = patient.name || patient.userId?.Fullname || 'Unknown Patient';
+                                      // Prioritize Patient document's mobileNumber over userId.mobile_number (which might be from referral)
+                                      const patientPhone = patient.mobileNumber || patient.userId?.mobile_number || 'N/A';
+                                      // Prioritize Patient document's email over userId.email (which might be from referral)
+                                      const patientEmail = patient.email || patient.userId?.email || 'N/A';
+                                      
+                                      console.log('[RENDER TABLE] Rendering patient row:', index, patientName);
+                                      
+                                      return (
+                                        <tr
+                                          key={patientKey}
+                                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                          onClick={() => {
+                                            setSelectedPatientDetail({ ...patient, sessions: patientSessions });
+                                            setShowPatientModal(true);
+                                          }}
+                                        >
+                                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div>
+                                              <p className="font-medium text-gray-900">{patientName}</p>
+                                              <p className="text-xs text-gray-500">ID: {(patient._id?.toString() || patient.userId?._id?.toString() || 'N/A').substring(0, 8)}...</p>
+                                            </div>
+                                          </td>
+                                          <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                            <p className="text-gray-900">{patientPhone}</p>
+                                            <p className="text-xs text-gray-500 truncate max-w-[200px]" title={patientEmail}>{patientEmail || 'N/A'}</p>
+                                          </td>
+                                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                            {patient.surgeryType || 'N/A'}
+                                          </td>
+                                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                            {patient.currentCondition || 'N/A'}
+                                          </td>
+                                          <td className="px-4 py-4 whitespace-nowrap text-center">
+                                            <div className="flex gap-4 justify-center text-sm">
+                                              <div>
+                                                <div className="font-semibold text-teal-600">{patient.totalSessions || 0}</div>
+                              <div className="text-xs text-gray-500">Total</div>
+                            </div>
+                            <div>
+                                                <div className="font-semibold text-green-600">{patient.completedSessions || 0}</div>
+                                                <div className="text-xs text-gray-500">Done</div>
+                            </div>
+                            <div>
+                                                <div className="font-semibold text-blue-600">{patient.upcomingSessions || 0}</div>
+                              <div className="text-xs text-gray-500">Upcoming</div>
+                            </div>
+                          </div>
+                                          </td>
+                                          <td className="px-4 py-4 whitespace-nowrap text-right">
+                                            <button
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedPatientDetail({ ...patient, sessions: patientSessions });
+                                                setShowPatientModal(true);
+                                              }}
+                                              className="px-3 py-1.5 bg-teal-600 text-white text-sm rounded hover:bg-teal-700"
+                                            >
+                                              View
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    }) : (
+                                      <tr>
+                                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                                          No patients match your search criteria.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                              )}
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </>
                 )}
               </div>
             )}
@@ -1075,6 +1503,192 @@ const DoctorProfile = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Patient Detail Modal */}
+      {showPatientModal && selectedPatientDetail && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-4 sm:px-6 py-4 border-b flex justify-between items-center bg-teal-50">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                  {selectedPatientDetail.name || selectedPatientDetail.userId?.Fullname || 'Patient Details'}
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                  Patient ID: {(selectedPatientDetail._id?.toString() || selectedPatientDetail.userId?._id?.toString() || 'N/A').substring(0, 12)}...
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPatientModal(false);
+                  setSelectedPatientDetail(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+              {/* Patient Information */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-2">Patient Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Full Name</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.name || selectedPatientDetail.userId?.Fullname || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Phone Number</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.userId?.mobile_number || selectedPatientDetail.mobileNumber || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="text-base font-medium text-gray-900 break-all">
+                      {selectedPatientDetail.userId?.email || selectedPatientDetail.email || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Gender</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.gender || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Age</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.age || 'N/A'} {selectedPatientDetail.age ? 'years' : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Date of Birth</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.dateOfBirth 
+                        ? new Date(selectedPatientDetail.dateOfBirth).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Surgery Type</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.surgeryType || 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Surgery Date</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.surgeryDate 
+                        ? new Date(selectedPatientDetail.surgeryDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-sm text-gray-600">Current Condition</p>
+                    <p className="text-base font-medium text-gray-900">
+                      {selectedPatientDetail.currentCondition || 'Not specified'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sessions Section */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3 text-gray-800 border-b pb-2">
+                  All Sessions ({selectedPatientDetail.sessions?.length || 0})
+                </h3>
+                {selectedPatientDetail.sessions && selectedPatientDetail.sessions.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedPatientDetail.sessions
+                      .sort((a, b) => new Date(b.sessionDate) - new Date(a.sessionDate))
+                      .map((session, index) => (
+                        <div key={session._id || index} className="border rounded-lg p-4 bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+                            <div>
+                              <p className="font-semibold text-gray-900">
+                                Session #{selectedPatientDetail.sessions.length - index}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {new Date(session.sessionDate).toLocaleDateString('en-US', {
+                                  weekday: 'long',
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              session.status === 'completed' 
+                                ? 'bg-green-100 text-green-800'
+                                : session.status === 'cancelled'
+                                ? 'bg-red-100 text-red-800'
+                                : new Date(session.sessionDate) > new Date()
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                              {session.status || 'Scheduled'}
+                            </span>
+                          </div>
+                          {session.physioId && (
+                            <div className="mt-2">
+                              <p className="text-sm text-gray-600">
+                                <strong>Physiotherapist:</strong> {session.physioId.name || 'N/A'}
+                                {session.physioId.specialization && ` (${session.physioId.specialization})`}
+                              </p>
+                              {session.physioId.mobile_number && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Contact: {session.physioId.mobile_number}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          {session.notes && (
+                            <div className="mt-2 pt-2 border-t">
+                              <p className="text-sm text-gray-700">
+                                <strong>Notes:</strong> {session.notes}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No sessions found for this patient.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-4 sm:px-6 py-4 border-t bg-gray-50 flex justify-end">
+              <button
+                onClick={() => {
+                  setShowPatientModal(false);
+                  setSelectedPatientDetail(null);
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm sm:text-base"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

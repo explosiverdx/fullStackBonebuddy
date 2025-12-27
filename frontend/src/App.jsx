@@ -20,6 +20,9 @@ import NeurosurgeryRehab from './components/ServicesContentPages/NeurosurgeryReh
 import About from './components/About';
 
 import Contact from './components/Contact';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import TermsAndConditions from './components/TermsAndConditions';
+import CookiePolicy from './components/CookiePolicy';
 import Footer from './components/Footer';
 import SignIn from './components/SignIn';
 import PatientSignup from './components/PatientSignup';
@@ -74,6 +77,9 @@ function App() {
         <Route path="/appointment" element={<Appointment />} />
 
         <Route path="/contact" element={<Contact />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="/cookie-policy" element={<CookiePolicy />} />
         <Route path="/signUp" element={<Home />} />
         <Route path="/login-success" element={<ProtectedRoute><LoginRedirector /></ProtectedRoute>} />
         <Route path="/userForm" element={<ProtectedRoute allowedRoles={['patient', 'doctor', 'physiotherapist']}><PatientSignup /></ProtectedRoute>} />

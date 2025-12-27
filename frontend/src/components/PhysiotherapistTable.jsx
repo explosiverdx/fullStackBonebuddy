@@ -34,8 +34,10 @@ const PhysiotherapistTable = ({ user: userProp }) => {
   const [dateFilter, setDateFilter] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedPhysio, setSelectedPhysio] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
   const [newPhysio, setNewPhysio] = useState({
     fullName: '',
     mobile_number: '',
@@ -142,6 +144,76 @@ const PhysiotherapistTable = ({ user: userProp }) => {
 
   const handleView = (physio) => {
     alert(`View details for ${physio.name}`);
+  };
+
+  const handleChangePassword = (physio) => {
+    // Get userId from physio object
+    const userId = physio.userId?._id || physio.userId || physio._id;
+    
+    if (!userId) {
+      alert('Error: User ID not found for this physiotherapist. Cannot change password.');
+      return;
+    }
+
+    setSelectedPhysio({ ...physio, userId });
+    setPasswordData({ newPassword: '', confirmPassword: '' });
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!passwordData.newPassword || passwordData.newPassword.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    const userId = selectedPhysio.userId || selectedPhysio.user?._id;
+    if (!userId) {
+      alert('Error: User ID not found. Cannot change password.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/v1/admin/users/${userId}/change-password`, {
+        method: 'PATCH',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          newPassword: passwordData.newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to change password');
+      }
+
+      alert('Password changed successfully!');
+      setShowPasswordModal(false);
+      setSelectedPhysio(null);
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+      setError('');
+    } catch (err) {
+      console.error('Error changing password:', err);
+      const errorMessage = err.message || 'Failed to change password';
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false);
+    setSelectedPhysio(null);
+    setPasswordData({ newPassword: '', confirmPassword: '' });
   };
 
 
@@ -675,12 +747,21 @@ const PhysiotherapistTable = ({ user: userProp }) => {
                           <button
                             onClick={() => handleEdit(physio)}
                             className="text-yellow-600 hover:text-yellow-900"
+                            title="Edit Physiotherapist"
                           >
                             ✏️
                           </button>
                           <button
+                            onClick={() => handleChangePassword(physio)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="Change Password"
+                          >
+                            🔑
+                          </button>
+                          <button
                             onClick={() => handleDelete(physio._id)}
                             className="text-red-600 hover:text-red-900"
+                            title="Delete Physiotherapist"
                           >
                             🗑️
                           </button>
@@ -1085,6 +1166,64 @@ const PhysiotherapistTable = ({ user: userProp }) => {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && selectedPhysio && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Change Password</h3>
+            <p className="text-sm text-gray-600 mb-4">Change password for: <strong>{selectedPhysio.name || selectedPhysio.fullName}</strong></p>
+            
+            <form onSubmit={handlePasswordSubmit}>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter new password (min 6 characters)"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-blue-600"
+                >
+                  Change Password
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePasswordCancel}
+                  className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

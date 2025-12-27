@@ -79,6 +79,10 @@ const userSchema=new mongoose.Schema({
         type: Date,
         default: null,
     },
+    markedAsAdded: {
+        type: Boolean,
+        default: false,
+    },
     // Patient-specific fields
     surgeryType: {
         type: String,

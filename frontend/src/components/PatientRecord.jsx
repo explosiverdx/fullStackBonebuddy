@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { useAuth } from '../hooks/useAuth';
 
@@ -67,7 +67,8 @@ const PatientRecord = ({ user: userProp }) => {
     medicalHistory: '',
     allergies: '',
     bloodGroup: '',
-    medicalInsurance: ''
+    medicalInsurance: '',
+    password: '' // Optional password field for new patients
   });
   const [stats, setStats] = useState({ total: 0, incomplete: 0, active: 0, inactive: 0 });
   const [statsLoading, setStatsLoading] = useState(true);
@@ -91,25 +92,58 @@ const PatientRecord = ({ user: userProp }) => {
     completedSessions: '',
     notes: ''
   });
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '', newMobileNumber: '' });
+  const [selectedUserForPassword, setSelectedUserForPassword] = useState(null);
+  const [referralData, setReferralData] = useState(null);
+  const [isFromReferral, setIsFromReferral] = useState(false);
+  const [calculatedAge, setCalculatedAge] = useState({ years: 0, months: 0, days: 0, display: '' });
+  const [dobDay, setDobDay] = useState('');
+  const [dobMonth, setDobMonth] = useState('');
+  const [dobYear, setDobYear] = useState('');
 
   const { patientId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const calculateAgeFromDob = (dobString) => {
-    if (!dobString) return '';
+    if (!dobString) return { years: 0, months: 0, days: 0, display: '' };
     const birthDate = new Date(dobString);
-    if (Number.isNaN(birthDate.getTime())) return '';
+    if (Number.isNaN(birthDate.getTime())) return { years: 0, months: 0, days: 0, display: '' };
 
     const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    const dayDiff = today.getDate() - birthDate.getDate();
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    let days = today.getDate() - birthDate.getDate();
 
-    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-      age -= 1;
+    // Adjust for negative days
+    if (days < 0) {
+      months--;
+      const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += lastMonth.getDate();
     }
 
-    return Math.max(age, 0);
+    // Adjust for negative months
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    // Ensure non-negative values
+    years = Math.max(years, 0);
+    months = Math.max(months, 0);
+    days = Math.max(days, 0);
+
+    // Create display string
+    const parts = [];
+    if (years > 0) parts.push(`${years} ${years === 1 ? 'Year' : 'Years'}`);
+    if (months > 0) parts.push(`${months} ${months === 1 ? 'Month' : 'Months'}`);
+    if (days > 0) parts.push(`${days} ${days === 1 ? 'Day' : 'Days'}`);
+    
+    const display = parts.length > 0 ? parts.join(', ') : '0 Days';
+    const totalYears = years; // For backward compatibility with age field
+
+    return { years, months, days, display, totalYears };
   };
 
   useEffect(() => {
@@ -131,12 +165,125 @@ const PatientRecord = ({ user: userProp }) => {
     fetchPhysiotherapists();
   }, []);
 
+  // Check for referral data in URL params
   useEffect(() => {
-    if (!formData.dateOfBirth) return;
-    const autoAge = calculateAgeFromDob(formData.dateOfBirth);
-    const currentAge = Number(formData.age);
-    if (autoAge !== currentAge && autoAge !== '') {
-      setFormData((prev) => ({ ...prev, age: autoAge.toString() }));
+    const searchParams = new URLSearchParams(location.search);
+    const referralParam = searchParams.get('referral');
+    if (referralParam) {
+      try {
+        const referral = JSON.parse(decodeURIComponent(referralParam));
+        setReferralData(referral);
+        setIsFromReferral(true);
+        // Auto-open the add patient modal with pre-filled data
+        setModalMode('add');
+        // Wait for doctors to load before setting form data
+        if (doctors.length > 0) {
+          fillFormFromReferral(referral);
+        }
+      } catch (error) {
+        console.error('Error parsing referral data:', error);
+      }
+    }
+  }, [location.search, doctors]);
+
+  // Fill form when doctors are loaded and referral data exists
+  useEffect(() => {
+    if (referralData && doctors.length > 0 && isFromReferral) {
+      fillFormFromReferral(referralData);
+      setShowModal(true);
+    }
+  }, [doctors, referralData, isFromReferral]);
+
+  const fillFormFromReferral = (referral) => {
+    // Find the doctor by ID or name
+    let selectedDoctorId = '';
+    if (referral.doctorId) {
+      const doctor = doctors.find(d => d._id === referral.doctorId || d.userId === referral.doctorId);
+      if (doctor) {
+        selectedDoctorId = doctor._id;
+      }
+    }
+    // If not found by ID, try to find by name
+    if (!selectedDoctorId && referral.doctorName) {
+      const doctor = doctors.find(d => d.Fullname === referral.doctorName || d.name === referral.doctorName);
+      if (doctor) {
+        selectedDoctorId = doctor._id;
+      }
+    }
+
+    // Calculate date of birth from age if age is provided but DOB is not
+    let dobValue = '';
+    if (referral.patientAge) {
+      const today = new Date();
+      const birthYear = today.getFullYear() - parseInt(referral.patientAge);
+      // Use a reasonable default month and day (January 1st)
+      dobValue = `${birthYear}-01-01`;
+    }
+
+    setFormData({
+      name: referral.patientName || '',
+      email: referral.patientEmail || '',
+      dateOfBirth: dobValue,
+      gender: referral.patientGender || '',
+      mobileNumber: referral.patientPhone || '',
+      surgeryType: referral.surgeryType || '',
+      surgeryDate: referral.surgeryDate ? new Date(referral.surgeryDate).toISOString().split('T')[0] : '',
+      assignedDoctor: selectedDoctorId || referral.doctorName || '',
+      medicalReport: '',
+      hospitalClinic: '',
+      emergencyContactNumber: referral.patientPhone || '',
+      userId: '',
+      age: referral.patientAge ? referral.patientAge.toString() : '',
+      address: '',
+      currentCondition: referral.condition || '',
+      assignedPhysiotherapist: '',
+      medicalHistory: referral.notes || '',
+      allergies: '',
+      bloodGroup: '',
+      medicalInsurance: '',
+      password: ''
+    });
+  };
+
+  // Update dateOfBirth when dropdowns change
+  useEffect(() => {
+    if (dobDay && dobMonth && dobYear) {
+      const monthIndex = parseInt(dobMonth) - 1; // JavaScript months are 0-indexed
+      const date = new Date(parseInt(dobYear), monthIndex, parseInt(dobDay));
+      const formattedDate = `${dobYear}-${dobMonth.padStart(2, '0')}-${dobDay.padStart(2, '0')}`;
+      setFormData((prev) => ({ ...prev, dateOfBirth: formattedDate }));
+    }
+  }, [dobDay, dobMonth, dobYear]);
+
+  // Update dropdowns when dateOfBirth changes (from external source)
+  useEffect(() => {
+    if (formData.dateOfBirth && formData.dateOfBirth.includes('-')) {
+      const [year, month, day] = formData.dateOfBirth.split('-');
+      if (year && month && day && year.length === 4) {
+        // Only update if values are different to avoid unnecessary re-renders
+        if (dobYear !== year) setDobYear(year);
+        if (dobMonth !== month) setDobMonth(month);
+        if (dobDay !== day) setDobDay(day);
+      }
+    } else if (!formData.dateOfBirth) {
+      // Reset dropdowns if dateOfBirth is cleared
+      setDobDay('');
+      setDobMonth('');
+      setDobYear('');
+    }
+  }, [formData.dateOfBirth]);
+
+  // Calculate age when dateOfBirth changes
+  useEffect(() => {
+    if (!formData.dateOfBirth) {
+      setCalculatedAge({ years: 0, months: 0, days: 0, display: '' });
+      return;
+    }
+    const ageData = calculateAgeFromDob(formData.dateOfBirth);
+    setCalculatedAge(ageData);
+    // Also update the age field with total years for backward compatibility
+    if (ageData.totalYears !== Number(formData.age)) {
+      setFormData((prev) => ({ ...prev, age: ageData.totalYears.toString() }));
     }
   }, [formData.dateOfBirth]);
 
@@ -253,21 +400,28 @@ const PatientRecord = ({ user: userProp }) => {
       medicalHistory: '',
       allergies: '',
       bloodGroup: '',
-      medicalInsurance: ''
+      medicalInsurance: '',
+      password: ''
     });
     setShowModal(true);
   };
 
   const handleEdit = (patient) => {
     setModalMode('edit');
+    const dobValue = patient.dateOfBirth 
+      ? (patient.dateOfBirth.includes('T') 
+          ? patient.dateOfBirth.split('T')[0] 
+          : new Date(patient.dateOfBirth).toISOString().split('T')[0])
+      : '';
+    
     setFormData({
       name: patient.name,
       email: patient.email || '',
-      dateOfBirth: patient.dateOfBirth || '',
+      dateOfBirth: dobValue,
       gender: patient.gender || '',
       mobileNumber: patient.mobileNumber || '',
       surgeryType: patient.surgeryType || '',
-      surgeryDate: patient.surgeryDate || '',
+      surgeryDate: patient.surgeryDate ? (patient.surgeryDate.includes('T') ? patient.surgeryDate.split('T')[0] : new Date(patient.surgeryDate).toISOString().split('T')[0]) : '',
       assignedDoctor: patient.assignedDoctor || '',
       medicalReport: patient.medicalReport || '',
       hospitalClinic: patient.hospitalClinic || '',
@@ -327,6 +481,20 @@ const PatientRecord = ({ user: userProp }) => {
     setShowModal(true);
   };
 
+  const handleMarkAsAdded = async (user) => {
+    try {
+      await apiClient.patch(`/admin/users/${user._id}/mark-as-added`);
+      // Refresh the incomplete users list
+      fetchAvailableUsers();
+      alert(`User "${user.Fullname || user.username}" has been marked as added and will no longer appear in incomplete accounts.`);
+      setError('');
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.message || 'Failed to mark user as added.';
+      alert(`Error: ${errorMsg}`);
+      setError(errorMsg);
+    }
+  };
+
   const handleDeleteUser = async (user) => {
     if (!confirm(`Are you sure you want to delete the user account for "${user.Fullname || user.username}"? This action cannot be undone.`)) {
       return;
@@ -372,7 +540,26 @@ const PatientRecord = ({ user: userProp }) => {
     const missingFields = [];
     
     if (!formData.name || formData.name.trim() === '') missingFields.push('Name');
-    if (!formData.dateOfBirth) missingFields.push('Date of Birth');
+    if (!dobDay || !dobMonth || !dobYear) {
+      missingFields.push('Date of Birth (Day, Month, and Year must be selected)');
+    } else if (!formData.dateOfBirth) {
+      missingFields.push('Date of Birth');
+    }
+    // Validate date is valid
+    if (dobDay && dobMonth && dobYear) {
+      const testDate = new Date(parseInt(dobYear), parseInt(dobMonth) - 1, parseInt(dobDay));
+      if (testDate.getDate() !== parseInt(dobDay) || 
+          testDate.getMonth() !== parseInt(dobMonth) - 1 || 
+          testDate.getFullYear() !== parseInt(dobYear)) {
+        alert('Invalid date selected. Please check Day, Month, and Year.');
+        return;
+      }
+      // Check if date is in the future
+      if (testDate > new Date()) {
+        alert('Date of Birth cannot be in the future.');
+        return;
+      }
+    }
     if (!formData.age) missingFields.push('Age');
     if (!formData.gender) missingFields.push('Gender');
     if (!formData.mobileNumber || formData.mobileNumber.trim() === '') missingFields.push('Mobile Number');
@@ -393,6 +580,15 @@ const PatientRecord = ({ user: userProp }) => {
       // Convert age to number
       if (payload.age) {
         payload.age = parseInt(payload.age, 10);
+      }
+      
+      // Convert doctor ID to doctor name if needed
+      if (payload.assignedDoctor) {
+        const selectedDoctor = doctors.find(d => d._id === payload.assignedDoctor);
+        if (selectedDoctor) {
+          // Store both ID and name - backend might need the name
+          payload.assignedDoctor = selectedDoctor.Fullname || selectedDoctor.name || payload.assignedDoctor;
+        }
       }
       
       // Remove userId if it's empty or not selected
@@ -424,6 +620,29 @@ const PatientRecord = ({ user: userProp }) => {
       if (modalMode === 'add') {
         const response = await apiClient.post('/admin/patients', dataToSend, headers);
         console.log('Patient created:', response.data);
+        
+        // If patient was created from a referral, link the referral to the patient
+        if (referralData && referralData.referralId) {
+          try {
+            const patientUserId = response.data.data?.userId || response.data.data?.patient?.userId;
+            if (patientUserId) {
+              await apiClient.patch(
+                `/api/v1/referrals/${referralData.referralId}/link-patient`,
+                { patientId: patientUserId },
+                {
+                  headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                  }
+                }
+              );
+              console.log('Referral linked to patient successfully');
+            }
+          } catch (linkError) {
+            console.error('Error linking referral to patient:', linkError);
+            // Don't block the success message, just log the error
+          }
+        }
+        
         alert('Patient added successfully!');
         // Reset form after successful add
         setFormData({
@@ -446,8 +665,17 @@ const PatientRecord = ({ user: userProp }) => {
           medicalHistory: '',
           allergies: '',
           bloodGroup: '',
-          medicalInsurance: ''
+          medicalInsurance: '',
+          password: ''
         });
+        setDobDay('');
+        setDobMonth('');
+        setDobYear('');
+        // Clear referral data and reset flag
+        setReferralData(null);
+        setIsFromReferral(false);
+        // Remove referral param from URL
+        navigate('/admin/patients', { replace: true });
       } else {
         const response = await apiClient.patch(`/admin/patients/${selectedPatient.patientId}`, dataToSend, headers);
         console.log('Patient updated:', response.data);
@@ -481,6 +709,9 @@ const PatientRecord = ({ user: userProp }) => {
   const handleCancel = () => {
     setShowModal(false);
     setSelectedPatient(null);
+    setDobDay('');
+    setDobMonth('');
+    setDobYear('');
     // Don't navigate, just close modal - stay on current page
   };
 
@@ -595,6 +826,100 @@ const PatientRecord = ({ user: userProp }) => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete session.');
     }
+  };
+
+  const handleChangePassword = (patient) => {
+    // Get userId from patient object
+    const userId = patient.userId?._id || patient.userId || patient._id;
+    
+    if (!userId) {
+      alert('Error: User ID not found for this patient. Cannot change password.');
+      return;
+    }
+
+    const patientName = patient.name || patient.userId?.Fullname || 'Patient';
+    const currentMobileNumber = patient.mobileNumber || patient.userId?.mobile_number || '';
+
+    setSelectedUserForPassword({
+      userId,
+      name: patientName,
+      currentMobileNumber
+    });
+    setPasswordData({ newPassword: '', confirmPassword: '', newMobileNumber: currentMobileNumber });
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!selectedUserForPassword || !selectedUserForPassword.userId) {
+      alert('Error: User ID not found. Cannot change password.');
+      return;
+    }
+
+    // Validate password if provided
+    if (passwordData.newPassword) {
+      if (passwordData.newPassword.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return;
+      }
+
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert('Passwords do not match');
+        return;
+      }
+    }
+
+    // Validate mobile number if provided
+    if (passwordData.newMobileNumber) {
+      const phoneDigits = passwordData.newMobileNumber.replace(/[^0-9]/g, '');
+      if (phoneDigits.length !== 10) {
+        alert('Mobile number must be exactly 10 digits');
+        return;
+      }
+    }
+
+    // Check if at least one field is being changed
+    if (!passwordData.newPassword && !passwordData.newMobileNumber) {
+      alert('Please provide either a new password or a new mobile number');
+      return;
+    }
+
+    try {
+      const updateData = {};
+      if (passwordData.newPassword) {
+        updateData.newPassword = passwordData.newPassword;
+      }
+      if (passwordData.newMobileNumber) {
+        updateData.newMobileNumber = passwordData.newMobileNumber;
+      }
+
+      const response = await apiClient.patch(`/admin/users/${selectedUserForPassword.userId}/change-password`, updateData);
+
+      const changes = [];
+      if (passwordData.newPassword) changes.push('password');
+      if (passwordData.newMobileNumber) changes.push('mobile number');
+      
+      alert(`${changes.join(' and ')} changed successfully!`);
+      setShowPasswordModal(false);
+      setSelectedUserForPassword(null);
+      setPasswordData({ newPassword: '', confirmPassword: '', newMobileNumber: '' });
+      setError('');
+      
+      // Refresh patient list to show updated data
+      fetchPatients();
+    } catch (err) {
+      console.error('Error changing password/mobile:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to change password/mobile number';
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false);
+    setSelectedUserForPassword(null);
+    setPasswordData({ newPassword: '', confirmPassword: '', newMobileNumber: '' });
   };
 
   return (
@@ -744,7 +1069,11 @@ const PatientRecord = ({ user: userProp }) => {
               {patients.map((patient) => (
                 <tr key={patient._id} className={!patient.isProfileComplete ? 'bg-yellow-50' : ''}>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2 whitespace-nowrap">{patient.name}</td>
-                  <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.email || patient.userId?.email || 'N/A'}</td>
+                  <td className="border border-gray-300 px-2 sm:px-4 py-2">
+                    {(patient.email && patient.email.trim() !== '') || (patient.userId?.email && patient.userId.email.trim() !== '') 
+                      ? (patient.email || patient.userId?.email) 
+                      : 'N/A'}
+                  </td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.dateOfBirth ? new Date(patient.dateOfBirth).toLocaleDateString() : 'N/A'}</td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.gender}</td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.mobileNumber}</td>
@@ -778,8 +1107,9 @@ const PatientRecord = ({ user: userProp }) => {
                         <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleViewDetails(patient.patientId); }} className="text-blue-500 mr-1 sm:mr-2 text-xs sm:text-sm">View</button>
                         {!isSectionReadOnly(user, 'patients') && (
                           <>
-                            <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleEdit(patient); }} className="text-yellow-500 mr-1 sm:mr-2 text-xs sm:text-sm">Edit</button>
-                            <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleDelete(patient); }} className="text-red-500 text-xs sm:text-sm">Delete</button>
+                            <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleEdit(patient); }} className="text-yellow-500 mr-1 sm:mr-2 text-xs sm:text-sm" title="Edit Patient">Edit</button>
+                            <button onClick={() => handleChangePassword(patient)} className="text-blue-500 mr-1 sm:mr-2 text-xs sm:text-sm" title="Change Password">🔑</button>
+                            <button onClick={() => { if (!patient.patientId || patient.patientId === 'N/A') { setError('Patient details not available for this user'); return; } handleDelete(patient); }} className="text-red-500 text-xs sm:text-sm" title="Delete Patient">Delete</button>
                           </>
                         )}
                         {isSectionReadOnly(user, 'patients') && (
@@ -906,6 +1236,16 @@ const PatientRecord = ({ user: userProp }) => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                           </svg>
                           Create Profile
+                        </button>
+                        <button
+                          onClick={() => handleMarkAsAdded(user)}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 mr-2 transition-colors"
+                          title="Mark as Added - Remove from incomplete accounts"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Added
                         </button>
                         <button
                           onClick={() => handleDeleteUser(user)}
@@ -1061,31 +1401,132 @@ const PatientRecord = ({ user: userProp }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date of Birth <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-                required
-              />
+              <div className="grid grid-cols-3 gap-2">
+                {/* Day Dropdown */}
+                <select
+                  value={dobDay}
+                  onChange={(e) => setDobDay(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 bg-white"
+                  required
+                >
+                  <option value="">Day</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                    <option key={day} value={day.toString().padStart(2, '0')}>
+                      {day}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Month Dropdown */}
+                <select
+                  value={dobMonth}
+                  onChange={(e) => {
+                    setDobMonth(e.target.value);
+                    // Reset day if month changes and day is invalid for new month
+                    if (dobDay && e.target.value) {
+                      const daysInMonth = new Date(parseInt(dobYear || new Date().getFullYear()), parseInt(e.target.value), 0).getDate();
+                      if (parseInt(dobDay) > daysInMonth) {
+                        setDobDay('');
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 bg-white"
+                  required
+                >
+                  <option value="">Month</option>
+                  {[
+                    { value: '01', label: 'January' },
+                    { value: '02', label: 'February' },
+                    { value: '03', label: 'March' },
+                    { value: '04', label: 'April' },
+                    { value: '05', label: 'May' },
+                    { value: '06', label: 'June' },
+                    { value: '07', label: 'July' },
+                    { value: '08', label: 'August' },
+                    { value: '09', label: 'September' },
+                    { value: '10', label: 'October' },
+                    { value: '11', label: 'November' },
+                    { value: '12', label: 'December' }
+                  ].map(month => (
+                    <option key={month.value} value={month.value}>
+                      {month.label}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Year Dropdown */}
+                <select
+                  value={dobYear}
+                  onChange={(e) => {
+                    setDobYear(e.target.value);
+                    // Reset day if year changes and it's a leap year issue
+                    if (dobDay && dobMonth === '02' && e.target.value) {
+                      const isLeapYear = (year) => (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+                      const daysInFeb = isLeapYear(parseInt(e.target.value)) ? 29 : 28;
+                      if (parseInt(dobDay) > daysInFeb) {
+                        setDobDay('');
+                      }
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 bg-white"
+                  required
+                >
+                  <option value="">Year</option>
+                  {Array.from({ length: 120 }, (_, i) => {
+                    const year = new Date().getFullYear() - i;
+                    return (
+                      <option key={year} value={year.toString()}>
+                        {year}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              {dobDay && dobMonth && dobYear && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Selected: {new Date(parseInt(dobYear), parseInt(dobMonth) - 1, parseInt(dobDay)).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              )}
+              {(!dobDay || !dobMonth || !dobYear) && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Please select Day, Month, and Year
+                </p>
+              )}
             </div>
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Age <span className="text-red-500">*</span>
               </label>
+              <div className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-50 flex items-center justify-between">
+                <div className="flex-1">
+                  {calculatedAge.display ? (
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-sm font-semibold text-gray-700">{calculatedAge.display}</span>
+                      {calculatedAge.years > 0 && (
+                        <span className="text-xs text-gray-500">
+                          ({calculatedAge.years} {calculatedAge.years === 1 ? 'year' : 'years'})
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-400">Select date of birth to calculate age</span>
+                  )}
+                </div>
+              </div>
+              {/* Hidden input for form submission (stores total years) */}
               <input
-                type="number"
-                placeholder="Auto-calculated from DOB"
+                type="hidden"
                 value={formData.age}
-                onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-                min="0"
-                max="150"
-                readOnly
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Age is auto-calculated from the selected date of birth.</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Age is automatically calculated from the date of birth (Years, Months, Days)
+              </p>
             </div>
 
             <div className="mb-3">
@@ -1157,15 +1598,29 @@ const PatientRecord = ({ user: userProp }) => {
             </div>
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Assigned Doctor
+                Assigned Doctor {isFromReferral && <span className="text-red-500">*</span>}
               </label>
-              <input
-                type="text"
-                placeholder="Enter doctor name"
+              <select
                 value={formData.assignedDoctor}
                 onChange={(e) => setFormData({ ...formData, assignedDoctor: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-              />
+                disabled={isFromReferral}
+                className={`w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 ${
+                  isFromReferral ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+                required
+              >
+                <option value="">Select Doctor</option>
+                {doctors.map(doctor => (
+                  <option key={doctor._id} value={doctor._id}>
+                    {doctor.Fullname || doctor.name || 'Unknown Doctor'}
+                  </option>
+                ))}
+              </select>
+              {isFromReferral && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Doctor is pre-selected from referral and cannot be changed
+                </p>
+              )}
             </div>
 
             <div className="mb-3">
@@ -1314,35 +1769,53 @@ const PatientRecord = ({ user: userProp }) => {
               />
             </div>
             {modalMode === 'add' && (
-              <div className="mb-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Link Existing User Account (optional)
-                </label>
-                <select
-                  value={formData.userId}
-                  onChange={(e) => {
-                    const selectedUser = availableUsers.find(user => user._id === e.target.value);
-                    setFormData({
-                      ...formData,
-                      userId: e.target.value,
-                      name: selectedUser ? selectedUser.Fullname : formData.name,
-                      email: selectedUser ? selectedUser.email : formData.email,
-                      mobileNumber: selectedUser ? selectedUser.mobile_number : formData.mobileNumber
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded"
-                >
-                  <option value="">-- Create new patient account --</option>
-                  {availableUsers.map(user => (
-                    <option key={user._id} value={user._id}>
-                      {user.Fullname || user.username} - {user.mobile_number} ({user.email || 'no email'})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Leave this as default to auto-create a patient user using the details above, or select an existing registration to link.
-                </p>
-              </div>
+              <>
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Set Password (optional)
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Set password for patient login (min 6 characters)"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
+                    minLength={6}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    If provided, this password will be set for the patient account. If left empty, password can be set later using the Change Password button.
+                  </p>
+                </div>
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Link Existing User Account (optional)
+                  </label>
+                  <select
+                    value={formData.userId}
+                    onChange={(e) => {
+                      const selectedUser = availableUsers.find(user => user._id === e.target.value);
+                      setFormData({
+                        ...formData,
+                        userId: e.target.value,
+                        name: selectedUser ? selectedUser.Fullname : formData.name,
+                        email: selectedUser ? selectedUser.email : formData.email,
+                        mobileNumber: selectedUser ? selectedUser.mobile_number : formData.mobileNumber
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                  >
+                    <option value="">-- Create new patient account --</option>
+                    {availableUsers.map(user => (
+                      <option key={user._id} value={user._id}>
+                        {user.Fullname || user.username} - {user.mobile_number} ({user.email || 'no email'})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave this as default to auto-create a patient user using the details above, or select an existing registration to link.
+                  </p>
+                </div>
+              </>
             )}
             {modalMode === 'edit' && (
               <input
@@ -1476,6 +1949,90 @@ const PatientRecord = ({ user: userProp }) => {
               <button type="button" onClick={handleEditSessionCancel} className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto">Cancel</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Change Password & Mobile Number Modal */}
+      {showPasswordModal && selectedUserForPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Change Password & Mobile Number</h3>
+            <p className="text-sm text-gray-600 mb-4">Update credentials for: <strong>{selectedUserForPassword.name}</strong></p>
+            
+            <form onSubmit={handlePasswordSubmit}>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  placeholder="Enter new 10-digit mobile number"
+                  value={passwordData.newMobileNumber}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setPasswordData({ ...passwordData, newMobileNumber: value });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  maxLength="10"
+                  pattern="[0-9]{10}"
+                />
+                {selectedUserForPassword.currentMobileNumber && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Current: {selectedUserForPassword.currentMobileNumber}
+                  </p>
+                )}
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter new password (min 6 characters)"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  minLength={6}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty if you only want to change mobile number
+                </p>
+              </div>
+
+              {passwordData.newPassword && (
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Confirm new password"
+                    value={passwordData.confirmPassword}
+                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    minLength={6}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-blue-600"
+                >
+                  Save Changes
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePasswordCancel}
+                  className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

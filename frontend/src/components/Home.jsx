@@ -213,14 +213,6 @@ const Home = () => {
             "description": "Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services.",
             "url": "https://bonebuddy.com",
             "logo": "https://bonebuddy.com/assets/BoneBuddy_Logo-modified.webp",
-            "address": {
-              "@type": "PostalAddress",
-              "streetAddress": "Your Street Address",
-              "addressLocality": "Your City",
-              "addressRegion": "Your State",
-              "postalCode": "Your Postal Code",
-              "addressCountry": "Your Country"
-            },
             "telephone": "+1-XXX-XXX-XXXX",
             "email": "info@bonebuddy.com",
             "sameAs": [

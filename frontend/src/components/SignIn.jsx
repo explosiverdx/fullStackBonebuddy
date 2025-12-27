@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; // Note: Link is not used, can be removed if not needed elsewhere.
 import { useAuth } from '../hooks/useAuth';
 import { sendAdminOtp, verifyAdminOtp } from '../api/auth.js';
+import apiClient from '../api/apiClient';
 
 const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
   const navigate = useNavigate();
@@ -77,24 +78,46 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
+    if (!phoneNumber || phoneNumber.length !== 10) {
+      alert('Please enter a valid 10-digit phone number');
+      return;
+    }
+    if (!password || password.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+    
     try {
-      const response = await fetch('/api/v1/users/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ mobile_number: `+91${phoneNumber}`, password }),
+      console.log('[LOGIN] Attempting login with:', { phoneNumber, hasPassword: !!password });
+      const response = await apiClient.post('/users/login', {
+        mobile_number: `+91${phoneNumber}`,
+        password
       });
-      const data = await response.json();
-      if (response.ok) {
-        console.log('Logged in with password:', data);
-        login(data.data.user, data.data.accessToken, data.data.refreshToken);
+      
+      console.log('[LOGIN] Response received:', response.status, response.data);
+      
+      if (response.data && response.data.data) {
+        console.log('Logged in with password:', response.data);
+        login(response.data.data.user, response.data.data.accessToken, response.data.data.refreshToken);
         navigate('/login-success', { replace: true });
       } else {
-        alert(`Error: ${data.message}`);
+        alert(`Error: ${response.data?.message || 'Login failed'}`);
       }
     } catch (error) {
-      console.error('Failed to login with password:', error);
-      alert('Failed to login. Please try again.');
+      console.error('[LOGIN] Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.response?.data?.message || error.message,
+        url: error.config?.url,
+        fullError: error
+      });
+      
+      if (error.response?.status === 404) {
+        alert('Login endpoint not found. Please ensure the backend server is running on port 8000.');
+      } else {
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to login. Please try again.';
+        alert(`Error: ${errorMessage}`);
+      }
     }
   };
 

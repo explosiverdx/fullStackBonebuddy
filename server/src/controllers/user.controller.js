@@ -84,14 +84,13 @@ const registerWithPassword = asyncHandler(async (req, res) => {
     }
 
     const defaultUsername = `patient_${phoneDigits}`;
-    const defaultEmail = `${defaultUsername}@default.com`;
 
     const user = await User.create({
         mobile_number: normalizedPhone,
         password: password,
         userType: 'patient',
         username: defaultUsername,
-        email: defaultEmail,
+        email: null, // Don't auto-generate email
         Fullname: defaultUsername,
         gender: 'Other',
         dateOfBirth: new Date('2000-01-01'),
@@ -143,7 +142,6 @@ const sendOTP = asyncHandler(async (req, res) => {
     const normalizedPhone = `+91${phoneDigits}`;
 
     const defaultUsername = `patient_${phoneDigits}`;
-    const defaultEmail = `${defaultUsername}@default.com`;
 
     const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false, lowerCaseAlphabets: false });
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
@@ -163,7 +161,7 @@ const sendOTP = asyncHandler(async (req, res) => {
                 mobile_number: normalizedPhone,
                 userType: 'patient',
                 username: defaultUsername,
-                email: defaultEmail,
+                email: null, // Don't auto-generate email
                 Fullname: defaultUsername,
                 gender: 'Other',
                 dateOfBirth: new Date('2000-01-01'),
@@ -176,7 +174,7 @@ const sendOTP = asyncHandler(async (req, res) => {
             await Patient.create({
                 userId: user._id,
                 name: user.Fullname,
-                email: user.email,
+                email: null, // Don't auto-generate email
                 mobileNumber: user.mobile_number,
                 gender: user.gender,
                 dateOfBirth: user.dateOfBirth,
@@ -314,6 +312,8 @@ const verifyOTP = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
     const { email, username, password, mobile_number } = req.body;
 
+    console.log('[LOGIN] Login attempt:', { email, username, mobile_number, hasPassword: !!password });
+
     if (!password) {
         throw new ApiError(400, "Password is required");
     }
@@ -324,14 +324,48 @@ const loginUser = asyncHandler(async (req, res) => {
     const findQuery = [];
     if (username) findQuery.push({ username });
     if (email) findQuery.push({ email });
-    if (mobile_number) findQuery.push({ mobile_number });
+    if (mobile_number) {
+        // Normalize mobile number to handle all possible formats
+        const phoneDigits = mobile_number.replace(/[^0-9]/g, '').slice(-10);
+        const normalizedPhone = `+91${phoneDigits}`;
+        // Search for both formats - also try without leading 0 if present
+        const phoneWithoutLeadingZero = phoneDigits.startsWith('0') ? phoneDigits.slice(1) : phoneDigits;
+        
+        // Build comprehensive search query
+        const mobileSearchQueries = [
+            phoneDigits,
+            normalizedPhone,
+            phoneWithoutLeadingZero,
+            `+91${phoneWithoutLeadingZero}`,
+            mobile_number.trim(), // Original format
+            mobile_number.replace(/\s+/g, ''), // Without spaces
+            mobile_number.replace(/[^0-9+]/g, ''), // Only digits and +
+        ];
+        
+        // Remove duplicates and add to findQuery
+        const uniqueQueries = [...new Set(mobileSearchQueries.filter(q => q && q.length >= 10))];
+        uniqueQueries.forEach(query => {
+            findQuery.push({ mobile_number: query });
+        });
+        
+        // Also try regex search for partial matches (last 10 digits)
+        if (phoneDigits && phoneDigits.length === 10) {
+            findQuery.push({
+                mobile_number: { $regex: phoneDigits + '$', $options: 'i' }
+            });
+        }
+        
+        console.log('[LOGIN] Searching for mobile_number with formats:', uniqueQueries);
+    }
 
     const user = await User.findOne({
         $or: findQuery
     });
 
+    console.log('[LOGIN] User found:', user ? { id: user._id, name: user.Fullname, mobile: user.mobile_number, hasPassword: !!user.password } : 'NOT FOUND');
+
     if (!user) {
-        throw new ApiError(404, "User does not exist");
+        throw new ApiError(401, "Invalid credentials"); // Changed from 404 to 401 for security
     }
 
     const isPasswordValid = await user.isPasswordCorrect(password);
@@ -486,6 +520,22 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         try {
             const patient = await Patient.findOne({ userId: userObj._id });
             if (patient) {
+                // Merge Patient document fields into userObj for profile display
+                // Prioritize Patient document data over User data for medical information
+                userObj.surgeryType = patient.surgeryType || userObj.surgeryType || null;
+                userObj.surgeryDate = patient.surgeryDate || userObj.surgeryDate || null;
+                userObj.assignedDoctor = patient.assignedDoctor || userObj.assignedDoctor || null;
+                userObj.assignedPhysiotherapist = patient.assignedPhysiotherapist || userObj.assignedPhysio || null;
+                userObj.assignedPhysio = patient.assignedPhysiotherapist || userObj.assignedPhysio || null; // Also set assignedPhysio for compatibility
+                userObj.currentCondition = patient.currentCondition || null;
+                userObj.hospitalName = patient.hospitalClinic || userObj.hospitalName || null; // Map hospitalClinic to hospitalName for frontend
+                userObj.hospitalClinic = patient.hospitalClinic || userObj.hospitalClinic || null; // Also keep original field name
+                userObj.medicalHistory = patient.medicalHistory || null;
+                userObj.allergies = patient.allergies || null;
+                userObj.bloodGroup = patient.bloodGroup || null;
+                userObj.medicalInsurance = patient.medicalInsurance || null;
+                userObj.emergencyContactNumber = patient.emergencyContactNumber || null;
+                
                 // Populate doctor and physio details for each session
                 const sessions = await Session.find({ patientId: patient._id })
                     .populate('doctorId', 'name')

@@ -26,7 +26,9 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -109,18 +111,27 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
   };
 
   const handleEdit = (doctor) => {
-    // Check if doctor has a valid doctorId
-    const doctorId = doctor.doctorId || doctor._id;
+    // Always use _id as the primary identifier to avoid confusion with doctorId/userId
+    const doctorId = doctor._id;
     
     if (!doctorId || doctorId === 'N/A' || doctorId === 'undefined') {
       alert('Error: This doctor does not have a valid profile. Cannot edit.');
       return;
     }
 
-    console.log('Editing doctor:', doctor);
-    console.log('Doctor ID:', doctorId);
+    console.log('Editing doctor:', {
+      name: doctor.name,
+      _id: doctor._id,
+      doctorId: doctor.doctorId,
+      userId: doctor.userId
+    });
+    console.log('Using Doctor ID (_id) for update:', doctorId);
     
-    setSelectedDoctor(doctor);
+    // Store the doctor object with the correct _id
+    setSelectedDoctor({
+      ...doctor,
+      _id: doctorId // Ensure _id is set correctly
+    });
     setEditFormData({
       name: doctor.name || '',
       email: doctor.email || '',
@@ -150,15 +161,19 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
         payload.experience = parseInt(payload.experience, 10);
       }
 
-      // Use doctorId if available, otherwise fall back to _id
-      const doctorId = selectedDoctor.doctorId || selectedDoctor._id;
+      // Always use _id as the primary identifier to ensure we update the correct doctor
+      const doctorId = selectedDoctor._id;
       
-      console.log('Updating doctor with ID:', doctorId, 'Selected doctor:', selectedDoctor);
-      
-      if (!doctorId || doctorId === 'N/A') {
+      if (!doctorId || doctorId === 'N/A' || doctorId === 'undefined' || doctorId === 'null') {
         alert('Error: Doctor ID not found. Please refresh the page and try again.');
         return;
       }
+
+      console.log('Updating doctor:', {
+        doctorId: doctorId,
+        doctorName: selectedDoctor.name,
+        updateData: payload
+      });
 
       const response = await apiClient.patch(`/admin/doctors/${doctorId}`, payload);
       
@@ -193,6 +208,63 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
       experience: '',
       hospitalAffiliation: ''
     });
+  };
+
+  const handleChangePassword = (doctor) => {
+    // Get userId from doctor object - it might be in userId field or need to be fetched
+    const userId = doctor.userId || doctor.user?._id;
+    
+    if (!userId) {
+      alert('Error: User ID not found for this doctor. Cannot change password.');
+      return;
+    }
+
+    setSelectedDoctor({ ...doctor, userId });
+    setPasswordData({ newPassword: '', confirmPassword: '' });
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!passwordData.newPassword || passwordData.newPassword.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    const userId = selectedDoctor.userId || selectedDoctor.user?._id;
+    if (!userId) {
+      alert('Error: User ID not found. Cannot change password.');
+      return;
+    }
+
+    try {
+      const response = await apiClient.patch(`/admin/users/${userId}/change-password`, {
+        newPassword: passwordData.newPassword
+      });
+
+      alert('Password changed successfully!');
+      setShowPasswordModal(false);
+      setSelectedDoctor(null);
+      setPasswordData({ newPassword: '', confirmPassword: '' });
+      setError('');
+    } catch (err) {
+      console.error('Error changing password:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to change password';
+      alert(`Error: ${errorMessage}`);
+      setError(errorMessage);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false);
+    setSelectedDoctor(null);
+    setPasswordData({ newPassword: '', confirmPassword: '' });
   };
 
   const handleDelete = async (doctorId) => {
@@ -439,13 +511,23 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
                         onClick={() => handleEdit(doctor)}
                         className="text-yellow-600 hover:text-yellow-900"
                         style={{ display: isSectionReadOnly(user, 'doctors') ? 'none' : 'inline-block' }}
+                        title="Edit Doctor"
                       >
                         ✏️
                       </button>
                       <button
-                        onClick={() => handleDelete(doctor.doctorId || doctor._id)}
+                        onClick={() => handleChangePassword(doctor)}
+                        className="text-blue-600 hover:text-blue-900"
+                        style={{ display: isSectionReadOnly(user, 'doctors') ? 'none' : 'inline-block' }}
+                        title="Change Password"
+                      >
+                        🔑
+                      </button>
+                      <button
+                        onClick={() => handleDelete(doctor._id)}
                         className="text-red-600 hover:text-red-900"
                         style={{ display: isSectionReadOnly(user, 'doctors') ? 'none' : 'inline-block' }}
+                        title="Delete Doctor"
                       >
                         🗑️
                       </button>
@@ -727,6 +809,64 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
                 <button
                   type="button"
                   onClick={handleEditCancel}
+                  className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {showPasswordModal && selectedDoctor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">Change Password</h3>
+            <p className="text-sm text-gray-600 mb-4">Change password for: <strong>{selectedDoctor.name}</strong></p>
+            
+            <form onSubmit={handlePasswordSubmit}>
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter new password (min 6 characters)"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4 mt-4">
+                <button
+                  type="submit"
+                  className="bg-blue-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-blue-600"
+                >
+                  Change Password
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePasswordCancel}
                   className="bg-gray-500 text-white px-4 py-2 rounded w-full sm:w-auto hover:bg-gray-600"
                 >
                   Cancel

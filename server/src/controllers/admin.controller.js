@@ -440,7 +440,8 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
             medicalHistory,
             allergies,
             bloodGroup,
-            medicalInsurance
+            medicalInsurance,
+            password // Optional password for new patient account
         } = req.body;
 
         console.log('createPatientAdmin received data:', { name, email, dateOfBirth, age, gender, mobileNumber, surgeryType, surgeryDate, currentCondition, emergencyContactNumber, userId });
@@ -458,8 +459,24 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
         let resolvedUserId = userId && userId !== 'undefined' && userId !== 'null' && userId !== '' ? userId : null;
 
         if (!resolvedUserId) {
+            // Normalize mobile number for consistent storage and lookup
+            const normalizeMobileNumber = (phone) => {
+                if (!phone) return null;
+                // Remove all non-digit characters and get last 10 digits
+                const digits = phone.replace(/[^0-9]/g, '').slice(-10);
+                return digits; // Store without +91 prefix for consistency
+            };
+            const normalizedMobileNumber = normalizeMobileNumber(mobileNumber);
+            
             // Allow admins to create a new patient along with a lightweight user account
-            let existingUser = await User.findOne({ mobile_number: mobileNumber });
+            // Search for user with normalized mobile number (try both formats)
+            let existingUser = await User.findOne({
+                $or: [
+                    { mobile_number: normalizedMobileNumber },
+                    { mobile_number: `+91${normalizedMobileNumber}` },
+                    { mobile_number: mobileNumber } // Also try original format for backward compatibility
+                ]
+            });
 
             if (existingUser) {
                 const patientExists = await Patient.findOne({ userId: existingUser._id });
@@ -469,7 +486,7 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
 
                 existingUser.userType = 'patient';
                 existingUser.Fullname = name;
-                existingUser.email = email || existingUser.email;
+                existingUser.email = (email && email.trim() !== '') ? email : (existingUser.email || null);
                 existingUser.gender = gender || existingUser.gender;
                 existingUser.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : existingUser.dateOfBirth;
                 existingUser.age = ageNum || existingUser.age;
@@ -479,20 +496,27 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
 
                 resolvedUserId = existingUser._id;
             } else {
-                const usernameBase = email ? email.split('@')[0] : `patient_${mobileNumber}`;
-                const newUser = await User.create({
+                const usernameBase = email ? email.split('@')[0] : `patient_${normalizedMobileNumber}`;
+                const userData = {
                     Fullname: name,
-                    email: email || `${usernameBase}@autogen.bonebuddy`,
+                    email: email && email.trim() !== '' ? email : null, // Don't auto-generate email
                     username: usernameBase.toLowerCase(),
                     userType: 'patient',
-                    mobile_number: mobileNumber,
+                    mobile_number: normalizedMobileNumber, // Store normalized (without +91) for consistency
                     gender,
                     dateOfBirth: new Date(dateOfBirth),
                     age: ageNum,
                     address,
                     hospitalName: hospitalClinic || 'Not Specified', // Required for patient userType
                     profileCompleted: false
-                });
+                };
+                
+                // Add password if provided (will be hashed by pre-save hook)
+                if (password && password.trim() !== '' && password.length >= 6) {
+                    userData.password = password;
+                }
+                
+                const newUser = await User.create(userData);
 
                 resolvedUserId = newUser._id;
             }
@@ -504,18 +528,26 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
             }
         }
 
+        // Normalize mobile numbers for consistent storage
+        const normalizeMobileNumber = (phone) => {
+            if (!phone) return null;
+            return phone.replace(/[^0-9]/g, '').slice(-10);
+        };
+        const normalizedMobileNumber = normalizeMobileNumber(mobileNumber);
+        const normalizedEmergencyContact = normalizeMobileNumber(emergencyContactNumber);
+        
         const patientData = {
             userId: resolvedUserId,
             name,
             email: email || undefined,
             dateOfBirth: new Date(dateOfBirth),
             gender,
-            mobileNumber,
+            mobileNumber: normalizedMobileNumber, // Store normalized format
             surgeryType,
             surgeryDate: new Date(surgeryDate),
             assignedDoctor: assignedDoctor || undefined,
             hospitalClinic: hospitalClinic || undefined,
-            emergencyContactNumber,
+            emergencyContactNumber: normalizedEmergencyContact || emergencyContactNumber,
             age: ageNum,
             address: address || undefined,
             currentCondition,
@@ -563,7 +595,8 @@ const updatePatientAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(400, `Missing required fields: ${missingFields.join(', ')}`);
     }
 
-    const patient = await Patient.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+    const patient = await Patient.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
+        .populate('userId', 'Fullname mobile_number email');
 
     if (!patient) {
         console.log(`Patient not found for ID: ${id}`);
@@ -571,6 +604,37 @@ const updatePatientAdmin = asyncHandler(async (req, res) => {
     }
 
     console.log(`Patient updated successfully for ID: ${id}`);
+
+    // If mobileNumber was updated, also update the User model to keep them in sync
+    // Patient document is the source of truth, so update User to match Patient
+    if (updateData.mobileNumber && patient.userId) {
+        try {
+            await User.findByIdAndUpdate(
+                patient.userId._id || patient.userId,
+                { mobile_number: updateData.mobileNumber },
+                { new: true }
+            );
+            console.log(`Updated User mobile_number to match Patient mobileNumber for userId: ${patient.userId._id || patient.userId}`);
+        } catch (userUpdateError) {
+            console.error(`Error updating User mobile_number:`, userUpdateError);
+            // Don't fail the request if User update fails, Patient update is more important
+        }
+    }
+
+    // If email was updated, also update the User model to keep them in sync
+    if (updateData.email !== undefined && patient.userId) {
+        try {
+            await User.findByIdAndUpdate(
+                patient.userId._id || patient.userId,
+                { email: updateData.email || null },
+                { new: true }
+            );
+            console.log(`Updated User email to match Patient email for userId: ${patient.userId._id || patient.userId}`);
+        } catch (userUpdateError) {
+            console.error(`Error updating User email:`, userUpdateError);
+            // Don't fail the request if User update fails, Patient update is more important
+        }
+    }
 
     // Format dates to yyyy-MM-dd for frontend compatibility
     const formattedPatient = {
@@ -752,13 +816,38 @@ const exportAllUsersAdmin = asyncHandler(async (req, res) => {
 });
 
 const getUsersWithoutPatients = asyncHandler(async (req, res) => {
-    const users = await User.find({ userType: 'patient' }).select('_id Fullname username email mobile_number');
+    const users = await User.find({ 
+        userType: 'patient',
+        markedAsAdded: { $ne: true } // Exclude users marked as added
+    }).select('_id Fullname username email mobile_number');
 
     const usersWithPatients = await Patient.find().distinct('userId');
 
     const availableUsers = users.filter(user => !usersWithPatients.includes(user._id));
 
     return res.status(200).json(new ApiResponse(200, availableUsers, "Available users retrieved successfully."));
+});
+
+const markUserAsAdded = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId || userId === 'undefined' || userId === 'null') {
+        throw new ApiError(400, "User ID is required");
+    }
+
+    const user = await User.findByIdAndUpdate(
+        userId,
+        { markedAsAdded: true },
+        { new: true }
+    );
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    console.log(`User ${user.Fullname || user.username} (${userId}) marked as added`);
+
+    return res.status(200).json(new ApiResponse(200, user, "User marked as added successfully"));
 });
 
 const universalSearch = asyncHandler(async (req, res) => {
@@ -2026,16 +2115,25 @@ const updateDoctorAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid doctor ID");
     }
 
-    // Try to find doctor by ID
+    // Try to find doctor by ID - use only _id to avoid confusion
     let existingDoctor = await Doctor.findById(id);
     
-    // If not found, try to find by userId (in case id is actually a userId)
-    if (!existingDoctor) {
-        console.log('Doctor not found by ID, trying to find by userId...');
-        existingDoctor = await Doctor.findOne({ userId: id });
+    // Log for debugging
+    console.log('Looking for doctor with ID:', id);
+    console.log('Doctor found by _id:', existingDoctor ? { _id: existingDoctor._id.toString(), name: existingDoctor.name } : 'Not found');
+    
+    // Only try userId lookup if ID format suggests it might be a userId (optional fallback)
+    // But log a warning as this could cause issues
+    if (!existingDoctor && id.length === 24) { // MongoDB ObjectId format
+        console.log('⚠️ WARNING: Doctor not found by _id, trying userId fallback (this may cause incorrect updates)...');
+        const fallbackDoctor = await Doctor.findOne({ userId: id });
+        if (fallbackDoctor) {
+            console.log('⚠️ Found doctor by userId:', { _id: fallbackDoctor._id.toString(), name: fallbackDoctor.name, userId: fallbackDoctor.userId });
+            existingDoctor = fallbackDoctor;
+        }
     }
 
-    console.log('Existing doctor found:', existingDoctor ? existingDoctor._id : 'Not found');
+    console.log('Final doctor to update:', existingDoctor ? { _id: existingDoctor._id.toString(), name: existingDoctor.name } : 'Not found');
 
     if (!existingDoctor) {
         // List all doctor IDs for debugging
@@ -2717,4 +2815,73 @@ const getPatientPaymentCredits = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, payments, "Patient payment credits retrieved successfully"));
 });
 
-export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits };
+const changeUserPasswordAdmin = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const { newPassword, newMobileNumber } = req.body;
+
+    if (!userId || userId === 'undefined' || userId === 'null') {
+        throw new ApiError(400, "User ID is required");
+    }
+
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    const changes = [];
+
+    // Update password if provided
+    if (newPassword) {
+        if (newPassword.length < 6) {
+            throw new ApiError(400, "Password must be at least 6 characters long");
+        }
+        user.password = newPassword; // Mongoose pre-save hook will hash this
+        changes.push('password');
+    }
+
+    // Update mobile number if provided
+    if (newMobileNumber) {
+        // Normalize mobile number (last 10 digits)
+        const normalizedMobile = newMobileNumber.replace(/[^0-9]/g, '').slice(-10);
+        if (normalizedMobile.length !== 10) {
+            throw new ApiError(400, "Mobile number must be 10 digits");
+        }
+        
+        // Check if another user already has this mobile number
+        const existingUser = await User.findOne({ 
+            mobile_number: normalizedMobile,
+            _id: { $ne: userId }
+        });
+        if (existingUser) {
+            throw new ApiError(409, "Another user already has this mobile number");
+        }
+        
+        user.mobile_number = normalizedMobile;
+        changes.push('mobile number');
+        
+        // Also update Patient document if it exists
+        const patient = await Patient.findOne({ userId: userId });
+        if (patient) {
+            patient.mobileNumber = normalizedMobile;
+            await patient.save({ validateBeforeSave: false });
+            console.log(`Updated Patient mobileNumber to ${normalizedMobile} for userId: ${userId}`);
+        }
+    }
+
+    // Check if at least one field is being updated
+    if (changes.length === 0) {
+        throw new ApiError(400, "Please provide either a new password or a new mobile number");
+    }
+
+    await user.save({ validateBeforeSave: true });
+
+    console.log(`Admin changed ${changes.join(' and ')} for user: ${user.Fullname || user.username} (${userId})`);
+
+    return res.status(200).json(new ApiResponse(200, {
+        updatedFields: changes,
+        mobileNumber: newMobileNumber ? newMobileNumber.replace(/[^0-9]/g, '').slice(-10) : undefined
+    }, `${changes.join(' and ')} changed successfully`));
+});
+
+export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin };
