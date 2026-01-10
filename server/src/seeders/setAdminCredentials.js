@@ -42,7 +42,7 @@ async function setAdminCredentials() {
       
       // Set default values if missing
       if (!adminUser.Fullname) adminUser.Fullname = 'Admin';
-      if (!adminUser.email) adminUser.email = 'info@bonebuddy.org';
+      if (!adminUser.email) adminUser.email = 'admin@bonebuddy.in';
       if (!adminUser.mobile_number) adminUser.mobile_number = '9999999999';
       
       // Update password - mark as modified to trigger pre-save hook
@@ -61,7 +61,7 @@ async function setAdminCredentials() {
         password: password, // Will be hashed by pre-save hook
         userType: 'admin',
         Fullname: 'Admin',
-        email: 'info@bonebuddy.org',
+        email: 'admin@bonebuddy.in',
         mobile_number: '9999999999',
         gender: 'Other',
         dateOfBirth: new Date('1990-01-01'),
