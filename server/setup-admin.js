@@ -32,7 +32,7 @@ async function setupAdmin() {
       admin.password = password;
       admin.userType = 'admin';
       if (!admin.Fullname) admin.Fullname = 'Admin';
-      if (!admin.email) admin.email = 'admin@bonebuddy.cloud';
+      if (!admin.email) admin.email = 'info@bonebuddy.org';
       if (!admin.mobile_number) admin.mobile_number = '9999999999';
       
       await admin.save();
@@ -44,7 +44,7 @@ async function setupAdmin() {
         password: password,
         userType: 'admin',
         Fullname: 'Admin',
-        email: 'admin@bonebuddy.cloud',
+        email: 'info@bonebuddy.org',
         mobile_number: '9999999999',
         gender: 'Other',
         dateOfBirth: new Date('1990-01-01'),

@@ -33,7 +33,7 @@ async function verifyAdmin() {
         password: 'BoneBuddy@96PhysioX&',
         userType: 'admin',
         Fullname: 'Admin',
-        email: 'admin@bonebuddy.cloud',
+        email: 'info@bonebuddy.org',
         mobile_number: '9999999999',
         gender: 'Other',
         dateOfBirth: new Date('1990-01-01'),
@@ -64,7 +64,7 @@ async function verifyAdmin() {
         existingUser.password = 'BoneBuddy@96PhysioX&';
         existingUser.userType = 'admin';
         if (!existingUser.Fullname) existingUser.Fullname = 'Admin';
-        if (!existingUser.email) existingUser.email = 'admin@bonebuddy.cloud';
+        if (!existingUser.email) existingUser.email = 'info@bonebuddy.org';
         await existingUser.save();
         console.log('✅ Admin credentials updated!');
         console.log('   Username: admin');

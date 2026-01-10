@@ -11,7 +11,7 @@ async function seedNewAdmin() {
       mobile_number: '9648832796',
       userType: 'admin',
       username: 'admin_9648832796',
-      email: 'admin9648832796@bonebuddy.cloud',
+      email: 'info@bonebuddy.org',
       Fullname: 'Admin 9648832796',
       gender: 'Other',
       dateOfBirth: new Date('1990-01-01'),

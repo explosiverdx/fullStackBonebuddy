@@ -12,7 +12,7 @@ async function seedPhysio() {
     const physioUser = await User.create({
       mobile_number: '+919876543211',
       userType: 'physio',
-      email: 'physio@bonebuddy.cloud',
+      email: 'info@bonebuddy.org',
       Fullname: 'Jane Smith',
       gender: 'Female',
       dateOfBirth: new Date('1985-05-15'),

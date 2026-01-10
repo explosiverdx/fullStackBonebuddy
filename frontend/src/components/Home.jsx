@@ -214,7 +214,7 @@ const Home = () => {
             "url": "https://bonebuddy.cloud",
             "logo": "https://bonebuddy.cloud/assets/BoneBuddy_Logo-modified.webp",
             "telephone": "+1-XXX-XXX-XXXX",
-            "email": "info@bonebuddy.cloud",
+            "email": "info@bonebuddy.org",
             "sameAs": [
               "https://www.facebook.com/bonebuddy",
               "https://www.instagram.com/bonebuddy",
