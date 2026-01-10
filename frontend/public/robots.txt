@@ -1,4 +1,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://bonebuddy.com/sitemap.xml
+Sitemap: https://bonebuddy.cloud/sitemap.xml
