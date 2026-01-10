@@ -578,6 +578,48 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         }
     }
 
+    // If the user is a doctor, attach doctor profile data
+    if (userObj && userObj.userType === 'doctor') {
+        try {
+            const doctor = await Doctor.findOne({ userId: userObj._id });
+            if (doctor) {
+                // Merge Doctor document fields into userObj
+                userObj.qualification = doctor.qualification || null;
+                userObj.specialization = doctor.specialization || null;
+                userObj.experience = doctor.experience || null;
+                userObj.registrationNumber = doctor.registrationNumber || null;
+                userObj.hospitalAffiliation = doctor.hospitalAffiliation || null;
+                userObj.availableDays = doctor.availableDays || [];
+                userObj.availableTimeSlots = doctor.availableTimeSlots || null;
+                userObj.consultationFee = doctor.consultationFee || null;
+                userObj.bio = doctor.bio || null;
+            }
+        } catch (err) {
+            console.error('Error fetching doctor profile:', err.message || err);
+        }
+    }
+
+    // If the user is a physiotherapist, attach physio profile data
+    if (userObj && (userObj.userType === 'physiotherapist' || userObj.userType === 'physio')) {
+        try {
+            const physio = await Physio.findOne({ userId: userObj._id });
+            if (physio) {
+                // Merge Physio document fields into userObj
+                userObj.qualification = physio.qualification || null;
+                userObj.specialization = physio.specialization || null;
+                userObj.experience = physio.experience || null;
+                userObj.registrationNumber = physio.registrationNumber || null;
+                userObj.clinicAffiliation = physio.clinicAffiliation || null;
+                userObj.availableDays = physio.availableDays || [];
+                userObj.availableTimeSlots = physio.availableTimeSlots || null;
+                userObj.consultationFee = physio.consultationFee || null;
+                userObj.bio = physio.bio || null;
+            }
+        } catch (err) {
+            console.error('Error fetching physio profile:', err.message || err);
+        }
+    }
+
     return res
         .status(200)
         .json(new ApiResponse(

@@ -1,4 +1,5 @@
 *.md
 *.txt
+*.sh
 .gitignore
 mobile_app

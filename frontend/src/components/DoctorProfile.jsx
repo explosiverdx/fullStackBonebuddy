@@ -1123,15 +1123,31 @@ const DoctorProfile = () => {
                                   )}
                                 </div>
                                 <div className="text-left sm:text-right">
-                                  <span className={`inline-block px-2 sm:px-3 py-1 text-xs rounded-full ${
-                                    session.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    session.status === 'missed' ? 'bg-orange-100 text-orange-800' :
-                                    'bg-blue-100 text-blue-800'
-                                  }`}>
-                                    {session.status === 'completed' ? '✅ Completed' : 
-                                     session.status === 'missed' ? '⚠️ Missed' :
-                                     'Ongoing'}
-                                  </span>
+                                  {(() => {
+                                    // Determine status for past sessions
+                                    const sessionDate = new Date(session.sessionDate);
+                                    const sessionEnd = new Date(sessionDate.getTime() + (session.durationMinutes || 60) * 60000);
+                                    const now = new Date();
+                                    const isPastSession = now > sessionEnd;
+                                    
+                                    // If it's a past session and not completed, and physiotherapist didn't start it, it's missed
+                                    let displayStatus = session.status;
+                                    if (isPastSession && session.status !== 'completed' && session.status !== 'cancelled' && !session.startTime) {
+                                      displayStatus = 'missed';
+                                    }
+                                    
+                                    return (
+                                      <span className={`inline-block px-2 sm:px-3 py-1 text-xs rounded-full ${
+                                        displayStatus === 'completed' ? 'bg-green-100 text-green-800' :
+                                        displayStatus === 'missed' ? 'bg-orange-100 text-orange-800' :
+                                        'bg-blue-100 text-blue-800'
+                                      }`}>
+                                        {displayStatus === 'completed' ? '✅ Completed' : 
+                                         displayStatus === 'missed' ? '⚠️ Missed' :
+                                         'Ongoing'}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
 

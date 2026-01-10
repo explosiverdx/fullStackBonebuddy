@@ -8,6 +8,47 @@ import { Referral } from "../models/referral.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import mongoose from "mongoose";
 
+/**
+ * Helper function to check and update missed sessions
+ * A session is missed if:
+ * - sessionDate has passed (sessionEnd time has passed)
+ * - startTime is not set (physiotherapist didn't start it)
+ * - status is not 'completed', 'cancelled', or already 'missed'
+ */
+const updateMissedSessions = async (sessions) => {
+    const now = new Date();
+    const updates = [];
+
+    for (const session of sessions) {
+        // Check if session should be marked as missed
+        if (!session.startTime && 
+            session.status !== 'completed' && 
+            session.status !== 'cancelled' && 
+            session.status !== 'missed') {
+            
+            const sessionDate = new Date(session.sessionDate);
+            const sessionEnd = new Date(sessionDate.getTime() + (session.durationMinutes || 60) * 60000);
+            
+            // If session time has passed and physiotherapist didn't start it, mark as missed
+            if (now > sessionEnd) {
+                try {
+                    await Session.findByIdAndUpdate(session._id, { status: 'missed' });
+                    session.status = 'missed';
+                    updates.push(session._id);
+                } catch (error) {
+                    console.error(`Error updating session ${session._id} to missed:`, error);
+                }
+            }
+        }
+    }
+
+    if (updates.length > 0) {
+        console.log(`Marked ${updates.length} sessions as missed`);
+    }
+
+    return sessions;
+};
+
 const createDoctorProfile = asyncHandler(async (req, res) => {
     const { name, qualification, specialization, experience } = req.body;
     const userId = req.user._id;
@@ -491,7 +532,10 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
     sessionsForVirtualByUserId.forEach(s => {
         allSessionsMap.set(s._id.toString(), s);
     });
-    const uniqueSessions = Array.from(allSessionsMap.values());
+    let uniqueSessions = Array.from(allSessionsMap.values());
+    
+    // Update missed sessions before returning
+    uniqueSessions = await updateMissedSessions(uniqueSessions);
     
     console.log(`[DEBUG] Total unique sessions: ${uniqueSessions.length}`);
     
