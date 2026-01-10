@@ -12,7 +12,7 @@ async function seedDoctor() {
     const doctorUser = await User.create({
       mobile_number: '+919876543210',
       userType: 'doctor',
-      email: 'doctor@bonebuddy.com',
+      email: 'doctor@bonebuddy.cloud',
       Fullname: 'Dr. John Doe',
       gender: 'Male',
       dateOfBirth: new Date('1980-01-01'),

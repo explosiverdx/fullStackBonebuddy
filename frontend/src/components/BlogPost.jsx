@@ -196,7 +196,7 @@ const BlogPost = () => {
       <Helmet>
         <title>{blog.metaTitle || blog.title} - BoneBuddy</title>
         <meta name="description" content={blog.metaDescription || blog.excerpt} />
-        <link rel="canonical" href={`https://bonebuddy.com/blog/${blog.slug}`} />
+        <link rel="canonical" href={`https://bonebuddy.cloud/blog/${blog.slug}`} />
       </Helmet>
 
       <main className="main-content py-12 pt-24 px-4 sm:px-6 lg:px-8">

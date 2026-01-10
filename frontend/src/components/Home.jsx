@@ -211,10 +211,10 @@ const Home = () => {
             "@type": "MedicalBusiness",
             "name": "BoneBuddy",
             "description": "Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services.",
-            "url": "https://bonebuddy.com",
-            "logo": "https://bonebuddy.com/assets/BoneBuddy_Logo-modified.webp",
+            "url": "https://bonebuddy.cloud",
+            "logo": "https://bonebuddy.cloud/assets/BoneBuddy_Logo-modified.webp",
             "telephone": "+1-XXX-XXX-XXXX",
-            "email": "info@bonebuddy.com",
+            "email": "info@bonebuddy.cloud",
             "sameAs": [
               "https://www.facebook.com/bonebuddy",
               "https://www.instagram.com/bonebuddy",

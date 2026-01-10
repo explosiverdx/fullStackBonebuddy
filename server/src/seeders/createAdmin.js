@@ -27,7 +27,7 @@ async function createAdmin() {
       admin.password = password;
       admin.userType = 'admin';
       if (!admin.Fullname) admin.Fullname = 'Admin';
-      if (!admin.email) admin.email = 'admin@bonebuddy.com';
+      if (!admin.email) admin.email = 'admin@bonebuddy.cloud';
       if (!admin.mobile_number) admin.mobile_number = '9999999999';
       await admin.save();
       process.stdout.write('SUCCESS: Admin credentials updated!\n');
@@ -47,7 +47,7 @@ async function createAdmin() {
           password: password,
           userType: 'admin',
           Fullname: 'Admin',
-          email: 'admin@bonebuddy.com',
+          email: 'admin@bonebuddy.cloud',
           mobile_number: '9999999999',
           gender: 'Other',
           dateOfBirth: new Date('1990-01-01'),

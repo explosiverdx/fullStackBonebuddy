@@ -62,7 +62,7 @@ const seedRBAC = async () => {
       await User.create({
         Fullname: 'Default Admin',
         username: 'admin',
-        email: 'admin@bonebuddy.com',
+        email: 'admin@bonebuddy.cloud',
         mobile_number: adminPhoneNumber,
         userType: 'admin',
       });
