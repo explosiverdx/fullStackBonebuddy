@@ -155,34 +155,27 @@ const sendOTP = asyncHandler(async (req, res) => {
             await user.save({ validateBeforeSave: false });
         }
     } else {
-        // Create new user
+        // Create new user - keep name and email blank for user to fill in app
         try {
-            user = await User.create({
+            // Create user with blank name and email - user will fill in app
+            user = new User({
                 mobile_number: normalizedPhone,
                 userType: 'patient',
                 username: defaultUsername,
-                email: null, // Don't auto-generate email
-                Fullname: defaultUsername,
+                email: null, // Keep blank for user to fill
+                Fullname: '', // Keep blank for user to fill
                 gender: 'Other',
                 dateOfBirth: new Date('2000-01-01'),
                 age: 24,
-                address: 'Unknown',
-                hospitalName: 'Unknown'
+                address: '',
+                hospitalName: '',
+                profileCompleted: false // User needs to complete profile
             });
+            await user.save({ validateBeforeSave: false }); // Disable validation to allow empty Fullname
 
-            // Also create the corresponding Patient document
-            await Patient.create({
-                userId: user._id,
-                name: user.Fullname,
-                email: null, // Don't auto-generate email
-                mobileNumber: user.mobile_number,
-                gender: user.gender,
-                dateOfBirth: user.dateOfBirth,
-                age: user.age,
-                surgeryType: 'Other', // Default value
-                surgeryDate: new Date(), // Default value
-                currentCondition: 'Not specified' // Default value
-            });
+            // Don't create Patient document yet - user will complete profile later
+            // This prevents the "incomplete user" vs "complete patient" mismatch
+            // Patient document will be created when user completes their profile
         } catch (error) {
             console.error("Error creating new user:", error);
             throw new ApiError(500, "Failed to create new user");
