@@ -738,7 +738,9 @@ const setPassword = asyncHandler(async (req, res) => {
     }
 
     user.password = password;
-    await user.save({ validateBeforeSave: true }); // Use validation to trigger pre-save hook
+    // Use validateBeforeSave: false to allow empty Fullname (user hasn't completed profile yet)
+    // Pre-save hook will still run to hash the password
+    await user.save({ validateBeforeSave: false });
 
     return res.status(200).json(new ApiResponse(200, {}, "Password set successfully."));
 });
