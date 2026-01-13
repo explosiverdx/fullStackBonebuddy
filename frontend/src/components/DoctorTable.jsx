@@ -524,7 +524,7 @@ const DoctorTable = ({ selectedItem, user: userProp }) => {
                         🔑
                       </button>
                       <button
-                        onClick={() => handleDelete(doctor._id)}
+                        onClick={() => handleDelete(doctor.doctorId || doctor._id)}
                         className="text-red-600 hover:text-red-900"
                         style={{ display: isSectionReadOnly(user, 'doctors') ? 'none' : 'inline-block' }}
                         title="Delete Doctor"

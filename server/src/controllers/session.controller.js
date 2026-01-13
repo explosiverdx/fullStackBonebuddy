@@ -1,10 +1,15 @@
 import mongoose from 'mongoose';
 import fs from 'fs';
 import path from 'path';
+import axios from 'axios';
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { Session } from "../models/sessions.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+
+// In-memory storage for session OTPs
+// Format: { sessionId_type: { otp: string, expires: timestamp, phone: string } }
+const sessionOtpStore = new Map();
 
 /**
  * Helper function to check and update missed sessions
@@ -329,10 +334,152 @@ const deleteSessionAdmin = asyncHandler(async (req, res) => {
 });
 
 /**
- * Start a session - Physiotherapist clicks "Start" button
+ * Send OTP to patient for session start
+ */
+const sendSessionStartOtp = asyncHandler(async (req, res) => {
+    const { sessionId } = req.body;
+
+    if (!['physio', 'physiotherapist'].includes(req.user.userType)) {
+        throw new ApiError(403, "Only physiotherapists can send session OTP.");
+    }
+
+    if (!sessionId) {
+        throw new ApiError(400, "Session ID is required.");
+    }
+
+    const session = await Session.findById(sessionId).populate('patientId');
+    if (!session) {
+        throw new ApiError(404, "Session not found.");
+    }
+
+    // Verify this physiotherapist is assigned to this session
+    const { Physio } = await import('../models/physio.models.js');
+    const physio = await Physio.findOne({ userId: req.user._id });
+    
+    if (!physio || session.physioId.toString() !== physio._id.toString()) {
+        throw new ApiError(403, "You are not authorized to send OTP for this session.");
+    }
+
+    // Check if session can be started
+    if (session.status === 'completed') {
+        throw new ApiError(400, "This session has already been completed.");
+    }
+
+    if (session.status === 'in-progress') {
+        throw new ApiError(400, "This session is already in progress.");
+    }
+
+    // Get patient phone number
+    const patient = session.patientId;
+    if (!patient || !patient.mobileNumber) {
+        throw new ApiError(400, "Patient phone number not found.");
+    }
+
+    const phone = patient.mobileNumber;
+
+    // Generate 4-digit OTP
+    const otp = Math.floor(Math.random() * (9999 - 1111 + 1)) + 1111;
+    const otpKey = `${sessionId}_start`;
+
+    // Store OTP (expires in 10 minutes)
+    sessionOtpStore.set(otpKey, {
+        otp: otp.toString(),
+        expires: Date.now() + 10 * 60 * 1000,
+        phone: phone
+    });
+
+    // Send OTP via SMS
+    const API = process.env.SMS_API_KEY;
+    if (!API) {
+        throw new ApiError(500, "SMS service not configured");
+    }
+    const URL = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phone}&OTP=${otp}`;
+
+    try {
+        await axios.get(URL);
+        return res.status(200).json(
+            new ApiResponse(200, { message: "OTP sent successfully to patient" }, "OTP sent successfully.")
+        );
+    } catch (error) {
+        console.error("SMS Error:", error);
+        throw new ApiError(500, "Failed to send OTP");
+    }
+});
+
+/**
+ * Send OTP to patient for session end
+ */
+const sendSessionEndOtp = asyncHandler(async (req, res) => {
+    const { sessionId } = req.body;
+
+    if (!['physio', 'physiotherapist'].includes(req.user.userType)) {
+        throw new ApiError(403, "Only physiotherapists can send session OTP.");
+    }
+
+    if (!sessionId) {
+        throw new ApiError(400, "Session ID is required.");
+    }
+
+    const session = await Session.findById(sessionId).populate('patientId');
+    if (!session) {
+        throw new ApiError(404, "Session not found.");
+    }
+
+    // Verify this physiotherapist is assigned to this session
+    const { Physio } = await import('../models/physio.models.js');
+    const physio = await Physio.findOne({ userId: req.user._id });
+    
+    if (!physio || session.physioId.toString() !== physio._id.toString()) {
+        throw new ApiError(403, "You are not authorized to send OTP for this session.");
+    }
+
+    // Check if session is in progress
+    if (session.status !== 'in-progress') {
+        throw new ApiError(400, "Session must be in progress to end it.");
+    }
+
+    // Get patient phone number
+    const patient = session.patientId;
+    if (!patient || !patient.mobileNumber) {
+        throw new ApiError(400, "Patient phone number not found.");
+    }
+
+    const phone = patient.mobileNumber;
+
+    // Generate 4-digit OTP
+    const otp = Math.floor(Math.random() * (9999 - 1111 + 1)) + 1111;
+    const otpKey = `${sessionId}_end`;
+
+    // Store OTP (expires in 10 minutes)
+    sessionOtpStore.set(otpKey, {
+        otp: otp.toString(),
+        expires: Date.now() + 10 * 60 * 1000,
+        phone: phone
+    });
+
+    // Send OTP via SMS
+    const API = process.env.SMS_API_KEY;
+    if (!API) {
+        throw new ApiError(500, "SMS service not configured");
+    }
+    const URL = `https://sms.renflair.in/V1.php?API=${API}&PHONE=${phone}&OTP=${otp}`;
+
+    try {
+        await axios.get(URL);
+        return res.status(200).json(
+            new ApiResponse(200, { message: "OTP sent successfully to patient" }, "OTP sent successfully.")
+        );
+    } catch (error) {
+        console.error("SMS Error:", error);
+        throw new ApiError(500, "Failed to send OTP");
+    }
+});
+
+/**
+ * Start a session - Physiotherapist clicks "Start" button (requires OTP)
  */
 const startSession = asyncHandler(async (req, res) => {
-    const { sessionId } = req.body;
+    const { sessionId, otp } = req.body;
 
     if (!['physio', 'physiotherapist'].includes(req.user.userType)) {
         throw new ApiError(403, "Only physiotherapists can start sessions.");
@@ -340,6 +487,10 @@ const startSession = asyncHandler(async (req, res) => {
 
     if (!sessionId) {
         throw new ApiError(400, "Session ID is required.");
+    }
+
+    if (!otp) {
+        throw new ApiError(400, "OTP is required to start the session.");
     }
 
     const session = await Session.findById(sessionId);
@@ -364,6 +515,26 @@ const startSession = asyncHandler(async (req, res) => {
         throw new ApiError(400, "This session is already in progress.");
     }
 
+    // Verify OTP
+    const otpKey = `${sessionId}_start`;
+    const storedData = sessionOtpStore.get(otpKey);
+
+    if (!storedData) {
+        throw new ApiError(400, "OTP not found. Please request a new OTP.");
+    }
+
+    if (storedData.expires < Date.now()) {
+        sessionOtpStore.delete(otpKey);
+        throw new ApiError(400, "OTP expired. Please request a new OTP.");
+    }
+
+    if (storedData.otp !== otp.trim()) {
+        throw new ApiError(400, "Incorrect OTP. Please verify the OTP with the patient.");
+    }
+
+    // Clear OTP after successful verification
+    sessionOtpStore.delete(otpKey);
+
     // Update session
     session.status = 'in-progress';
     session.startTime = new Date();
@@ -375,10 +546,10 @@ const startSession = asyncHandler(async (req, res) => {
 });
 
 /**
- * End a session - Physiotherapist clicks "End" button
+ * End a session - Physiotherapist clicks "End" button (requires OTP)
  */
 const endSession = asyncHandler(async (req, res) => {
-    const { sessionId, notes } = req.body;
+    const { sessionId, notes, otp } = req.body;
 
     if (!['physio', 'physiotherapist'].includes(req.user.userType)) {
         throw new ApiError(403, "Only physiotherapists can end sessions.");
@@ -386,6 +557,10 @@ const endSession = asyncHandler(async (req, res) => {
 
     if (!sessionId) {
         throw new ApiError(400, "Session ID is required.");
+    }
+
+    if (!otp) {
+        throw new ApiError(400, "OTP is required to end the session.");
     }
 
     const session = await Session.findById(sessionId);
@@ -405,6 +580,26 @@ const endSession = asyncHandler(async (req, res) => {
     if (session.status !== 'in-progress') {
         throw new ApiError(400, "Session must be started before it can be ended.");
     }
+
+    // Verify OTP
+    const otpKey = `${sessionId}_end`;
+    const storedData = sessionOtpStore.get(otpKey);
+
+    if (!storedData) {
+        throw new ApiError(400, "OTP not found. Please request a new OTP.");
+    }
+
+    if (storedData.expires < Date.now()) {
+        sessionOtpStore.delete(otpKey);
+        throw new ApiError(400, "OTP expired. Please request a new OTP.");
+    }
+
+    if (storedData.otp !== otp.trim()) {
+        throw new ApiError(400, "Incorrect OTP. Please verify the OTP with the patient.");
+    }
+
+    // Clear OTP after successful verification
+    sessionOtpStore.delete(otpKey);
 
     // Calculate actual duration
     if (session.startTime) {
@@ -624,6 +819,8 @@ export {
     listSessionsAdmin, 
     updateSessionAdmin, 
     deleteSessionAdmin,
+    sendSessionStartOtp,
+    sendSessionEndOtp,
     startSession,
     endSession,
     uploadSessionVideo,

@@ -653,10 +653,9 @@ const PatientSignup = () => {
             <input
               type="text"
               name="registrationNumber"
-              placeholder="Registration Number / License ID"
+              placeholder="Registration Number / License ID (optional)"
               value={formData.registrationNumber}
               onChange={handleChange}
-              required
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
             <input
@@ -760,10 +759,9 @@ const PatientSignup = () => {
             <input
               type="text"
               name="physioRegistrationNumber"
-              placeholder="Registration / License Number"
+              placeholder="Registration / License Number (optional)"
               value={formData.physioRegistrationNumber}
               onChange={handleChange}
-              required
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
             <input

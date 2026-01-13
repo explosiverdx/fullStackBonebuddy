@@ -211,7 +211,7 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 flex justify-between items-center h-14 sm:h-16 md:h-20 gap-2 sm:gap-4">
         <div className="logo-section flex-shrink-0 min-w-0">
           <Link to="/" className="logo-link flex items-center gap-1 sm:gap-2 md:gap-3">
-            <div className="logo-circle w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 lg:w-12 lg:h-12 flex-shrink-0">
+            <div className="logo-circle w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 xl:w-20 xl:h-20 flex-shrink-0">
               <img src="/assets/bone buddy logo-1.png" alt="BoneBuddy logo" className="w-full h-full object-cover" />
             </div>
             <span className="logo-text text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl font-Roboto whitespace-nowrap">BONEBUDDY</span>

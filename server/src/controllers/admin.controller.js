@@ -2177,20 +2177,42 @@ const deleteDoctorAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Doctor ID is required");
     }
 
-    const doctor = await Doctor.findById(id);
+    // Try to find doctor by _id first (Doctor document ID)
+    let doctor = await Doctor.findById(id);
+    
+    // If not found, try to find by userId (User document ID)
+    if (!doctor) {
+        doctor = await Doctor.findOne({ userId: id });
+    }
 
     if (!doctor) {
         throw new ApiError(404, "Doctor not found");
     }
 
+    // Get the doctor document ID and userId
+    const doctorId = doctor._id;
+    const userId = doctor.userId;
+
     // Delete all sessions where this doctor was assigned
-    const sessionsResult = await Session.deleteMany({ doctorId: id });
+    const sessionsResult = await Session.deleteMany({ doctorId: doctorId });
     
     // Delete all progress reports by this doctor
-    const reportsResult = await ProgressReport.deleteMany({ doctorId: id });
+    const reportsResult = await ProgressReport.deleteMany({ doctorId: doctorId });
+
+    // Delete medical records by this doctor
+    const medicalRecordsResult = await MedicalRecord.deleteMany({ doctorId: doctorId });
 
     // Delete the doctor profile
-    await Doctor.findByIdAndDelete(id);
+    await Doctor.findByIdAndDelete(doctorId);
+
+    // If there's an associated user account, delete it as well
+    if (userId) {
+        // Delete notifications for this user
+        await Notification.deleteMany({ userId: userId });
+        
+        // Delete the user account
+        await User.findByIdAndDelete(userId);
+    }
 
     return res.status(200).json(
         new ApiResponse(
@@ -2198,9 +2220,11 @@ const deleteDoctorAdmin = asyncHandler(async (req, res) => {
             { 
                 deletedDoctor: doctor.name,
                 deletedSessions: sessionsResult.deletedCount || 0,
-                deletedReports: reportsResult.deletedCount || 0
+                deletedReports: reportsResult.deletedCount || 0,
+                deletedMedicalRecords: medicalRecordsResult.deletedCount || 0,
+                deletedUser: userId ? true : false
             }, 
-            "Doctor and associated data deleted successfully."
+            "Doctor profile, user account, and associated data deleted successfully."
         )
     );
 });
@@ -2400,6 +2424,9 @@ const deletePhysioAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(404, "Physiotherapist not found");
     }
 
+    // Get the userId before deleting the physio profile
+    const userId = physio.userId;
+
     // Delete all sessions where this physiotherapist was assigned
     const sessionsResult = await Session.deleteMany({ physioId: id });
     
@@ -2409,15 +2436,25 @@ const deletePhysioAdmin = asyncHandler(async (req, res) => {
     // Delete the physiotherapist profile
     await Physio.findByIdAndDelete(id);
 
+    // If there's an associated user account, delete it as well
+    if (userId) {
+        // Delete notifications for this user
+        await Notification.deleteMany({ userId: userId });
+        
+        // Delete the user account
+        await User.findByIdAndDelete(userId);
+    }
+
     return res.status(200).json(
         new ApiResponse(
             200, 
             { 
                 deletedPhysio: physio.name,
                 deletedSessions: sessionsResult.deletedCount || 0,
-                deletedReports: reportsResult.deletedCount || 0
+                deletedReports: reportsResult.deletedCount || 0,
+                deletedUser: userId ? true : false
             }, 
-            "Physiotherapist and associated data deleted successfully."
+            "Physiotherapist profile, user account, and associated data deleted successfully."
         )
     );
 });
@@ -2478,12 +2515,16 @@ const deleteUserAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(404, "User not found");
     }
 
-    // Find associated patient profile
+    // Find associated profiles based on user type
     const patient = await Patient.findOne({ userId: id });
+    const doctor = await Doctor.findOne({ userId: id });
+    const physio = await Physio.findOne({ userId: id });
 
     // Cascade delete all related data
     const deletionSummary = {
         patient: 0,
+        doctor: 0,
+        physio: 0,
         sessions: 0,
         payments: 0,
         medicalRecords: 0,
@@ -2493,6 +2534,7 @@ const deleteUserAdmin = asyncHandler(async (req, res) => {
         notifications: 0
     };
 
+    // Handle patient deletion
     if (patient) {
         // Delete sessions where user is a patient
         const sessionsResult = await Session.deleteMany({ patientId: patient._id });
@@ -2528,6 +2570,40 @@ const deleteUserAdmin = asyncHandler(async (req, res) => {
         deletionSummary.patient = 1;
     }
 
+    // Handle doctor deletion
+    if (doctor) {
+        // Delete sessions where this doctor was assigned
+        const doctorSessionsResult = await Session.deleteMany({ doctorId: doctor._id });
+        deletionSummary.sessions += doctorSessionsResult.deletedCount || 0;
+
+        // Delete progress reports by this doctor
+        const doctorReportsResult = await ProgressReport.deleteMany({ doctorId: doctor._id });
+        deletionSummary.progressReports += doctorReportsResult.deletedCount || 0;
+
+        // Delete medical records by this doctor
+        const doctorMedicalRecordsResult = await MedicalRecord.deleteMany({ doctorId: doctor._id });
+        deletionSummary.medicalRecords += doctorMedicalRecordsResult.deletedCount || 0;
+
+        // Delete doctor profile
+        await Doctor.findByIdAndDelete(doctor._id);
+        deletionSummary.doctor = 1;
+    }
+
+    // Handle physiotherapist deletion
+    if (physio) {
+        // Delete sessions where this physio was assigned
+        const physioSessionsResult = await Session.deleteMany({ physioId: physio._id });
+        deletionSummary.sessions += physioSessionsResult.deletedCount || 0;
+
+        // Delete progress reports by this physio
+        const physioReportsResult = await ProgressReport.deleteMany({ physioId: physio._id });
+        deletionSummary.progressReports += physioReportsResult.deletedCount || 0;
+
+        // Delete physio profile
+        await Physio.findByIdAndDelete(physio._id);
+        deletionSummary.physio = 1;
+    }
+
     // Delete notifications for this user
     const notificationsResult = await Notification.deleteMany({ userId: id });
     deletionSummary.notifications = notificationsResult.deletedCount || 0;
@@ -2540,6 +2616,7 @@ const deleteUserAdmin = asyncHandler(async (req, res) => {
             200, 
             { 
                 deletedUser: user.Fullname || user.mobile_number,
+                userType: user.userType,
                 deletionSummary 
             }, 
             "User account and all associated data deleted successfully."

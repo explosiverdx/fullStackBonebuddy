@@ -6,6 +6,8 @@ import {
     listSessionsAdmin,
     updateSessionAdmin,
     deleteSessionAdmin,
+    sendSessionStartOtp,
+    sendSessionEndOtp,
     startSession,
     endSession,
     uploadSessionVideo,
@@ -22,6 +24,10 @@ const router = Router();
 router.route("/").post(verifyJWT, createSession);
 router.route("/completed").get(verifyJWT, getCompletedSessions);
 router.route("/mine").get(verifyJWT, getMySessions);
+
+// Session OTP management for physiotherapists
+router.route("/send-start-otp").post(verifyJWT, sendSessionStartOtp);
+router.route("/send-end-otp").post(verifyJWT, sendSessionEndOtp);
 
 // Session management for physiotherapists
 router.route("/start").post(verifyJWT, startSession);
