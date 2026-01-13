@@ -154,6 +154,11 @@ const sendOTP = asyncHandler(async (req, res) => {
             user.mobile_number = normalizedPhone;
             await user.save({ validateBeforeSave: false });
         }
+        // If user has default name pattern (patient_XXXXX), clear it so user can fill in app
+        if (user.Fullname && user.Fullname.match(/^patient_\d{10}$/)) {
+            user.Fullname = '';
+            await user.save({ validateBeforeSave: false });
+        }
     } else {
         // Create new user - keep name and email blank for user to fill in app
         try {
