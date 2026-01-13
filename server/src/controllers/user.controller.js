@@ -278,6 +278,14 @@ const verifyOTP = asyncHandler(async (req, res) => {
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    
+    // Add hasPassword field to user object
+    const userObj = loggedInUser && typeof loggedInUser.toObject === 'function' 
+        ? loggedInUser.toObject() 
+        : loggedInUser;
+    if (userObj) {
+        userObj.hasPassword = !!user.password;
+    }
 
     const isProduction = process.env.NODE_ENV === 'production';
     const options = {
@@ -294,7 +302,7 @@ const verifyOTP = asyncHandler(async (req, res) => {
             new ApiResponse(
                 200,
                 {
-                    user: loggedInUser,
+                    user: userObj || loggedInUser,
                     needsProfile,
                     needsPasswordCreation,
                     accessToken,
@@ -378,6 +386,14 @@ const loginUser = asyncHandler(async (req, res) => {
     const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id);
 
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+    
+    // Add hasPassword field to user object
+    const userObj = loggedInUser && typeof loggedInUser.toObject === 'function' 
+        ? loggedInUser.toObject() 
+        : loggedInUser;
+    if (userObj) {
+        userObj.hasPassword = !!user.password;
+    }
 
     // Check if profile is completed
     const needsProfile = !loggedInUser.profileCompleted;
@@ -397,7 +413,7 @@ const loginUser = asyncHandler(async (req, res) => {
             new ApiResponse(
                 200,
                 {
-                    user: loggedInUser,
+                    user: userObj || loggedInUser,
                     needsProfile,
                     accessToken,
                     refreshToken
@@ -616,6 +632,14 @@ const getCurrentUser = asyncHandler(async (req, res) => {
         } catch (err) {
             console.error('Error fetching physio profile:', err.message || err);
         }
+    }
+
+    // Add hasPassword field to indicate if user has set a password
+    // This helps mobile app determine if user needs to complete registration
+    if (userObj) {
+        userObj.hasPassword = !!userObj.password;
+        // Remove password from response (security)
+        delete userObj.password;
     }
 
     return res
