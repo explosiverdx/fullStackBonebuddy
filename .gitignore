@@ -17,3 +17,4 @@ mobile_app/.metadata
 mobile_app/pubspec.lock
 mobile_app/**/*.apk
 mobile_app/**/*.aab
+mobile_app/node_modules/
