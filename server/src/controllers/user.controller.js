@@ -607,6 +607,10 @@ const getCurrentUser = asyncHandler(async (req, res) => {
                 userObj.availableTimeSlots = doctor.availableTimeSlots || null;
                 userObj.consultationFee = doctor.consultationFee || null;
                 userObj.bio = doctor.bio || null;
+                // If user doesn't have avatar but doctor has profilePhoto, use it
+                if (!userObj.avatar && doctor.profilePhoto) {
+                    userObj.avatar = doctor.profilePhoto;
+                }
             }
         } catch (err) {
             console.error('Error fetching doctor profile:', err.message || err);
@@ -628,6 +632,10 @@ const getCurrentUser = asyncHandler(async (req, res) => {
                 userObj.availableTimeSlots = physio.availableTimeSlots || null;
                 userObj.consultationFee = physio.consultationFee || null;
                 userObj.bio = physio.bio || null;
+                // If user doesn't have avatar but physio has profilePhoto, use it
+                if (!userObj.avatar && physio.profilePhoto) {
+                    userObj.avatar = physio.profilePhoto;
+                }
             }
         } catch (err) {
             console.error('Error fetching physio profile:', err.message || err);
@@ -972,6 +980,23 @@ const updateProfile = asyncHandler(async (req, res) => {
 
     // Create role-specific profile
     if (role === 'doctor') {
+        // Upload profile photo to Cloudinary if provided
+        let profilePhotoUrl = null;
+        if (files?.profilePhoto && files.profilePhoto[0]) {
+            try {
+                const cloudinaryResult = await uploadOnCloudinary(files.profilePhoto[0].path);
+                if (cloudinaryResult?.secure_url || cloudinaryResult?.url) {
+                    profilePhotoUrl = cloudinaryResult.secure_url || cloudinaryResult.url;
+                    // Also update user's avatar field
+                    user.avatar = profilePhotoUrl;
+                    await user.save({ validateBeforeSave: false });
+                    console.log('✅ Doctor profile photo uploaded to Cloudinary:', profilePhotoUrl);
+                }
+            } catch (error) {
+                console.error('❌ Error uploading doctor profile photo to Cloudinary:', error);
+            }
+        }
+        
         await Doctor.findOneAndUpdate(
             { userId: user._id },
             {
@@ -986,11 +1011,28 @@ const updateProfile = asyncHandler(async (req, res) => {
                 availableTimeSlots: availableTimeSlots || '',
                 consultationFee: consultationFee || 0,
                 bio: bio || '',
-                profilePhoto: files?.profilePhoto ? files.profilePhoto[0].path : null
+                profilePhoto: profilePhotoUrl
             },
             { upsert: true, new: true }
         );
     } else if (role === 'physiotherapist') {
+        // Upload profile photo to Cloudinary if provided
+        let profilePhotoUrl = null;
+        if (files?.physioProfilePhoto && files.physioProfilePhoto[0]) {
+            try {
+                const cloudinaryResult = await uploadOnCloudinary(files.physioProfilePhoto[0].path);
+                if (cloudinaryResult?.secure_url || cloudinaryResult?.url) {
+                    profilePhotoUrl = cloudinaryResult.secure_url || cloudinaryResult.url;
+                    // Also update user's avatar field
+                    user.avatar = profilePhotoUrl;
+                    await user.save({ validateBeforeSave: false });
+                    console.log('✅ Physio profile photo uploaded to Cloudinary:', profilePhotoUrl);
+                }
+            } catch (error) {
+                console.error('❌ Error uploading physio profile photo to Cloudinary:', error);
+            }
+        }
+        
         await Physio.findOneAndUpdate(
             { userId: user._id },
             {
@@ -1005,7 +1047,7 @@ const updateProfile = asyncHandler(async (req, res) => {
                 availableTimeSlots: physioAvailableTimeSlots || '',
                 consultationFee: physioConsultationFee || 0,
                 bio: physioBio || '',
-                profilePhoto: files?.physioProfilePhoto ? files.physioProfilePhoto[0].path : null
+                profilePhoto: profilePhotoUrl
             },
             { upsert: true, new: true }
         );
