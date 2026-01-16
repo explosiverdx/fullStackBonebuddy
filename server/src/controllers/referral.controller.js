@@ -162,24 +162,74 @@ export const getMyReferrals = asyncHandler(async (req, res) => {
 
   // Filter out referrals where the registered patient has been deleted
   // Check if registeredPatientId exists and the user/patient still exists
+  // Also check by phone number to catch referrals that might not have registeredPatientId set
   const validReferrals = [];
+  const normalizePhone = (phone) => {
+    if (!phone) return null;
+    return phone.replace(/[^0-9]/g, '').slice(-10);
+  };
+  
   for (const referral of referrals) {
-    // If referral has a registeredPatientId, verify the user and patient still exist
-    if (referral.registeredPatientId) {
+    let shouldInclude = true;
+    
+    // If referral is marked as "registered", it MUST have a valid patient
+    if (referral.status === 'registered') {
+      if (!referral.registeredPatientId) {
+        // Registered referral without registeredPatientId is invalid
+        shouldInclude = false;
+      } else {
+        const user = await User.findById(referral.registeredPatientId);
+        if (!user) {
+          // User was deleted, skip this referral
+          shouldInclude = false;
+        } else {
+          // Also check if patient profile exists
+          const patient = await Patient.findOne({ userId: referral.registeredPatientId });
+          if (!patient) {
+            // Patient profile was deleted, skip this referral
+            shouldInclude = false;
+          }
+        }
+      }
+    } else if (referral.registeredPatientId) {
+      // For non-registered referrals with registeredPatientId, still verify it exists
       const user = await User.findById(referral.registeredPatientId);
       if (!user) {
-        // User was deleted, skip this referral
-        continue;
-      }
-      
-      // Also check if patient profile exists
-      const patient = await Patient.findOne({ userId: referral.registeredPatientId });
-      if (!patient) {
-        // Patient profile was deleted, skip this referral
-        continue;
+        shouldInclude = false;
+      } else {
+        const patient = await Patient.findOne({ userId: referral.registeredPatientId });
+        if (!patient && user.userType === 'patient') {
+          // Patient profile was deleted
+          shouldInclude = false;
+        }
       }
     }
-    validReferrals.push(referral);
+    
+    // Also check by phone number - if we can't find any active patient with this phone, exclude registered referrals
+    if (shouldInclude && referral.patientPhone && referral.status === 'registered') {
+      const normalizedPhone = normalizePhone(referral.patientPhone);
+      if (normalizedPhone) {
+        // For registered referrals, verify there's an active patient with this phone
+        const userByPhone = await User.findOne({
+          mobile_number: { $in: [normalizedPhone, `+91${normalizedPhone}`, referral.patientPhone] }
+        });
+        
+        if (userByPhone) {
+          const patientByPhone = await Patient.findOne({ userId: userByPhone._id });
+          // If user exists but patient profile doesn't, patient was deleted
+          if (!patientByPhone && userByPhone.userType === 'patient') {
+            shouldInclude = false;
+          }
+        } else {
+          // No user found with this phone - might be deleted, exclude registered referral
+          shouldInclude = false;
+        }
+      }
+    }
+    
+    if (shouldInclude) {
+      validReferrals.push(referral);
+    }
   }
 
   return res

@@ -691,21 +691,42 @@ const deletePatientAdmin = asyncHandler(async (req, res) => {
 
     // Delete all referrals where this patient is registered (removes from doctor's profile)
     // Match by registeredPatientId (userId) OR by phone number (in case registeredPatientId wasn't set)
-    const referralQuery = {
-        $or: [
-            { registeredPatientId: patientUserId },
-            ...(normalizedPhone ? [
-                { patientPhone: normalizedPhone },
-                { patientPhone: `+91${normalizedPhone}` },
-                { patientPhone: patientMobileNumber }
-            ] : [])
-        ]
-    };
+    // Use comprehensive phone number matching to catch all variations
+    const referralQueryConditions = [
+      { registeredPatientId: patientUserId }
+    ];
+    
+    if (normalizedPhone) {
+      referralQueryConditions.push(
+        { patientPhone: normalizedPhone },
+        { patientPhone: `+91${normalizedPhone}` },
+        { patientPhone: patientMobileNumber },
+        // Also try regex matching for partial matches
+        { patientPhone: { $regex: normalizedPhone.replace(/^0+/, ''), $options: 'i' } }
+      );
+    }
+    
+    const referralQuery = { $or: referralQueryConditions };
+    
+    // First, try to find all referrals that might be related to this patient (for logging)
+    const allPossibleReferrals = await Referral.find(referralQuery);
+    console.log(`[deletePatientAdmin] Found ${allPossibleReferrals.length} possible referral(s) to delete for patient ${patient.name} (userId: ${patientUserId}, phone: ${patientMobileNumber}, normalized: ${normalizedPhone})`);
+    
+    if (allPossibleReferrals.length > 0) {
+      allPossibleReferrals.forEach(ref => {
+        console.log(`[deletePatientAdmin] Referral ${ref._id}: registeredPatientId=${ref.registeredPatientId}, patientPhone=${ref.patientPhone}, status=${ref.status}`);
+      });
+    }
     
     const referralsResult = await Referral.deleteMany(referralQuery);
     deletionSummary.referrals = referralsResult.deletedCount || 0;
     
-    console.log(`[deletePatientAdmin] Deleted ${deletionSummary.referrals} referral(s) for patient ${patient.name} (userId: ${patientUserId}, phone: ${patientMobileNumber})`);
+    console.log(`[deletePatientAdmin] Deleted ${deletionSummary.referrals} referral(s) for patient ${patient.name}`);
+    
+    // If we found referrals but didn't delete them, log a warning
+    if (allPossibleReferrals.length > deletionSummary.referrals) {
+      console.log(`[deletePatientAdmin] WARNING: Found ${allPossibleReferrals.length} referrals but only deleted ${deletionSummary.referrals}`);
+    }
 
     // Delete sessions where this patient is involved
     const sessionsResult = await Session.deleteMany({ patientId: id });
