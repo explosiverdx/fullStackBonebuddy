@@ -223,14 +223,22 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
         .sort({ sessionDate: -1 });
 
     console.log(`[DEBUG] Found ${sessions.length} sessions for doctor ${doctor._id}`);
+    
+    // Filter out sessions where patient has been deleted
+    const validSessions = sessions.filter(s => {
+        if (!s.patientId) return false;
+        // Patient document still exists (populate worked)
+        return true;
+    });
+    console.log(`[DEBUG] Valid sessions (patient exists): ${validSessions.length} (filtered out ${sessions.length - validSessions.length} deleted patients)`);
 
-    // Get unique patients from sessions
-    const uniquePatientIds = [...new Set(sessions.map(s => s.patientId?._id?.toString()).filter(Boolean))];
-    console.log(`[DEBUG] Unique patient IDs from sessions: ${uniquePatientIds.length}`, uniquePatientIds);
+    // Get unique patients from valid sessions only
+    const uniquePatientIds = [...new Set(validSessions.map(s => s.patientId?._id?.toString()).filter(Boolean))];
+    console.log(`[DEBUG] Unique patient IDs from valid sessions: ${uniquePatientIds.length}`, uniquePatientIds);
     
     // ALSO find patients directly assigned to this doctor (not just from sessions)
     // assignedDoctor can be doctor name OR doctor ID, so check both
-    const directlyAssignedPatients = await Patient.find({
+    const directlyAssignedPatientsRaw = await Patient.find({
         $or: [
             { assignedDoctor: doctorName },
             { assignedDoctor: doctorUserId },
@@ -240,7 +248,17 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
     .populate('userId', 'Fullname mobile_number email userType gender dateOfBirth age')
     .lean();
     
-    console.log(`[DEBUG] Found ${directlyAssignedPatients.length} patients directly assigned to doctor (name: "${doctorName}", userId: "${doctorUserId}")`);
+    // Filter out patients where User has been deleted
+    const directlyAssignedPatients = directlyAssignedPatientsRaw.filter(patient => {
+        if (!patient.userId) {
+            console.log(`[DEBUG] Filtering out patient ${patient._id} - no userId`);
+            return false;
+        }
+        // Verify User still exists
+        return true;
+    });
+    
+    console.log(`[DEBUG] Found ${directlyAssignedPatients.length} valid patients directly assigned to doctor (filtered out ${directlyAssignedPatientsRaw.length - directlyAssignedPatients.length} deleted)`);
     if (directlyAssignedPatients.length > 0) {
         console.log(`[DEBUG] Directly assigned patients:`, directlyAssignedPatients.map(p => ({
             _id: p._id,
@@ -350,12 +368,33 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
         }
 
         if (patientDoc) {
+            // Verify User still exists before including
+            const userStillExists = await User.findById(userIdToSearch);
+            if (!userStillExists) {
+                console.log(`[DEBUG] Skipping patient ${patientDoc._id} - User was deleted`);
+                continue;
+            }
             // Use existing Patient document - Patient document data takes priority over referral data
             // This ensures admin updates to patient data are reflected
             console.log(`[DEBUG] Using existing patient document:`, patientDoc._id);
             console.log(`[DEBUG] Using Patient document phone: ${patientDoc.mobileNumber || patientDoc.userId?.mobile_number} (not referral phone: ${referral.patientPhone})`);
             referredPatients.push(patientDoc);
         } else {
+            // Before creating virtual patient, verify User still exists and Patient doesn't exist
+            const userStillExists = await User.findById(userIdToSearch);
+            if (!userStillExists) {
+                console.log(`[DEBUG] Skipping virtual patient creation - User ${userIdToSearch} was deleted`);
+                continue;
+            }
+            
+            // Double-check Patient document doesn't exist (it might have been created between checks)
+            const patientDocCheck = await Patient.findOne({ userId: userIdToSearch });
+            if (patientDocCheck) {
+                console.log(`[DEBUG] Patient document found on second check, using it instead of creating virtual:`, patientDocCheck._id);
+                referredPatients.push(patientDocCheck);
+                continue;
+            }
+            
             // Create virtual patient entry from referral and user data ONLY if no Patient document exists
             // For virtual patients, prioritize referral data over user data since referral is the source of truth
             console.log(`[DEBUG] Creating virtual patient for user:`, userIdToSearch);
@@ -403,11 +442,22 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
     console.log(`[DEBUG] Total patient IDs (sessions + directly assigned): ${allPatientIdsFromSessionsAndAssigned.length}`);
     
     // Fetch all real patients (from sessions AND directly assigned)
-    const patientsFromSessions = allPatientIdsFromSessionsAndAssigned.length > 0
+    const patientsFromSessionsRaw = allPatientIdsFromSessionsAndAssigned.length > 0
         ? await Patient.find({ _id: { $in: allPatientIdsFromSessionsAndAssigned } })
             .populate('userId', 'Fullname mobile_number email')
             .lean()
         : [];
+    
+    // Filter out patients where User has been deleted
+    const patientsFromSessions = patientsFromSessionsRaw.filter(patient => {
+        if (!patient.userId) {
+            console.log(`[DEBUG] Filtering out patient ${patient._id} from sessions - no userId`);
+            return false;
+        }
+        return true;
+    });
+    
+    console.log(`[DEBUG] Valid patients from sessions: ${patientsFromSessions.length} (filtered out ${patientsFromSessionsRaw.length - patientsFromSessions.length} deleted)`);
     
     // Also add directly assigned patients that might not have been in the query above
     const allPatientsFromSessions = [...patientsFromSessions];
@@ -448,11 +498,46 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
         }
     });
     
-    // Convert map to array
-    const allPatients = Array.from(patientMap.values());
+    // Convert map to array and filter out any patients where User or Patient document doesn't exist
+    const allPatientsRaw = Array.from(patientMap.values());
     
-    console.log(`[DEBUG] Total patients: ${allPatients.length} (${patientsFromSessions.length} from sessions, ${referredPatients.length} from referrals, ${patientMap.size} unique)`);
-    console.log(`[DEBUG] Virtual patients: ${referredPatients.filter(p => p.isVirtual).length}`);
+    // Final validation: ensure all patients have valid User and Patient documents
+    const allPatients = [];
+    for (const patient of allPatientsRaw) {
+        if (patient.isVirtual) {
+            // For virtual patients, verify User still exists
+            const userId = patient.userId?._id?.toString() || patient.userId?.toString();
+            if (userId) {
+                const userExists = await User.findById(userId);
+                if (!userExists) {
+                    console.log(`[DEBUG] Filtering out virtual patient ${patient._id} - User ${userId} was deleted`);
+                    continue;
+                }
+                // Also check if Patient document was created (should use real one instead)
+                const patientDoc = await Patient.findOne({ userId: userId });
+                if (patientDoc) {
+                    // Use real Patient document instead of virtual
+                    allPatients.push(patientDoc);
+                    continue;
+                }
+            }
+            allPatients.push(patient);
+        } else {
+            // For real patients, verify User still exists
+            const userId = patient.userId?._id?.toString() || patient.userId?.toString();
+            if (userId) {
+                const userExists = await User.findById(userId);
+                if (!userExists) {
+                    console.log(`[DEBUG] Filtering out patient ${patient._id} - User ${userId} was deleted`);
+                    continue;
+                }
+            }
+            allPatients.push(patient);
+        }
+    }
+    
+    console.log(`[DEBUG] Total patients: ${allPatients.length} (${patientsFromSessions.length} from sessions, ${referredPatients.length} from referrals, ${patientMap.size} unique, filtered to ${allPatients.length} valid)`);
+    console.log(`[DEBUG] Virtual patients: ${allPatients.filter(p => p.isVirtual).length}`);
 
     // For virtual patients, try to find their Patient documents by userId to get sessions
     const virtualPatientUserIds = allPatients
@@ -523,7 +608,7 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
     
     // Combine sessions, removing duplicates
     const allSessionsMap = new Map();
-    sessions.forEach(s => {
+    validSessions.forEach(s => {
         allSessionsMap.set(s._id.toString(), s);
     });
     allSessionsForPatients.forEach(s => {
