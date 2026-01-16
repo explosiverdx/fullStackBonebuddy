@@ -1,6 +1,6 @@
 
 import { Router } from "express";
-import { sendAdminOTP, verifyAdminOTP, loginAdmin, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin } from "../controllers/admin.controller.js";
+import { sendAdminOTP, verifyAdminOTP, loginAdmin, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, getPhysioDetailsAdmin, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin, updateUserProfileStatusAdmin } from "../controllers/admin.controller.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 import { verifyPermission } from "../middleware/permission.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
@@ -27,6 +27,8 @@ router.route("/users-without-patients").get(verifyJWT, verifyPermission(['admin'
 router.route("/users/:userId/mark-as-added").patch(verifyJWT, verifyPermission(['admin']), markUserAsAdded);
 router.route("/users/:id").delete(verifyJWT, verifyPermission(['admin']), deleteUserAdmin);
 router.route("/users/:userId/change-password").patch(verifyJWT, verifyPermission(['admin']), changeUserPasswordAdmin);
+router.route("/users/:userId/profile-status").patch(verifyJWT, verifyPermission(['admin']), updateUserProfileStatusAdmin);
+router.route("/users/profile-status").patch(verifyJWT, verifyPermission(['admin']), updateUserProfileStatusAdmin);
 router.route("/doctors").get(verifyJWT, verifyPermission(['admin']), getAllDoctorsAdmin);
 router.route("/doctors").post(verifyJWT, verifyPermission(['admin']), createDoctorAdmin);
 router.route("/doctors/:id").patch(verifyJWT, verifyPermission(['admin']), updateDoctorAdmin);

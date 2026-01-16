@@ -14,6 +14,7 @@ import { Payment } from "../models/payments.models.js";
 import { Notification } from "../models/notification.models.js";
 import { Contact } from "../models/contact.model.js";
 import { Appointment } from "../models/appointments.models.js";
+import { Referral } from "../models/referral.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import otpGenerator from "otp-generator";
 import { generateAccessAndRefreshTokens } from "../utils/auth.utils.js";
@@ -492,6 +493,7 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
                 existingUser.age = ageNum || existingUser.age;
                 existingUser.address = address || existingUser.address;
                 existingUser.hospitalName = hospitalClinic || existingUser.hospitalName || 'Not Specified'; // Required for patient userType
+                existingUser.profileCompleted = true; // Admin-created profiles are complete
                 await existingUser.save({ validateBeforeSave: false });
 
                 resolvedUserId = existingUser._id;
@@ -508,7 +510,7 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
                     age: ageNum,
                     address,
                     hospitalName: hospitalClinic || 'Not Specified', // Required for patient userType
-                    profileCompleted: false
+                    profileCompleted: true // Admin-created profiles are complete
                 };
                 
                 // Add password if provided (will be hashed by pre-save hook)
@@ -565,6 +567,13 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
         console.log('Creating patient with data:', patientData);
 
         const patient = await Patient.create(patientData);
+
+        // Ensure the user's profileCompleted is set to true after patient creation
+        const user = await User.findById(resolvedUserId);
+        if (user && !user.profileCompleted) {
+            user.profileCompleted = true;
+            await user.save({ validateBeforeSave: false });
+        }
 
         console.log('Patient created successfully:', patient._id);
 
@@ -653,13 +662,70 @@ const deletePatientAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Patient ID is required");
     }
 
-    const patient = await Patient.findByIdAndDelete(id);
-
+    // Find the patient first to get userId for cascade deletion
+    const patient = await Patient.findById(id);
     if (!patient) {
         throw new ApiError(404, "Patient not found");
     }
 
-    return res.status(200).json(new ApiResponse(200, {}, "Patient deleted successfully."));
+    const patientUserId = patient.userId;
+    const deletionSummary = {
+        referrals: 0,
+        sessions: 0,
+        payments: 0,
+        medicalRecords: 0,
+        progressReports: 0,
+        appointments: 0,
+        reports: 0,
+        notifications: 0
+    };
+
+    // Delete all referrals where this patient is registered (removes from doctor's profile)
+    const referralsResult = await Referral.deleteMany({ registeredPatientId: patientUserId });
+    deletionSummary.referrals = referralsResult.deletedCount || 0;
+
+    // Delete sessions where this patient is involved
+    const sessionsResult = await Session.deleteMany({ patientId: id });
+    deletionSummary.sessions = sessionsResult.deletedCount || 0;
+
+    // Delete payments for this patient
+    const paymentsResult = await Payment.deleteMany({ 
+        $or: [
+            { patientId: id },
+            { userId: patientUserId }
+        ]
+    });
+    deletionSummary.payments = paymentsResult.deletedCount || 0;
+
+    // Delete medical records for this patient
+    const medicalRecordsResult = await MedicalRecord.deleteMany({ patientId: id });
+    deletionSummary.medicalRecords = medicalRecordsResult.deletedCount || 0;
+
+    // Delete progress reports for this patient
+    const progressReportsResult = await ProgressReport.deleteMany({ patientId: id });
+    deletionSummary.progressReports = progressReportsResult.deletedCount || 0;
+
+    // Delete appointments for this patient
+    const appointmentsResult = await Appointment.deleteMany({ patientId: id });
+    deletionSummary.appointments = appointmentsResult.deletedCount || 0;
+
+    // Delete reports for this patient
+    const reportsResult = await Report.deleteMany({ patientId: id });
+    deletionSummary.reports = reportsResult.deletedCount || 0;
+
+    // Delete notifications for this patient's user
+    const notificationsResult = await Notification.deleteMany({ userId: patientUserId });
+    deletionSummary.notifications = notificationsResult.deletedCount || 0;
+
+    // Delete the patient profile
+    await Patient.findByIdAndDelete(id);
+
+    console.log(`Patient deleted: ${patient.name} (${id}). Removed ${deletionSummary.referrals} referral(s) from doctor profiles.`);
+
+    return res.status(200).json(new ApiResponse(200, {
+        deletedPatient: patient.name,
+        deletionSummary
+    }, "Patient and all associated data deleted successfully, including removal from doctor referrals."));
 });
 
 const getPatientDetailsAdmin = asyncHandler(async (req, res) => {
@@ -2961,4 +3027,62 @@ const changeUserPasswordAdmin = asyncHandler(async (req, res) => {
     }, `${changes.join(' and ')} changed successfully`));
 });
 
-export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin };
+const updateUserProfileStatusAdmin = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+    const { phoneNumber, profileCompleted, userType } = req.body;
+
+    // Find user by userId (from params) or phoneNumber (from body)
+    let user;
+    if (userId && userId !== 'undefined' && userId !== 'null') {
+        user = await User.findById(userId);
+    } else if (phoneNumber) {
+        // Normalize phone number (last 10 digits)
+        const normalizedPhone = phoneNumber.replace(/[^0-9]/g, '').slice(-10);
+        user = await User.findOne({ 
+            mobile_number: { $in: [normalizedPhone, `+91${normalizedPhone}`, phoneNumber] } 
+        });
+    } else {
+        throw new ApiError(400, "Either userId (in URL) or phoneNumber (in body) is required");
+    }
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    const changes = [];
+
+    // Update profileCompleted if provided
+    if (profileCompleted !== undefined) {
+        user.profileCompleted = profileCompleted === true || profileCompleted === 'true';
+        changes.push(`profileCompleted: ${user.profileCompleted}`);
+    }
+
+    // Update userType if provided
+    if (userType) {
+        const validUserTypes = ['patient', 'doctor', 'physio', 'physiotherapist', 'admin'];
+        if (!validUserTypes.includes(userType.toLowerCase())) {
+            throw new ApiError(400, `Invalid userType. Must be one of: ${validUserTypes.join(', ')}`);
+        }
+        user.userType = userType.toLowerCase();
+        changes.push(`userType: ${user.userType}`);
+    }
+
+    // Check if at least one field is being updated
+    if (changes.length === 0) {
+        throw new ApiError(400, "Please provide either profileCompleted or userType to update");
+    }
+
+    await user.save({ validateBeforeSave: false });
+
+    console.log(`Admin updated profile status for user: ${user.Fullname || user.username} (${user.mobile_number}) - ${changes.join(', ')}`);
+
+    return res.status(200).json(new ApiResponse(200, {
+        userId: user._id,
+        mobileNumber: user.mobile_number,
+        profileCompleted: user.profileCompleted,
+        userType: user.userType,
+        updatedFields: changes
+    }, "User profile status updated successfully"));
+});
+
+export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin, updateUserProfileStatusAdmin };
