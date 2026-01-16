@@ -669,6 +669,15 @@ const deletePatientAdmin = asyncHandler(async (req, res) => {
     }
 
     const patientUserId = patient.userId;
+    const patientMobileNumber = patient.mobileNumber;
+    
+    // Normalize phone number for matching (remove +91 prefix if present, get last 10 digits)
+    const normalizePhone = (phone) => {
+        if (!phone) return null;
+        return phone.replace(/[^0-9]/g, '').slice(-10);
+    };
+    const normalizedPhone = normalizePhone(patientMobileNumber);
+    
     const deletionSummary = {
         referrals: 0,
         sessions: 0,
@@ -681,8 +690,22 @@ const deletePatientAdmin = asyncHandler(async (req, res) => {
     };
 
     // Delete all referrals where this patient is registered (removes from doctor's profile)
-    const referralsResult = await Referral.deleteMany({ registeredPatientId: patientUserId });
+    // Match by registeredPatientId (userId) OR by phone number (in case registeredPatientId wasn't set)
+    const referralQuery = {
+        $or: [
+            { registeredPatientId: patientUserId },
+            ...(normalizedPhone ? [
+                { patientPhone: normalizedPhone },
+                { patientPhone: `+91${normalizedPhone}` },
+                { patientPhone: patientMobileNumber }
+            ] : [])
+        ]
+    };
+    
+    const referralsResult = await Referral.deleteMany(referralQuery);
     deletionSummary.referrals = referralsResult.deletedCount || 0;
+    
+    console.log(`[deletePatientAdmin] Deleted ${deletionSummary.referrals} referral(s) for patient ${patient.name} (userId: ${patientUserId}, phone: ${patientMobileNumber})`);
 
     // Delete sessions where this patient is involved
     const sessionsResult = await Session.deleteMany({ patientId: id });
@@ -720,7 +743,23 @@ const deletePatientAdmin = asyncHandler(async (req, res) => {
     // Delete the patient profile
     await Patient.findByIdAndDelete(id);
 
-    console.log(`Patient deleted: ${patient.name} (${id}). Removed ${deletionSummary.referrals} referral(s) from doctor profiles.`);
+    // Also delete the User account if it exists and is a patient-only account
+    // This ensures referrals are completely removed since they reference userId
+    const user = await User.findById(patientUserId);
+    if (user && user.userType === 'patient') {
+        // Check if there are any other profiles (doctor, physio) - if not, safe to delete user
+        const hasDoctorProfile = await Doctor.findOne({ userId: patientUserId });
+        const hasPhysioProfile = await Physio.findOne({ userId: patientUserId });
+        
+        if (!hasDoctorProfile && !hasPhysioProfile) {
+            await User.findByIdAndDelete(patientUserId);
+            console.log(`[deletePatientAdmin] Also deleted User account for patient ${patient.name} (${patientUserId})`);
+        } else {
+            console.log(`[deletePatientAdmin] User account kept for patient ${patient.name} (${patientUserId}) - has other profiles`);
+        }
+    }
+
+    console.log(`[deletePatientAdmin] Patient deleted: ${patient.name} (${id}). Removed ${deletionSummary.referrals} referral(s) from doctor profiles.`);
 
     return res.status(200).json(new ApiResponse(200, {
         deletedPatient: patient.name,

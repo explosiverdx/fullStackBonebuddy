@@ -3,6 +3,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { Referral } from '../models/referral.models.js';
 import { User } from '../models/user.models.js';
+import { Patient } from '../models/patient.models.js';
 
 // Create a referral
 export const createReferral = asyncHandler(async (req, res) => {
@@ -159,10 +160,32 @@ export const getMyReferrals = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(50);
 
+  // Filter out referrals where the registered patient has been deleted
+  // Check if registeredPatientId exists and the user/patient still exists
+  const validReferrals = [];
+  for (const referral of referrals) {
+    // If referral has a registeredPatientId, verify the user and patient still exist
+    if (referral.registeredPatientId) {
+      const user = await User.findById(referral.registeredPatientId);
+      if (!user) {
+        // User was deleted, skip this referral
+        continue;
+      }
+      
+      // Also check if patient profile exists
+      const patient = await Patient.findOne({ userId: referral.registeredPatientId });
+      if (!patient) {
+        // Patient profile was deleted, skip this referral
+        continue;
+      }
+    }
+    validReferrals.push(referral);
+  }
+
   return res
     .status(200)
     .json(
-      new ApiResponse(200, referrals, 'Your referrals fetched successfully')
+      new ApiResponse(200, validReferrals, 'Your referrals fetched successfully')
     );
 });
 
