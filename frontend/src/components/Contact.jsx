@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -80,7 +81,24 @@ const Contact = () => {
   };
 
   return (
-    <div className="body-bg min-h-screen py-8 sm:py-12 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
+    <>
+      <Helmet>
+        <link rel="canonical" href="https://bonebuddy.cloud/contact/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+      </Helmet>
+      <div className="body-bg min-h-screen py-8 sm:py-12 pt-20 sm:pt-24 px-4 sm:px-6 lg:px-8 flex flex-col items-center justify-center">
       <main className="w-full">
         {/* Header Section */}
         <div className="form-header text-center mb-6 sm:mb-8">
@@ -195,6 +213,7 @@ const Contact = () => {
         </div>
       </main>
     </div>
+    </>
   );
 };
 

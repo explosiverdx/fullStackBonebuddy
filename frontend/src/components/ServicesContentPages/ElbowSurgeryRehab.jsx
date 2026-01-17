@@ -13,6 +13,20 @@ const ElbowSurgeryRehab = () => {
         <meta property="og:title" content="Elbow Surgery Recovery | BoneBuddy" />
         <meta property="og:description" content="Surgeon-supervised home physiotherapy for faster elbow pain relief. Structured 25-session plan + online support to return you to daily life." />
         <meta property="og:type" content="website" />
+        <link rel="canonical" href="https://bonebuddy.cloud/services/elbow-surgery-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
       </Helmet>
       <main className="main-content">
         <div className="">

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 const servicesData = [
   {
@@ -66,7 +67,24 @@ const servicesData = [
 
 const Services = () => {
   return (
-    <main className="main-content">
+    <>
+      <Helmet>
+        <link rel="canonical" href="https://bonebuddy.cloud/services/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+      </Helmet>
+      <main className="main-content">
       {/* Responsive Banner */}
       <section className="relative w-full overflow-hidden bg-gray-200">
         <img src="/assets/carousel1.jpeg" alt="Physiotherapy Banner" className="w-full h-auto max-h-[50vh] object-cover object-center" />
@@ -98,6 +116,7 @@ const Services = () => {
         </div>
       </section>
     </main>
+    </>
   );
 };
 

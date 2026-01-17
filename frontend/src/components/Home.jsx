@@ -204,31 +204,18 @@ const Home = () => {
         <meta name="twitter:title" content="BoneBuddy - Expert Physiotherapy Services" />
         <meta name="twitter:description" content="Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services." />
         <meta name="twitter:image" content="/assets/BoneBuddy_Logo-modified.webp" />
-        <link rel="canonical" href="https://bonebuddy.cloud" />
+        <link rel="canonical" href="https://bonebuddy.cloud/" />
         <script type="application/ld+json">
           {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "MedicalBusiness",
-            "name": "BoneBuddy",
-            "description": "Leading physiotherapy clinic offering expert care for post-surgery recovery, sports injuries, orthopaedic treatments, and personalized rehabilitation services.",
-            "url": "https://bonebuddy.cloud",
-            "logo": "https://bonebuddy.cloud/assets/BoneBuddy_Logo-modified.webp",
-            "telephone": "+1-XXX-XXX-XXXX",
-            "email": "info@bonebuddy.org",
-            "sameAs": [
-              "https://www.facebook.com/bonebuddy",
-              "https://www.instagram.com/bonebuddy",
-              "https://www.linkedin.com/company/bonebuddy"
-            ],
-            "serviceType": [
-              "Physiotherapy",
-              "Rehabilitation",
-              "Sports Injury Treatment",
-              "Orthopaedic Physiotherapy",
-              "Post-Surgery Recovery"
-            ],
-            "areaServed": "Your Service Area",
-            "priceRange": "$$"
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
           })}
         </script>
       </Helmet>

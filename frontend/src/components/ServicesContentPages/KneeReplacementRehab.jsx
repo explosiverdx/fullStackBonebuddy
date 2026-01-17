@@ -1,10 +1,63 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import './ServicesContentPages.css';
 
 const KneeReplacementRehab = () => {
   return (
-    <main className="main-content">
+    <>
+      <Helmet>
+        <link rel="canonical" href="https://bonebuddy.cloud/services/knee-replacement-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [{
+              "@type": "Question",
+              "name": "What is the fastest way to recover from a knee replacement?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Full knee replacement rehab is most effective with early, guided physiotherapy and a personalized recovery plan. BoneBuddy provides physio after total knee replacement at home, following a structured rehab protocol for total knee replacement to reduce pain, improve mobility, restore strength, and ensure a safe and confident recovery."
+              }
+            },{
+              "@type": "Question",
+              "name": "How to speed up knee recovery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Knee recovery can be sped up with early, guided physiotherapy and a structured full knee replacement rehab plan. BoneBuddy provides physio after total knee replacement at home, following a rehab protocol for total knee replacement to improve mobility, reduce pain, and ensure safe recovery."
+              }
+            },{
+              "@type": "Question",
+              "name": "How long to rest after knee replacement surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Full recovery after knee replacement surgery usually takes up to one year, but most patients can resume many daily activities within 4–6 weeks. Recovery time depends on factors such as your activity level before surgery, age, overall health, and consistency with physiotherapy.\n\nAt BoneBuddy, expert-led physiotherapy at home supports structured rehabilitation to improve mobility, reduce pain, and help patients recover safely and confidently."
+              }
+            },{
+              "@type": "Question",
+              "name": "What are the five mistakes people make after knee replacement?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The five most common mistakes people make after knee replacement surgery are:\n\n1.⁠ ⁠Delaying or skipping physiotherapy, which causes stiffness and slow recovery\n\n2.⁠ ⁠Putting too much load too early, leading to pain and swelling\n\n3.⁠ ⁠Not following a structured rehab protocol, affecting strength and mobility\n\n4.⁠ ⁠Ignoring pain, swelling, or warning signs instead of consulting professionals\n\n5.⁠ ⁠Being inconsistent with exercises, which delays long-term recovery\n\nAt BoneBuddy, expert-led physiotherapy at home helps patients avoid these mistakes through a structured rehab plan, guided exercises, and continuous professional support for safe and faster recovery."
+              }
+            }]
+          })}
+        </script>
+      </Helmet>
+      <main className="main-content">
       <div className="">
         <div className="mb-8">
           <Link to="/services" className="text-teal-600 hover:text-teal-800 transition-colors">
@@ -137,6 +190,7 @@ const KneeReplacementRehab = () => {
         </article>
       </div>
     </main>
+    </>
   );
 };
 

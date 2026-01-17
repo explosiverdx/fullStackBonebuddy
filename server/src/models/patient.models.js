@@ -79,7 +79,9 @@ const patientSchema = new mongoose.Schema(
     },
     medicalInsurance: {
       type: String,
-      required: false,
+      required: [true, "Medical insurance status is required"],
+      enum: ['Yes', 'No'],
+      default: 'No'
     },
     medicalReport: {
       type: String,

@@ -10,6 +10,62 @@ const SpinalSurgeryRehab = () => {
         <title>Spinal Surgery Recovery & Rehab | Safe Physiotherapy at Home – BoneBuddy</title>
         <meta name="description" content="Recover safely after spinal surgery with BoneBuddy's expert physiotherapy program. Regain mobility, reduce pain, and heal faster — right from home." />
         <meta name="keywords" content="spinal surgery recovery, spinal rehab, post spine surgery physiotherapy, bonebuddy rehab, physiotherapy after spine surgery, spine recovery program, home physiotherapy for spinal surgery" />
+        <link rel="canonical" href="https://bonebuddy.cloud/services/spinal-surgery-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [{
+              "@type": "Question",
+              "name": "How many times a day should you walk after back surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Spine surgery recovery physiotherapy usually begins within 24–72 hours, based on the type of surgery and medical advice. Physiotherapy after lumbar spine surgery and spinal fusion follows a structured spinal surgery physiotherapy protocol to restore movement safely.\n\nAt BoneBuddy, expert-led physiotherapy at home supports lumbar fusion rehab protocols and safe recovery after back surgery with guided exercises."
+              }
+            },{
+              "@type": "Question",
+              "name": "When to start rehab after surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Rehab after surgery usually begins within a few days, once pain and swelling are under control and the doctor allows movement. The exact timing depends on the type of surgery and overall health.\n\nAt BoneBuddy, expert-led physiotherapy at home starts at the right time with a personalized rehab plan for safe recovery."
+              }
+            },{
+              "@type": "Question",
+              "name": "What not to do after spine surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "After spine surgery, avoid heavy lifting, bending or twisting the spine, prolonged sitting, sudden movements, and skipping prescribed physiotherapy. Ignoring pain signals or returning to activities too early can slow spine surgery recovery and increase the risk of complications.\n\nWith BoneBuddy, expert-led physiotherapy at home follows a structured, phase-wise rehab plan—helping you recover safely, steadily, and stronger after surgery."
+              }
+            },{
+              "@type": "Question",
+              "name": "Can you live a normal life after spine surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes, many people regain a normal life after spine surgery with the right rehab. Early, guided physiotherapy helps rebuild strength and movement safely.\n\nAt BoneBuddy, expert-led physiotherapy at home supports a smooth recovery. Even after spinal fusion, consistent rehab helps patients return to daily activities with confidence."
+              }
+            },{
+              "@type": "Question",
+              "name": "How long is rehab after spinal surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "It may take 4 to 6 weeks to get back to doing simple activities, such as light housework. It may take 6 months to a year for your back to get better completely. You may need to wear a back brace while your back heals.\n\nWith BoneBuddy, recover smarter at home—guided by experts to restore strength, mobility, and confidence step by step."
+              }
+            }]
+          })}
+        </script>
       </Helmet>
       <main className="main-content">
         <div className="">

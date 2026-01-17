@@ -1,10 +1,56 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import './ServicesContentPages.css';
 
 const HipReplacementRehab = () => {
   return (
-    <main className="main-content">
+    <>
+      <Helmet>
+        <link rel="canonical" href="https://bonebuddy.cloud/services/hip-replacement-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            "mainEntity": [{
+              "@type": "Question",
+              "name": "How long is rehab after hip replacement surgery?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Hip operation recovery starts within weeks, but full hip recovery after surgery takes time and consistency. BoneBuddy supports hip op recovery, hip recovery surgery, and hip reconstruction recovery with expert-led physiotherapy at home for safe and improved mobility."
+              }
+            },{
+              "@type": "Question",
+              "name": "What are the three rules after hip replacement?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "After hip replacement surgery, patients should avoid bringing the knee higher than the hip, avoid leaning forward while sitting or standing up, and avoid picking up objects from the floor while sitting. These precautions are essential for hip recovery after surgery and help protect the new joint during hip operation recovery.\n\nAt BoneBuddy, expert-led physiotherapy at home supports safe hip op recovery and guides patients through proper movements for smooth hip replacement recovery."
+              }
+            },{
+              "@type": "Question",
+              "name": "What is the fastest way to recover from a hip replacement?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The fastest way to recover from a hip replacement is early, guided physiotherapy combined with a structured rehabilitation plan. Consistent exercises, gradual weight-bearing, and professional supervision help reduce pain and restore movement safely.\n\nAt BoneBuddy, expert-led physiotherapy at home supports hip operation recovery and hip recovery after surgery through personalized rehab programs that improve mobility and ensure safe, steady recovery."
+              }
+            }]
+          })}
+        </script>
+      </Helmet>
+      <main className="main-content">
       <div className="">
         <div className="mb-8">
           <Link to="/services" className="text-teal-600 hover:text-teal-800 transition-colors">
@@ -121,6 +167,7 @@ const HipReplacementRehab = () => {
         </article>
       </div>
     </main>
+    </>
   );
 };
 

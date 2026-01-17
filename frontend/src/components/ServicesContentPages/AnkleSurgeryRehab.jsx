@@ -10,6 +10,20 @@ const AnkleSurgeryRehab = () => {
         <title>Ankle Surgery Rehabilitation – Personalized Recovery Program at Home</title>
         <meta name="description" content="Recover from ankle surgery with BoneBuddy's 25-session physiotherapy plan. Restore mobility, strengthen ankle joints, and regain confidence at home." />
         <meta name="keywords" content="ankle surgery rehabilitation, ankle surgery recovery, broken ankle recovery, ankle ligament rupture recovery, damaged ankle ligaments recovery, ankle physiotherapy, ankle rehab at home" />
+        <link rel="canonical" href="https://bonebuddy.cloud/services/ankle-surgery-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
       </Helmet>
       <main className="main-content">
         <div className="">

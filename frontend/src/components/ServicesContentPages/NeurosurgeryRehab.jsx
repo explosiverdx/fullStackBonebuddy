@@ -1,4 +1,5 @@
 import React from 'react';
+import { Helmet } from 'react-helmet-async';
 import ServicePageLayout from '../ServicePageLayout';
 
 const NeurosurgeryRehab = () => {
@@ -21,7 +22,27 @@ const NeurosurgeryRehab = () => {
     ]
   };
 
-  return <ServicePageLayout service={service} />;
+  return (
+    <>
+      <Helmet>
+        <link rel="canonical" href="https://bonebuddy.cloud/services/neurosurgery-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+      </Helmet>
+      <ServicePageLayout service={service} />
+    </>
+  );
 };
 
 export default NeurosurgeryRehab;

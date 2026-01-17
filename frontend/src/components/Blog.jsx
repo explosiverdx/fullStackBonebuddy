@@ -75,7 +75,20 @@ const Blog = () => {
       <Helmet>
         <title>Blog - BoneBuddy</title>
         <meta name="description" content="Stay updated with the latest news, tips, and insights on physiotherapy and recovery from the BoneBuddy blog." />
-        <link rel="canonical" href="https://bonebuddy.cloud/blog" />
+        <link rel="canonical" href="https://bonebuddy.cloud/blog/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
       </Helmet>
       <main className="main-content py-12 pt-24 px-4 sm:px-6 lg:px-8">
         <section id="blog" className="section">

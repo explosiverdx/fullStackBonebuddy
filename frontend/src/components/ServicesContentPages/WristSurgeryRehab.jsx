@@ -1,10 +1,28 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import './ServicesContentPages.css';
 
 const WristSurgeryRehab = () => {
   return (
-    <main className="main-content">
+    <>
+      <Helmet>
+        <link rel="canonical" href="https://bonebuddy.cloud/services/wrist-surgery-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
+      </Helmet>
+      <main className="main-content">
       <div className="">
         <div className="mb-8">
           <Link to="/services" className="text-teal-600 hover-text-teal-800 transition-colors">
@@ -154,6 +172,7 @@ const WristSurgeryRehab = () => {
         </article>
       </div>
     </main>
+    </>
   );
 };
 

@@ -10,6 +10,20 @@ const ShoulderSurgeryRehab = () => {
         <title>Shoulder Surgery Rehab — Shoulder Surgery Recovery | BoneBuddy</title>
         <meta name="description" content="Shoulder Surgery Rehab by BoneBuddy offers doctor-monitored post-surgery shoulder recovery, digital tracking, and home based shoulder physiotherapy after surgery in India." />
         <meta name="keywords" content="Shoulder Surgery Rehab, shoulder surgery recovery, shoulder physiotherapy after surgery, post operative shoulder rehabilitation India, rotator cuff surgery recovery exercises, shoulder arthroscopy rehabilitation, home based shoulder rehabilitation, shoulder replacement surgery rehab, doctor reviews, best orthopedic near me" />
+        <link rel="canonical" href="https://bonebuddy.cloud/services/shoulder-surgery-rehab/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org/",
+            "@type": "Product",
+            "name": "BoneBuddy Physiotherapy & Post Surgery Rehab",
+            "aggregateRating": {
+              "@type": "AggregateRating",
+              "ratingValue": "4.8",
+              "ratingCount": "2371",
+              "reviewCount": "2371"
+            }
+          })}
+        </script>
       </Helmet>
       <main className="main-content">
         <div className="">
