@@ -718,8 +718,65 @@ const getMyPatientsAndSessions = asyncHandler(async (req, res) => {
         console.log(`[WARNING] No patients found! Sessions: ${sessions.length}, Referrals: ${allReferrals.length}, Confirmed: ${allConfirmedReferrals.length}`);
     }
 
+    // Final validation: ensure all patients have valid Patient documents
+    // This is the last check before returning to catch any edge cases
+    const finalValidPatients = [];
+    for (const patient of patientsWithStats) {
+        const patientId = patient._id?.toString();
+        const userId = patient.userId?._id?.toString() || patient.userId?.toString();
+        
+        if (patientId) {
+            // Check if Patient document exists
+            const patientDoc = await Patient.findById(patientId);
+            if (!patientDoc) {
+                console.log(`[getMyPatientsAndSessions] Final filter: Removing patient ${patientId} - Patient document not found`);
+                continue;
+            }
+            
+            // Also verify User exists
+            if (userId) {
+                const userDoc = await User.findById(userId);
+                if (!userDoc) {
+                    console.log(`[getMyPatientsAndSessions] Final filter: Removing patient ${patientId} - User ${userId} not found`);
+                    continue;
+                }
+            }
+        } else if (userId && patient.isVirtual) {
+            // For virtual patients, verify User exists and check if Patient was created
+            const userDoc = await User.findById(userId);
+            if (!userDoc) {
+                console.log(`[getMyPatientsAndSessions] Final filter: Removing virtual patient - User ${userId} not found`);
+                continue;
+            }
+            
+            // Check if Patient document was created (should use real one instead)
+            const patientDoc = await Patient.findOne({ userId: userId });
+            if (patientDoc) {
+                // Use real Patient document instead of virtual
+                console.log(`[getMyPatientsAndSessions] Final filter: Replacing virtual patient with real Patient document ${patientDoc._id}`);
+                finalValidPatients.push({
+                    ...patientDoc.toObject(),
+                    totalSessions: patient.totalSessions || 0,
+                    completedSessions: patient.completedSessions || 0,
+                    upcomingSessions: patient.upcomingSessions || 0,
+                    lastSession: patient.lastSession || null
+                });
+                continue;
+            }
+            
+            // Virtual patient is valid (no Patient document exists, but User exists)
+            finalValidPatients.push(patient);
+            continue;
+        }
+        
+        // Patient is valid
+        finalValidPatients.push(patient);
+    }
+
+    console.log(`[getMyPatientsAndSessions] Final patient count: ${finalValidPatients.length} (filtered out ${patientsWithStats.length - finalValidPatients.length} invalid)`);
+
     // Ensure we always return an array, even if empty
-    const finalPatientsArray = Array.isArray(patientsWithStats) ? patientsWithStats : [];
+    const finalPatientsArray = Array.isArray(finalValidPatients) ? finalValidPatients : [];
     const finalSessionsArray = Array.isArray(uniqueSessions) ? uniqueSessions : [];
 
     return res.status(200).json(
