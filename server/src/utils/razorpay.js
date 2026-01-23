@@ -98,10 +98,27 @@ export const createRazorpayOrder = async (amount, currency = 'INR', receipt, not
       notes,
     };
 
+    console.log('💳 Creating Razorpay order with options:', {
+      amount: options.amount,
+      currency: options.currency,
+      receipt: options.receipt,
+      notesKeys: Object.keys(options.notes || {})
+    });
+
     const order = await razorpayInstance.orders.create(options);
+    console.log('✅ Razorpay order created successfully:', order.id);
     return order;
   } catch (error) {
-    console.error('Error creating Razorpay order:', error);
+    console.error('❌ Error creating Razorpay order:', error);
+    console.error('❌ Error details:', {
+      message: error.message,
+      description: error.description,
+      field: error.field,
+      source: error.source,
+      step: error.step,
+      reason: error.reason,
+      metadata: error.metadata
+    });
     throw error;
   }
 };

@@ -145,17 +145,22 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
         payment.razorpaySignature = null;
     } else {
         // Create new payment record
-        payment = await Payment.create({
-            patientId: patient._id,
-            userId,
-            appointmentId: appointmentId || null,
-            sessionId: sessionId || null,
-            amount,
-            description,
-            status: 'pending',
-            paymentType: paymentType || 'other',
-            paymentGateway: 'razorpay',
-        });
+        try {
+            payment = await Payment.create({
+                patientId: patient._id,
+                userId,
+                appointmentId: appointmentId || null,
+                sessionId: sessionId || null,
+                amount,
+                description,
+                status: 'pending',
+                paymentType: paymentType || 'other',
+                paymentGateway: 'razorpay',
+            });
+        } catch (dbError) {
+            console.error('Error creating payment record:', dbError);
+            throw new ApiError(500, `Failed to create payment record: ${dbError.message}`);
+        }
     }
 
     // Create Razorpay order
@@ -168,11 +173,19 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
     };
 
     try {
+        console.log('💳 Attempting to create Razorpay order for payment:', payment._id);
+        console.log('💳 Amount:', amount, 'INR');
+        console.log('💳 Receipt:', receipt);
+        
         const razorpayOrder = await createRazorpayOrder(amount, 'INR', receipt, notes);
+
+        console.log('✅ Razorpay order created:', razorpayOrder.id);
 
         // Update payment with Razorpay order ID
         payment.razorpayOrderId = razorpayOrder.id;
         await payment.save();
+
+        console.log('✅ Payment record updated with Razorpay order ID');
 
         return res.status(201).json(
             new ApiResponse(201, {
@@ -180,15 +193,52 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
                 amount: razorpayOrder.amount,
                 currency: razorpayOrder.currency,
                 paymentId: payment._id,
+                razorpayOrderId: razorpayOrder.id,
                 key: process.env.RAZORPAY_KEY_ID,
             }, "Razorpay order created successfully.")
         );
     } catch (error) {
+        console.error('❌ Error in createRazorpayOrderController:', error);
+        console.error('❌ Error stack:', error.stack);
+        console.error('❌ Error details:', {
+            message: error.message,
+            description: error.description,
+            field: error.field,
+            source: error.source,
+            step: error.step,
+            reason: error.reason
+        });
+        
+        const errorMessage = error.message || 'Unknown error';
+        const errorDescription = error.description || '';
+        
         // Only delete if it's a new payment, not a retry
-        if (!existingPaymentId) {
-            await Payment.findByIdAndDelete(payment._id);
+        if (!existingPaymentId && payment && payment._id) {
+            try {
+                await Payment.findByIdAndDelete(payment._id);
+                console.log('🗑️ Deleted payment record due to error:', payment._id);
+            } catch (deleteError) {
+                console.error('❌ Error deleting payment record:', deleteError);
+            }
         }
-        throw new ApiError(500, "Failed to create Razorpay order: " + error.message);
+        
+        // Provide more specific error message
+        let userMessage = `Failed to create Razorpay order: ${errorMessage}`;
+        if (errorDescription) {
+            userMessage += ` - ${errorDescription}`;
+        }
+        
+        if (errorMessage.includes('Razorpay is not configured') || 
+            errorMessage.includes('RAZORPAY_KEY_ID') || 
+            errorMessage.includes('RAZORPAY_KEY_SECRET')) {
+            userMessage = 'Payment gateway is not configured on the server. Please contact support.';
+        } else if (errorMessage.includes('authentication') || errorMessage.includes('401')) {
+            userMessage = 'Invalid Razorpay credentials. Please check server configuration.';
+        } else if (errorMessage.includes('network') || errorMessage.includes('timeout')) {
+            userMessage = 'Network error connecting to payment gateway. Please try again.';
+        }
+        
+        throw new ApiError(500, userMessage);
     }
 });
 

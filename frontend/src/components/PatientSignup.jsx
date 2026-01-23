@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { indianStates, getCitiesByState, getAddressFromPincode } from '../utils/locationHelper';
 
 const PatientSignup = () => {
   const navigate = useNavigate();
@@ -16,6 +17,9 @@ const PatientSignup = () => {
     dob: '',
     gender: '',
     address: '',
+    state: '',
+    city: '',
+    areaCode: '',
     contact: verifiedMobile || location.state?.phoneNumber || '',
     // Patient fields
     surgeryType: '',
@@ -63,6 +67,9 @@ const PatientSignup = () => {
       dob: '',
       gender: '',
       address: '',
+      state: '',
+      city: '',
+      areaCode: '',
       contact: '',
       surgeryType: '',
       hospitalName: '',
@@ -83,6 +90,9 @@ const PatientSignup = () => {
       dob: '',
       gender: '',
       address: '',
+      state: '',
+      city: '',
+      areaCode: '',
       contact: '',
       profilePhoto: null,
       specialization: '',
@@ -101,6 +111,9 @@ const PatientSignup = () => {
       dob: '',
       gender: '',
       address: '',
+      state: '',
+      city: '',
+      areaCode: '',
       contact: '',
       physioProfilePhoto: null,
       physioSpecialization: '',
@@ -125,6 +138,139 @@ const PatientSignup = () => {
   }, [selectedRole]);
 
   const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const [isFetchingAddress, setIsFetchingAddress] = useState(false);
+  const [dynamicCitiesByState, setDynamicCitiesByState] = useState({});
+  
+  // Calculate registration fee based on medical insurance and state
+  // Only for insured patients (Medical Insurance = "Yes")
+  const calculateRegistrationFee = () => {
+    if (selectedRole === 'patient' && formData.medicalInsurance === 'Yes') {
+      if (formData.state === 'Uttar Pradesh') {
+        return 18000;
+      }
+      return 35000;
+    }
+    return null; // No fee for non-insured patients
+  };
+  
+  // Load Razorpay script
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+  
+  // Initiate payment after profile submission
+  const initiatePayment = async (amount) => {
+    try {
+      // Load Razorpay script
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        alert('Failed to load payment gateway. Please try again.');
+        return;
+      }
+
+      // Create Razorpay order
+      const orderResponse = await fetch('/api/v1/payments/razorpay/order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          amount: amount,
+          description: 'Patient Registration Fee',
+          paymentType: 'registration'
+        })
+      });
+
+      if (!orderResponse.ok) {
+        const errorData = await orderResponse.json();
+        throw new Error(errorData.message || 'Failed to create payment order');
+      }
+
+      const orderData = await orderResponse.json();
+      const { orderId, amount: orderAmount, currency, paymentId, key } = orderData.data;
+
+      // Initialize Razorpay checkout
+      const options = {
+        key: key,
+        amount: orderAmount,
+        currency: currency,
+        name: 'BoneBuddy',
+        description: 'Patient Registration Fee',
+        order_id: orderId,
+        handler: async function (response) {
+          try {
+            // Verify payment
+            const verifyResponse = await fetch('/api/v1/payments/razorpay/verify', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+              },
+              credentials: 'include',
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                paymentId: paymentId
+              })
+            });
+
+            if (!verifyResponse.ok) {
+              throw new Error('Payment verification failed');
+            }
+
+            alert('✅ Payment successful!');
+            // Navigate to patient profile after successful payment
+            navigate('/PatientProfile', { replace: true });
+          } catch (error) {
+            console.error('Payment verification error:', error);
+            alert('❌ Payment verification failed. Please contact support.');
+          }
+        },
+        prefill: {
+          name: formData.name || '',
+          email: formData.email || '',
+          contact: formData.contact || ''
+        },
+        theme: {
+          color: '#0d9488' // Teal color matching your theme
+        },
+        modal: {
+          ondismiss: function() {
+            // If payment is cancelled, still navigate to profile
+            navigate('/PatientProfile', { replace: true });
+          }
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      
+      razorpay.on('payment.failed', function (response) {
+        console.error('Payment failed:', response.error);
+        alert(`❌ Payment failed: ${response.error.description}`);
+        navigate('/PatientProfile', { replace: true });
+      });
+      
+      razorpay.open();
+    } catch (error) {
+      console.error('Payment initiation error:', error);
+      alert(`Failed to initiate payment: ${error.message}`);
+      // Navigate to profile even if payment fails
+      navigate('/PatientProfile', { replace: true });
+    }
+  };
 
   useEffect(() => {
     // Auto-fill contact from location state or user context
@@ -133,6 +279,62 @@ const PatientSignup = () => {
       setFormData(prev => ({ ...prev, contact: phoneNumber }));
     }
   }, [user, location.state]);
+
+  // Get cities for selected state
+  const getCitiesForSelectedState = (state = formData.state) => {
+    if (!state) return [];
+    const citiesMap = getCitiesByState();
+    const hardcodedCities = citiesMap[state] || [];
+    const dynamicCities = dynamicCitiesByState[state] || [];
+    
+    // Combine and remove duplicates
+    const allCities = [...new Set([...hardcodedCities, ...dynamicCities])].sort();
+    return allCities;
+  };
+
+  // Fetch address from pincode
+  const handlePincodeChange = async (e) => {
+    const pincode = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setFormData(prev => ({ ...prev, areaCode: pincode }));
+
+    if (pincode.length === 6) {
+      setIsFetchingAddress(true);
+      try {
+        const addressData = await getAddressFromPincode(pincode);
+        if (addressData) {
+          const { state, city } = addressData;
+          
+          // Add city to dynamic cities list
+          if (state && city) {
+            setDynamicCitiesByState(prev => {
+              const stateCities = prev[state] || [];
+              if (!stateCities.includes(city)) {
+                return { ...prev, [state]: [...stateCities, city] };
+              }
+              return prev;
+            });
+          }
+
+          setFormData(prev => ({
+            ...prev,
+            state: state || prev.state,
+            city: city || prev.city,
+            address: addressData.address || prev.address,
+          }));
+          
+          alert('Address fetched successfully!');
+        } else {
+          alert('Could not fetch address for this pincode');
+        }
+      } catch (error) {
+        console.error('Error fetching address:', error);
+        alert('Error fetching address. Please try again.');
+      } finally {
+        setIsFetchingAddress(false);
+      }
+    }
+  };
+
 
   // Calculate age from date of birth
   const calculateAgeFromDob = (dobValue) => {
@@ -257,6 +459,10 @@ const PatientSignup = () => {
     submitData.append('dob', formData.dob);
     submitData.append('gender', formData.gender);
     submitData.append('address', formData.address);
+    submitData.append('state', formData.state || '');
+    submitData.append('city', formData.city || '');
+    submitData.append('areaCode', formData.areaCode || '');
+    submitData.append('pincode', formData.areaCode || '');
     submitData.append('contact', formData.contact);
 
     if (selectedRole === 'patient') {
@@ -305,12 +511,25 @@ const PatientSignup = () => {
       if (response.status === 200) {
         const updatedUser = response.data.data;
         login(updatedUser);
-        const profileRoutes = {
-          patient: '/PatientProfile',
-          doctor: '/DoctorProfile',
-          physiotherapist: '/PhysiotherapistProfile'
-        };
-        navigate(profileRoutes[selectedRole] || '/PatientProfile', { replace: true });
+        
+        // For patient registration
+        if (selectedRole === 'patient') {
+          const registrationFee = calculateRegistrationFee();
+          // Only initiate payment for insured patients
+          if (registrationFee !== null && formData.medicalInsurance === 'Yes') {
+            await initiatePayment(registrationFee);
+          } else {
+            // Non-insured patient - just navigate to profile
+            navigate('/PatientProfile', { replace: true });
+          }
+        } else {
+          // For other roles, navigate to profile
+          const profileRoutes = {
+            doctor: '/DoctorProfile',
+            physiotherapist: '/PhysiotherapistProfile'
+          };
+          navigate(profileRoutes[selectedRole] || '/PatientProfile', { replace: true });
+        }
       }
     } catch (error) {
       console.error('Failed to update profile:', error);
@@ -436,9 +655,72 @@ const PatientSignup = () => {
           <option value="Female">Female</option>
           <option value="Other">Other</option>
         </select>
+        
+        {/* State Dropdown */}
+        <select
+          name="state"
+          value={formData.state || ''}
+          onChange={(e) => {
+            const newState = e.target.value;
+            handleChange(e);
+            // Reset city when state changes
+            setFormData(prev => {
+              const availableCities = getCitiesForSelectedState(newState);
+              const cityInNewState = availableCities.includes(prev.city);
+              return {
+                ...prev,
+                state: newState,
+                city: cityInNewState ? prev.city : '',
+              };
+            });
+          }}
+          required
+          className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+        >
+          <option value="">Select State *</option>
+          {indianStates.map(state => (
+            <option key={state} value={state}>{state}</option>
+          ))}
+        </select>
+
+        {/* City Dropdown */}
+        <select
+          name="city"
+          value={formData.city || ''}
+          onChange={handleChange}
+          required
+          disabled={!formData.state}
+          className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500 ${!formData.state ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        >
+          <option value="">Select City *</option>
+          {getCitiesForSelectedState().map(city => (
+            <option key={city} value={city}>{city}</option>
+          ))}
+        </select>
+
+        {/* Area Code (Pincode) Field */}
+        <div className="relative">
+          <input
+            type="text"
+            name="areaCode"
+            placeholder="Area Code (Pincode) *"
+            value={formData.areaCode || ''}
+            onChange={handlePincodeChange}
+            maxLength="6"
+            required
+            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500 pr-10"
+          />
+          {isFetchingAddress && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-teal-500"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Address Field */}
         <textarea
           name="address"
-          placeholder="Address"
+          placeholder="Address *"
           value={formData.address || ''}
           onChange={handleChange}
           required
@@ -516,6 +798,31 @@ const PatientSignup = () => {
             </div>
 
             <div>
+              <label className="block font-semibold mb-1">Medical Insurance <span className="text-red-500">*</span></label>
+              <select
+                name="medicalInsurance"
+                value={formData.medicalInsurance || ''}
+                onChange={handleChange}
+                required={selectedRole === 'patient'}
+                className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
+              >
+                <option value="">-- Select Medical Insurance --</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+
+            {/* Registration Fee Display - Only show for insured patients */}
+            {formData.medicalInsurance === 'Yes' && calculateRegistrationFee() !== null && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-bold text-blue-700">Registration Fee:</span>
+                  <span className="text-2xl font-bold text-blue-700">₹{calculateRegistrationFee().toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            )}
+
+            <div>
               <label className="block font-semibold mb-1">Current Condition <span className="text-red-500">*</span></label>
               <input
                 type="text"
@@ -581,15 +888,6 @@ const PatientSignup = () => {
               name="bloodGroup"
               placeholder="Blood Group (optional, e.g., A+, O-)"
               value={formData.bloodGroup || ''}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
-            />
-
-            <input
-              type="text"
-              name="medicalInsurance"
-              placeholder="Medical Insurance (optional)"
-              value={formData.medicalInsurance || ''}
               onChange={handleChange}
               className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
