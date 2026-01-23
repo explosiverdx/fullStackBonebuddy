@@ -38,7 +38,7 @@ const paymentSchema = new mongoose.Schema(
     },
     paymentType: {
       type: String,
-      enum: ['session', 'consultation', 'report', 'other'],
+      enum: ['session', 'consultation', 'report', 'registration', 'other'],
       default: 'other',
     },
     paymentGateway: {
