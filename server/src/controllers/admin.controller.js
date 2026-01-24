@@ -13,6 +13,7 @@ import { Hospital } from "../models/hospital.models.js";
 import { Payment } from "../models/payments.models.js";
 import { Notification } from "../models/notification.models.js";
 import { Contact } from "../models/contact.model.js";
+import { Feedback } from "../models/feedback.model.js";
 import { Appointment } from "../models/appointments.models.js";
 import { Referral } from "../models/referral.models.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -281,6 +282,9 @@ const getAllPatientsAdmin = asyncHandler(async (req, res) => {
                 mobileNumber: { $ifNull: ['$patient.mobileNumber', '$mobile_number'] },
                 email: { $ifNull: ['$patient.email', '$email'] },
                 address: '$patient.address',
+                state: '$patient.state',
+                city: '$patient.city',
+                pincode: '$patient.pincode',
                 surgeryType: '$patient.surgeryType',
                 surgeryDate: {
                     $cond: {
@@ -289,6 +293,7 @@ const getAllPatientsAdmin = asyncHandler(async (req, res) => {
                         else: null
                     }
                 },
+                assignedDoctor: '$patient.assignedDoctor',
                 hospitalClinic: '$patient.hospitalClinic',
                 assignedPhysiotherapist: '$patient.assignedPhysiotherapist',
                 currentCondition: '$patient.currentCondition',
@@ -436,6 +441,9 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
             userId,
             age,
             address,
+            state,
+            city,
+            pincode,
             currentCondition,
             assignedPhysiotherapist,
             medicalHistory,
@@ -453,7 +461,7 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Age must be a valid number.");
         }
 
-        if ([name, dateOfBirth, gender, mobileNumber, emergencyContactNumber, surgeryType, surgeryDate, currentCondition].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
+        if ([name, dateOfBirth, gender, mobileNumber, surgeryType, surgeryDate].some(field => !field || (typeof field === 'string' && field.trim() === ""))) {
             throw new ApiError(400, "All required fields must be filled out.");
         }
 
@@ -549,10 +557,13 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
             surgeryDate: new Date(surgeryDate),
             assignedDoctor: assignedDoctor || undefined,
             hospitalClinic: hospitalClinic || undefined,
-            emergencyContactNumber: normalizedEmergencyContact || emergencyContactNumber,
+            emergencyContactNumber: (normalizedEmergencyContact || emergencyContactNumber) || undefined,
             age: ageNum,
             address: address || undefined,
-            currentCondition,
+            state: state || undefined,
+            city: city || undefined,
+            pincode: pincode || undefined,
+            currentCondition: currentCondition || undefined,
             assignedPhysiotherapist: assignedPhysiotherapist || undefined,
             medicalHistory: medicalHistory || undefined,
             allergies: allergies || undefined,
@@ -560,8 +571,15 @@ const createPatientAdmin = asyncHandler(async (req, res) => {
             medicalInsurance: medicalInsurance || undefined
         };
 
-        if (req.file) {
-            patientData.medicalReport = `/uploads/${req.file.filename}`;
+        const medicalReportFile = (req.files || []).find((f) => f.fieldname === 'medicalReport');
+        if (medicalReportFile) {
+            patientData.medicalReports = [{
+                id: new mongoose.Types.ObjectId().toString(),
+                fileUrl: `/uploads/${medicalReportFile.filename}`,
+                uploadedByAdmin: true,
+                createdAt: new Date(),
+                title: 'Medical Report',
+            }];
         }
 
         console.log('Creating patient with data:', patientData);
@@ -590,13 +608,24 @@ const updatePatientAdmin = asyncHandler(async (req, res) => {
 
     console.log(`updatePatientAdmin called for patient ID: ${id} with data:`, updateData);
 
-    // Handle file upload for medicalReport
-    if (req.file) {
-        updateData.medicalReport = `/uploads/${req.file.filename}`;
-    }
+    // Handle file upload for medicalReport: append to medicalReports (keep all)
+    const medicalReportFile = (req.files || []).find((f) => f.fieldname === 'medicalReport');
+    const medicalReportPush = medicalReportFile ? {
+        id: new mongoose.Types.ObjectId().toString(),
+        fileUrl: `/uploads/${medicalReportFile.filename}`,
+        uploadedByAdmin: true,
+        createdAt: new Date(),
+        title: 'Medical Report',
+    } : null;
+
+    // Build update: $set for fields; $push for new medical report when appending
+    delete updateData.medicalReport;
+    delete updateData.medicalReportUploadedByAdmin;
+    const updateDoc = { $set: updateData };
+    if (medicalReportPush) updateDoc.$push = { medicalReports: medicalReportPush };
 
     // Validate required fields before update
-    const requiredFields = ['name', 'dateOfBirth', 'age', 'gender', 'mobileNumber', 'surgeryType', 'surgeryDate', 'currentCondition', 'emergencyContactNumber'];
+    const requiredFields = ['name', 'dateOfBirth', 'age', 'gender', 'mobileNumber', 'surgeryType', 'surgeryDate'];
     const missingFields = requiredFields.filter(field => !updateData[field]);
     
     if (missingFields.length > 0) {
@@ -604,7 +633,13 @@ const updatePatientAdmin = asyncHandler(async (req, res) => {
         throw new ApiError(400, `Missing required fields: ${missingFields.join(', ')}`);
     }
 
-    const patient = await Patient.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
+    // Fetch existing to detect change from non-insured to insured (before update)
+    const existing = await Patient.findById(id);
+    if (!existing) {
+        throw new ApiError(404, "Patient not found");
+    }
+
+    const patient = await Patient.findByIdAndUpdate(id, updateDoc, { new: true, runValidators: true })
         .populate('userId', 'Fullname mobile_number email');
 
     if (!patient) {
@@ -642,6 +677,63 @@ const updatePatientAdmin = asyncHandler(async (req, res) => {
         } catch (userUpdateError) {
             console.error(`Error updating User email:`, userUpdateError);
             // Don't fail the request if User update fails, Patient update is more important
+        }
+    }
+
+    // When admin changes patient from non-insured to insured, create a pending registration payment so the patient sees it on their profile
+    const wasNonInsured = (existing.medicalInsurance !== 'Yes');
+    const isNowInsured = (updateData.medicalInsurance === 'Yes');
+    if (wasNonInsured && isNowInsured && patient.userId) {
+        try {
+            const uid = patient.userId?._id || patient.userId;
+            const dup = await Payment.findOne({ patientId: id, paymentType: 'registration', status: 'pending' });
+            if (!dup) {
+                const user = await User.findById(uid).select('address').lean();
+                // Include state and city so Uttar Pradesh is detected (state may not be in address string)
+                const addr = [patient.address, patient.city, patient.state, patient.pincode, user?.address].filter(Boolean).join(' ');
+                const amount = /Uttar\s*Pradesh|U\.?P\.?\b/i.test(addr) ? 18000 : 35000;
+                const pay = await Payment.create({
+                    patientId: id,
+                    userId: uid,
+                    amount,
+                    description: 'Patient Registration Fee',
+                    paymentType: 'registration',
+                    status: 'pending',
+                    requestedBy: req.user._id,
+                });
+                await Notification.create({
+                    userId: uid,
+                    type: 'payment',
+                    title: 'Payment Request',
+                    message: `New payment request of ₹${amount.toLocaleString('en-IN')} for Patient Registration Fee`,
+                    relatedId: pay._id,
+                    relatedModel: 'Payment',
+                    actionUrl: '/PatientProfile?tab=payments',
+                    read: false,
+                });
+                console.log(`Created registration payment of ₹${amount} for patient ${id} (non-insured → insured)`);
+            }
+        } catch (err) {
+            console.error('Error creating registration payment for newly insured patient:', err);
+        }
+    }
+
+    // If patient is insured, ensure any pending registration payment has the correct amount (UP=18000, else 35000)
+    if (patient.medicalInsurance === 'Yes' && patient.userId) {
+        try {
+            const uid = patient.userId?._id || patient.userId;
+            const pend = await Payment.findOne({ patientId: id, paymentType: 'registration', status: 'pending' });
+            if (pend) {
+                const user = await User.findById(uid).select('address').lean();
+                const addr = [patient.address, patient.city, patient.state, patient.pincode, user?.address].filter(Boolean).join(' ');
+                const correctAmount = /Uttar\s*Pradesh|U\.?P\.?\b/i.test(addr) ? 18000 : 35000;
+                if (pend.amount !== correctAmount) {
+                    await Payment.findByIdAndUpdate(pend._id, { amount: correctAmount });
+                    console.log(`Updated registration payment amount to ₹${correctAmount} for patient ${id} (state: ${patient.state})`);
+                }
+            }
+        } catch (err) {
+            console.error('Error correcting registration payment amount:', err);
         }
     }
 
@@ -831,6 +923,50 @@ const getPatientDetailsAdmin = asyncHandler(async (req, res) => {
         sessions,
         recoveryPercent
     }, "Patient details retrieved successfully."));
+});
+
+const getPatientReportsAdmin = asyncHandler(async (req, res) => {
+    const { patientId } = req.params;
+    if (!patientId) throw new ApiError(400, "Patient ID is required.");
+    const patient = await Patient.findById(patientId);
+    if (!patient) return res.status(200).json(new ApiResponse(200, [], "No reports found for this patient."));
+    const reports = await Report.find({ patientId: patient._id }).populate('uploadedBy', 'Fullname userType').sort({ createdAt: -1 });
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const list = reports.map((r) => r.toObject ? r.toObject() : r);
+    if (patient.medicalReport && typeof patient.medicalReport === 'string' && patient.medicalReport.trim()) {
+        const fileUrl = patient.medicalReport.startsWith('http') ? patient.medicalReport : `${baseUrl}${patient.medicalReport}`;
+        list.push({ _id: 'profile-report', title: 'Medical Report', fileUrl, createdAt: patient.updatedAt || patient.createdAt, uploadedBy: null, isProfileReport: true, uploadedByAdmin: !!patient.medicalReportUploadedByAdmin });
+    }
+    const medicalReports = (patient.medicalReports || []).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    medicalReports.forEach((r, i) => {
+        const fileUrl = (r.fileUrl && r.fileUrl.startsWith('http')) ? r.fileUrl : `${baseUrl}${r.fileUrl || ''}`;
+        list.push({ _id: r.id || `medical-report-${i}-${r.fileUrl || ''}`, title: r.title || 'Medical Report', fileUrl, createdAt: r.createdAt || new Date(), uploadedBy: null, isFromMedicalReports: true, uploadedByAdmin: !!r.uploadedByAdmin });
+    });
+    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return res.status(200).json(new ApiResponse(200, list, "Reports fetched successfully."));
+});
+
+const deletePatientReportAdmin = asyncHandler(async (req, res) => {
+    const { patientId, reportId } = req.params;
+    if (!patientId || !reportId) throw new ApiError(400, "Patient ID and Report ID are required.");
+    const patient = await Patient.findById(patientId);
+    if (!patient) throw new ApiError(404, "Patient not found.");
+    if (reportId === 'profile-report') {
+        await Patient.findByIdAndUpdate(patientId, { $unset: { medicalReport: 1, medicalReportUploadedByAdmin: 1 } });
+        return res.status(200).json(new ApiResponse(200, {}, "Report deleted successfully."));
+    }
+    const isValidMongoId = /^[0-9a-fA-F]{24}$/.test(reportId);
+    if (isValidMongoId) {
+        const report = await Report.findOne({ _id: reportId, patientId });
+        if (report) {
+            await report.deleteOne();
+            return res.status(200).json(new ApiResponse(200, {}, "Report deleted successfully."));
+        }
+    }
+    const pullResult = await Patient.findByIdAndUpdate(patientId, { $pull: { medicalReports: { id: reportId } } }, { new: true });
+    const pulled = (patient.medicalReports || []).length !== (pullResult?.medicalReports || []).length;
+    if (!pulled && isValidMongoId) throw new ApiError(404, "Report not found.");
+    return res.status(200).json(new ApiResponse(200, {}, "Report deleted successfully."));
 });
 
 const getPatientsStats = asyncHandler(async (req, res) => {
@@ -3145,4 +3281,45 @@ const updateUserProfileStatusAdmin = asyncHandler(async (req, res) => {
     }, "User profile status updated successfully"));
 });
 
-export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin, updateUserProfileStatusAdmin };
+const getFeedbacks = asyncHandler(async (req, res) => {
+    const feedbacks = await Feedback.find()
+        .populate('user', 'Fullname email mobile_number')
+        .sort({ createdAt: -1 });
+    return res.status(200).json(new ApiResponse(200, feedbacks, "Feedbacks retrieved successfully."));
+});
+
+const updateFeedbackStatus = asyncHandler(async (req, res) => {
+    const { feedbackId } = req.params;
+    const { isPublic } = req.body;
+
+    if (typeof isPublic !== 'boolean') {
+        throw new ApiError(400, "isPublic must be a boolean value");
+    }
+
+    const feedback = await Feedback.findById(feedbackId);
+    if (!feedback) {
+        throw new ApiError(404, "Feedback not found");
+    }
+
+    feedback.isPublic = isPublic;
+    await feedback.save();
+
+    return res.status(200).json(
+        new ApiResponse(200, feedback, `Feedback ${isPublic ? 'published' : 'unpublished'} successfully`)
+    );
+});
+
+const deleteFeedback = asyncHandler(async (req, res) => {
+    const { feedbackId } = req.params;
+
+    const feedback = await Feedback.findByIdAndDelete(feedbackId);
+    if (!feedback) {
+        throw new ApiError(404, "Feedback not found");
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, null, "Feedback deleted successfully")
+    );
+});
+
+export { sendAdminOTP, verifyAdminOTP, getAllPatientsAdmin, getPatientsStats, createPatientAdmin, updatePatientAdmin, deletePatientAdmin, getPatientDetailsAdmin, getPatientReportsAdmin, deletePatientReportAdmin, exportPatientsAdmin, exportAllUsersAdmin, getUsersWithoutPatients, markUserAsAdded, universalSearch, quickSearch, allocateSession, loginAdmin, setAdminPassword, forgotAdminPassword, resetAdminPassword, getAllAdmins, createAdmin, updateAdmin, deleteAdmin, getAllDoctorsAdmin, createDoctorAdmin, updateDoctorAdmin, deleteDoctorAdmin, getDoctorDetailsAdmin, getAllPhysiosAdmin, createPhysioAdmin, updatePhysioAdmin, deletePhysioAdmin, getPhysioDetailsAdmin, getContactSubmissions, createContactSubmission, deleteUserAdmin, cleanupOrphanedSessions, createPaymentRequest, getAllPaymentsAdmin, updatePaymentStatus, getPatientPaymentCredits, changeUserPasswordAdmin, updateUserProfileStatusAdmin, getFeedbacks, updateFeedbackStatus, deleteFeedback };

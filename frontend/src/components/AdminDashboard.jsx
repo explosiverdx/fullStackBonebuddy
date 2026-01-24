@@ -7,6 +7,7 @@ import PatientRecord from './PatientRecord'; // Assuming these components exist
 import { useAuth } from '../hooks/useAuth';
 import DoctorTable from './DoctorTable'; // Assuming these components exist
 import ContactSubmissions from './ContactSubmissions';
+import Feedbacks from './Feedbacks';
 import PhysiotherapistTable from './PhysiotherapistTable'; // Assuming these components exist
 import Payments from './AdminDashboard/Payments';
 import Referrals from './AdminDashboard/Referrals';
@@ -2342,7 +2343,7 @@ const AdminList = ({ authHeaders }) => {
     email: '',
     mobile_number: '',
     adminPermissions: {
-      visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+      visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'feedback', 'blog'],
       sectionPermissions: {
         patients: { visible: true, readOnly: false },
         doctors: { visible: true, readOnly: false },
@@ -2507,7 +2508,7 @@ const AdminList = ({ authHeaders }) => {
       email: admin.email || '',
       mobile_number: admin.mobile_number || '',
       adminPermissions: admin.adminPermissions || {
-        visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+        visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'feedback', 'blog'],
         sectionPermissions: {
           patients: { visible: true, readOnly: false },
           doctors: { visible: true, readOnly: false },
@@ -2534,7 +2535,7 @@ const AdminList = ({ authHeaders }) => {
       email: '',
       mobile_number: '',
       adminPermissions: {
-        visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'blog'],
+        visibleSections: ['dashboard', 'patients', 'doctors', 'physiotherapists', 'sessions', 'payments', 'referrals', 'contact', 'feedback', 'blog'],
         sectionPermissions: {
           patients: { visible: true, readOnly: false },
           doctors: { visible: true, readOnly: false },
@@ -2783,6 +2784,7 @@ const AdminList = ({ authHeaders }) => {
                           { key: 'payments', label: 'Payments', canBeReadOnly: true },
                           { key: 'referrals', label: 'Referrals', canBeReadOnly: false },
                           { key: 'contact', label: 'Contact', canBeReadOnly: false },
+                          { key: 'feedback', label: 'Feedback', canBeReadOnly: false },
                           { key: 'blog', label: 'Blog', canBeReadOnly: false }
                         ].map((section) => (
                           <div key={section.key} className="flex items-center justify-between p-2 border rounded">
@@ -2989,6 +2991,7 @@ const AdminList = ({ authHeaders }) => {
                           { key: 'payments', label: 'Payments', canBeReadOnly: true },
                           { key: 'referrals', label: 'Referrals', canBeReadOnly: false },
                           { key: 'contact', label: 'Contact', canBeReadOnly: false },
+                          { key: 'feedback', label: 'Feedback', canBeReadOnly: false },
                           { key: 'blog', label: 'Blog', canBeReadOnly: false }
                         ].map((section) => (
                           <div key={section.key} className="flex items-center justify-between p-2 border rounded">
@@ -3548,6 +3551,7 @@ const AdminDashboard = () => {
                 { key: 'payments', path: '/admin/payments', label: 'Payments', exact: true },
                 { key: 'referrals', path: '/admin/referrals', label: 'Referrals', exact: true },
                 { key: 'contact', path: '/admin/contact', label: 'Contact Form', exact: true },
+                { key: 'feedback', path: '/admin/feedback', label: 'Feedback', exact: true },
                 { key: 'blog', path: '/admin/blog', label: 'Blog', exact: true }
               ];
 
@@ -3751,6 +3755,7 @@ const AdminDashboard = () => {
             <Route path="profile" element={renderAdminProfile()} />
             
             <Route path="contact" element={<ContactSubmissions />} />
+            <Route path="feedback" element={<Feedbacks />} />
             <Route path="payments" element={<Payments user={user} />} />
             <Route path="referrals" element={<Referrals />} />
             {/* <Route path="services" element={<p>Content for Services will be added later.</p>} /> */}

@@ -723,19 +723,36 @@ a {
   grid-column: span 2;
 }
 .footer-logo {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 4rem;
+  height: 4rem;
   border-radius: 9999px; /* full */
-  border: 2px solid white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  display: block;
   margin-bottom: 1rem;
+  overflow: hidden;
+  background-color: transparent;
+  padding: 0;
+  position: relative;
+  box-sizing: border-box;
+}
+@media (min-width: 640px) {
+  .footer-logo {
+    width: 5rem;
+    height: 5rem;
+  }
+}
+@media (min-width: 768px) {
+  .footer-logo {
+    width: 6rem;
+    height: 6rem;
+  }
 }
 .footer-logo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
+  border-radius: 50%;
+  display: block;
 }
 .footer-logo-text {
   font-size: 1.25rem;

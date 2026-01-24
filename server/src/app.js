@@ -1,7 +1,10 @@
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app=express()
 
 app.use(cors({
@@ -31,6 +34,8 @@ app.use((req, res, next) => {
 app.use(express.json({limit:"50mb"})) // Increased for video metadata
 app.use(express.urlencoded({extended:true, limit:"50mb"})) // Increased for video uploads
 app.use(express.static("public"))
+// Serve uploads (registration medical reports, etc.) from the same path multer uses
+app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")))
 app.use(cookieParser())
 
 // routes import

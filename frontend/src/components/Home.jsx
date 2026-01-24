@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useNavigate } from 'react-router-dom';
 
 const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -16,6 +17,10 @@ const Home = () => {
   const [dragStartX, setDragStartX] = useState(0);
   const [dragOffset, setDragOffset] = useState(0);
   const [currentTestimonialIndex, setCurrentTestimonialIndex] = useState(0);
+  const [pendingPayments, setPendingPayments] = useState([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
+  const navigate = useNavigate();
   
   const slides = [
     { src: "/assets/carousel/carousel1.jpeg", alt: "Physiotherapy Treatment" },
@@ -185,6 +190,58 @@ const Home = () => {
     return () => clearInterval(testimonialInterval);
   }, [testimonials.length]);
 
+  // Load pending payments and user profile for logged-in patients (same as registration-with-insurance flow)
+  const loadPaymentsAndProfile = React.useCallback(async () => {
+    const accessToken = localStorage.getItem('accessToken');
+    const userRole = localStorage.getItem('userRole');
+    if (!accessToken || userRole !== 'patient') return;
+
+    setIsLoadingPayments(true);
+    try {
+      const profileResponse = await fetch('/api/v1/users/me', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        credentials: 'include'
+      });
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        setUserProfile(profileData.data);
+      }
+
+      const paymentsResponse = await fetch('/api/v1/payments', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        credentials: 'include'
+      });
+      if (paymentsResponse.ok) {
+        const data = await paymentsResponse.json();
+        const raw = data?.data;
+        const list = Array.isArray(raw?.docs) ? raw.docs : Array.isArray(raw) ? raw : Array.isArray(data) ? data : [];
+        const pending = list.filter(p => p.status === 'pending' || p.isPending);
+        setPendingPayments(pending);
+      }
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setIsLoadingPayments(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPaymentsAndProfile();
+  }, [loadPaymentsAndProfile]);
+
+  // Re-fetch when user returns to this tab (so admin-created registration payment shows after non-insured→insured)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && localStorage.getItem('accessToken') && localStorage.getItem('userRole') === 'patient') {
+        loadPaymentsAndProfile();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadPaymentsAndProfile]);
+
   return (
     <>
       <Helmet>
@@ -239,6 +296,133 @@ const Home = () => {
           ))}
         </div>
       </div>
+
+      {/* Pending Payment Reminder */}
+      {!isLoadingPayments && pendingPayments.length > 0 && (
+        <div className="mx-4 sm:mx-6 lg:mx-8 mt-8 mb-8">
+          <div 
+            onClick={() => navigate('/PatientProfile')}
+            className="relative overflow-hidden rounded-2xl cursor-pointer transform hover:scale-[1.01] transition-all duration-300"
+            style={{
+              background: 'linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%)',
+              boxShadow: '0 20px 40px rgba(251, 146, 60, 0.4), 0 8px 16px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            {/* Decorative background pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-32 -mt-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -ml-24 -mb-24"></div>
+            </div>
+            
+            <div className="relative p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center space-x-5 flex-1 w-full sm:w-auto">
+                  <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full flex items-center justify-center shadow-2xl transform hover:rotate-12 transition-transform duration-300">
+                    <svg className="w-8 h-8 sm:w-10 sm:h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-lg sm:text-xl mb-2 drop-shadow-lg">Your payment is pending</p>
+                    <p className="text-white text-3xl sm:text-4xl font-black tracking-tight drop-shadow-lg">
+                      ₹{pendingPayments[0].amount?.toLocaleString('en-IN') || pendingPayments[0].amount}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/PatientProfile');
+                  }}
+                  className="w-full sm:w-auto bg-white text-orange-600 px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg shadow-2xl hover:shadow-3xl transform hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center space-x-2 whitespace-nowrap"
+                  style={{
+                    boxShadow: '0 10px 25px rgba(255, 255, 255, 0.3), 0 4px 10px rgba(0, 0, 0, 0.2)'
+                  }}
+                >
+                  <span>Pay Now</span>
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Non-Insured Patient Message (if no pending payments) */}
+      {!isLoadingPayments && 
+       pendingPayments.length === 0 && 
+       userProfile && 
+       userProfile.medicalInsurance !== 'Yes' && 
+       userProfile.userType === 'patient' && (
+        <div className="mx-4 sm:mx-6 lg:mx-8 mt-8 mb-8">
+          <div 
+            className="relative overflow-hidden rounded-2xl"
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 50%, #14b8a6 100%)',
+              boxShadow: '0 20px 40px rgba(59, 130, 246, 0.4), 0 8px 16px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            {/* Decorative background pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-32 -mt-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -ml-24 -mb-24"></div>
+            </div>
+            
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-center space-x-5">
+                <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full flex items-center justify-center shadow-2xl">
+                  <svg className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-bold text-lg sm:text-xl mb-1 drop-shadow-lg">Our representative will reach you soon.</p>
+                  <p className="text-white text-sm sm:text-base drop-shadow-lg opacity-95">Thank you for registering with us!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Non-Insured Patient Message (if no pending payments) */}
+      {!isLoadingPayments && 
+       pendingPayments.length === 0 && 
+       userProfile && 
+       userProfile.medicalInsurance !== 'Yes' && 
+       userProfile.userType === 'patient' && (
+        <div className="mx-4 sm:mx-6 lg:mx-8 mt-8 mb-8">
+          <div 
+            className="relative overflow-hidden rounded-2xl"
+            style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #06b6d4 50%, #14b8a6 100%)',
+              boxShadow: '0 20px 40px rgba(59, 130, 246, 0.4), 0 8px 16px rgba(0, 0, 0, 0.15)'
+            }}
+          >
+            {/* Decorative background pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-32 -mt-32"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -ml-24 -mb-24"></div>
+            </div>
+            
+            <div className="relative p-6 sm:p-8">
+              <div className="flex items-center space-x-5">
+                <div className="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full flex items-center justify-center shadow-2xl">
+                  <svg className="w-8 h-8 sm:w-10 sm:h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-bold text-lg sm:text-xl mb-1 drop-shadow-lg">Our representative will reach you soon.</p>
+                  <p className="text-white text-sm sm:text-base drop-shadow-lg opacity-95">Thank you for registering with us!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="main-content">
 

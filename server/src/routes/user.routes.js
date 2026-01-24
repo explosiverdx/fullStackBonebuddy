@@ -18,7 +18,9 @@ import {
     welcome,
     createContactSubmission
 } from "../controllers/user.controller.js";
+import { createFeedback, getPublicFeedbacks } from "../controllers/feedback.controller.js";
 import { upload } from "../middleware/multer.middleware.js";
+import { parseMultipartForm } from "../middleware/formData.middleware.js";
 import { verifyJWT } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -48,9 +50,11 @@ router.route("/me").get(verifyJWT, getCurrentUser);
 router.route("/change-password").post(verifyJWT, changeCurrentPassword);
 router.route("/me").patch(verifyJWT, updateUserAccount);
 router.route("/avatar").patch(verifyJWT, upload.single("avatar"), updateUserAvatar);
-router.route("/profile").post(verifyJWT, upload.any(), updateProfile);
+router.route("/profile").post(verifyJWT, parseMultipartForm, updateProfile);
 router.route("/set-password").post(verifyJWT, setPassword);
 router.route("/contact").post(createContactSubmission);
+router.route("/feedback").post(createFeedback);
+router.route("/feedbacks/public").get(getPublicFeedbacks);
 
 
 export default router;

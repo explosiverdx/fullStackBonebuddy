@@ -62,6 +62,9 @@ const PatientRecord = ({ user: userProp }) => {
     userId: '',
     age: '',
     address: '',
+    state: '',
+    city: '',
+    pincode: '',
     currentCondition: '',
     assignedPhysiotherapist: '',
     medicalHistory: '',
@@ -101,6 +104,8 @@ const PatientRecord = ({ user: userProp }) => {
   const [dobDay, setDobDay] = useState('');
   const [dobMonth, setDobMonth] = useState('');
   const [dobYear, setDobYear] = useState('');
+  const [adminReports, setAdminReports] = useState([]);
+  const [adminReportsLoading, setAdminReportsLoading] = useState(false);
 
   const { patientId } = useParams();
   const navigate = useNavigate();
@@ -158,6 +163,22 @@ const PatientRecord = ({ user: userProp }) => {
     }
   }, [patientId]);
 
+  // Fetch medical reports when Details modal is open (admin)
+  useEffect(() => {
+    if (!selectedPatient || showModal || !selectedPatient.patient?._id) {
+      setAdminReports([]);
+      setAdminReportsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAdminReportsLoading(true);
+    apiClient.get(`/admin/patients/${selectedPatient.patient._id}/reports`)
+      .then((res) => { if (!cancelled) setAdminReports(res.data?.data ?? []); })
+      .catch(() => { if (!cancelled) setAdminReports([]); })
+      .finally(() => { if (!cancelled) setAdminReportsLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedPatient, showModal]);
+
   useEffect(() => {
     fetchStats();
     fetchAvailableUsers();
@@ -195,6 +216,8 @@ const PatientRecord = ({ user: userProp }) => {
   }, [doctors, referralData, isFromReferral]);
 
   const fillFormFromReferral = (referral) => {
+    // Normalize phone to 10 digits to avoid "Please match the requested format" when it has +91
+    const norm = (v) => ((v || '').replace(/\D/g, '').slice(-10) || '');
     // Find the doctor by ID or name
     let selectedDoctorId = '';
     if (referral.doctorId) {
@@ -225,13 +248,13 @@ const PatientRecord = ({ user: userProp }) => {
       email: referral.patientEmail || '',
       dateOfBirth: dobValue,
       gender: referral.patientGender || '',
-      mobileNumber: referral.patientPhone || '',
+      mobileNumber: norm(referral.patientPhone) || '',
       surgeryType: referral.surgeryType || '',
       surgeryDate: referral.surgeryDate ? new Date(referral.surgeryDate).toISOString().split('T')[0] : '',
       assignedDoctor: selectedDoctorId || referral.doctorName || '',
       medicalReport: '',
       hospitalClinic: '',
-      emergencyContactNumber: referral.patientPhone || '',
+      emergencyContactNumber: norm(referral.patientPhone) || '',
       userId: '',
       age: referral.patientAge ? referral.patientAge.toString() : '',
       address: '',
@@ -395,6 +418,9 @@ const PatientRecord = ({ user: userProp }) => {
       userId: '',
       age: '',
       address: '',
+      state: '',
+      city: '',
+      pincode: '',
       currentCondition: '',
       assignedPhysiotherapist: '',
       medicalHistory: '',
@@ -414,21 +440,37 @@ const PatientRecord = ({ user: userProp }) => {
           : new Date(patient.dateOfBirth).toISOString().split('T')[0])
       : '';
     
+    // Normalize phone numbers to 10 digits so they match pattern [0-9]{10} (avoids "Please match the requested format" for +91 etc.)
+    const norm = (v) => ((v || '').replace(/\D/g, '').slice(-10) || '');
+    // Resolve assignedDoctor to doctor _id so the dropdown shows the correct selection (stored value can be ID or name)
+    let assignedDoctorValue = patient.assignedDoctor || '';
+    if (assignedDoctorValue && doctors.length > 0) {
+      const byId = doctors.find(d => d._id && String(d._id) === String(assignedDoctorValue));
+      if (byId) {
+        assignedDoctorValue = byId._id;
+      } else {
+        const byName = doctors.find(d => (d.Fullname || d.name || '') === assignedDoctorValue);
+        if (byName) assignedDoctorValue = byName._id;
+      }
+    }
     setFormData({
       name: patient.name,
       email: patient.email || '',
       dateOfBirth: dobValue,
       gender: patient.gender || '',
-      mobileNumber: patient.mobileNumber || '',
+      mobileNumber: norm(patient.mobileNumber) || '',
       surgeryType: patient.surgeryType || '',
       surgeryDate: patient.surgeryDate ? (patient.surgeryDate.includes('T') ? patient.surgeryDate.split('T')[0] : new Date(patient.surgeryDate).toISOString().split('T')[0]) : '',
-      assignedDoctor: patient.assignedDoctor || '',
+      assignedDoctor: assignedDoctorValue,
       medicalReport: patient.medicalReport || '',
       hospitalClinic: patient.hospitalClinic || '',
-      emergencyContactNumber: patient.emergencyContactNumber || '',
+      emergencyContactNumber: norm(patient.emergencyContactNumber) || '',
       userId: patient.userId,
       age: patient.age || '',
-      address: patient.address ? (typeof patient.address === 'object' ? `${patient.address.city || ''}, ${patient.address.state || ''}` : patient.address) : '',
+      address: (typeof patient.address === 'object' && patient.address != null) ? (patient.address.address || patient.address.street || '') : (patient.address || ''),
+      state: patient.state || '',
+      city: patient.city || '',
+      pincode: patient.pincode || '',
       currentCondition: patient.currentCondition || '',
       assignedPhysiotherapist: patient.assignedPhysiotherapist || '',
       medicalHistory: patient.medicalHistory || '',
@@ -454,23 +496,27 @@ const PatientRecord = ({ user: userProp }) => {
   };
 
   const handleCreateProfileForUser = (user) => {
-    // Open the add patient modal with pre-filled user information
+    // Normalize phone to 10 digits to avoid "Please match the requested format" when it has +91
+    const norm = (v) => ((v || '').replace(/\D/g, '').slice(-10) || '');
     setModalMode('add');
     setFormData({
       name: user.Fullname || '',
       email: user.email || '',
       dateOfBirth: '',
       gender: '',
-      mobileNumber: user.mobile_number || '',
+      mobileNumber: norm(user.mobile_number) || '',
       surgeryType: '',
       surgeryDate: '',
       assignedDoctor: '',
       medicalReport: '',
       hospitalClinic: '',
-      emergencyContactNumber: user.mobile_number || '',
+      emergencyContactNumber: norm(user.mobile_number) || '',
       userId: user._id,
       age: '',
       address: '',
+      state: '',
+      city: '',
+      pincode: '',
       currentCondition: '',
       assignedPhysiotherapist: '',
       medicalHistory: '',
@@ -565,8 +611,6 @@ const PatientRecord = ({ user: userProp }) => {
     if (!formData.mobileNumber || formData.mobileNumber.trim() === '') missingFields.push('Mobile Number');
     if (!formData.surgeryType || formData.surgeryType.trim() === '') missingFields.push('Surgery Type');
     if (!formData.surgeryDate) missingFields.push('Surgery Date');
-    if (!formData.currentCondition || formData.currentCondition.trim() === '') missingFields.push('Current Condition');
-    if (!formData.emergencyContactNumber || formData.emergencyContactNumber.trim() === '') missingFields.push('Emergency Contact Number');
     
     if (missingFields.length > 0) {
       alert(`Please fill in the following required fields:\n\n${missingFields.join('\n')}`);
@@ -576,6 +620,11 @@ const PatientRecord = ({ user: userProp }) => {
 
     try {
       const payload = { ...formData };
+      
+      // Ensure medicalInsurance is always Yes or No (Patient model enum)
+      if (!payload.medicalInsurance || (payload.medicalInsurance !== 'Yes' && payload.medicalInsurance !== 'No')) {
+        payload.medicalInsurance = 'No';
+      }
       
       // Convert age to number
       if (payload.age) {
@@ -605,6 +654,8 @@ const PatientRecord = ({ user: userProp }) => {
         Object.keys(payload).forEach(key => {
           if (key === 'medicalReport' && payload[key] instanceof File) {
             formDataObj.append(key, payload[key]);
+          } else if (['state', 'city', 'pincode', 'address'].includes(key)) {
+            formDataObj.append(key, payload[key] ?? '');
           } else if (payload[key] !== null && payload[key] !== undefined && payload[key] !== '') {
             // Convert age to string for FormData
             const value = key === 'age' ? String(payload[key]) : payload[key];
@@ -612,7 +663,9 @@ const PatientRecord = ({ user: userProp }) => {
           }
         });
         dataToSend = formDataObj;
-        headers = { 'Content-Type': 'multipart/form-data' };
+        // Do NOT set Content-Type: let the browser set multipart/form-data; boundary=...
+        // Otherwise the server's multer cannot parse the body.
+        headers = {};
       }
 
       console.log('Submitting patient data:', modalMode, dataToSend);
@@ -660,6 +713,9 @@ const PatientRecord = ({ user: userProp }) => {
           userId: '',
           age: '',
           address: '',
+          state: '',
+          city: '',
+          pincode: '',
           currentCondition: '',
           assignedPhysiotherapist: '',
           medicalHistory: '',
@@ -1094,12 +1150,7 @@ const PatientRecord = ({ user: userProp }) => {
                   </td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">{patient.hospitalClinic || 'N/A'}</td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2">
-                    {patient.address ? 
-                      (typeof patient.address === 'object' && patient.address !== null ? 
-                        `${patient.address.city || 'N/A'}, ${patient.address.state || 'N/A'}` : 
-                        patient.address
-                      ) : 'N/A'
-                    }
+                    {[patient.address, patient.city, patient.state, patient.pincode].filter(Boolean).join(', ') || 'N/A'}
                   </td>
                   <td className="border border-gray-300 px-2 sm:px-4 py-2 whitespace-nowrap">
                     {patient.isProfileComplete ? (
@@ -1288,24 +1339,45 @@ const PatientRecord = ({ user: userProp }) => {
               <p><strong>Surgery Date:</strong> {selectedPatient.patient.surgeryDate ? new Date(selectedPatient.patient.surgeryDate).toLocaleDateString() : 'N/A'}</p>
               <p><strong>Assigned Doctor:</strong> {selectedPatient.patient.assignedDoctor || 'N/A'}</p>
               <p><strong>Hospital/Clinic:</strong> {selectedPatient.patient.hospitalClinic || 'N/A'}</p>
-              <p><strong>Medical Report:</strong> {selectedPatient.patient.medicalReport ? (
-                <a 
-                  href={getMedicalReportUrl(selectedPatient.patient.medicalReport)} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-blue-500 hover:underline"
-                >
-                  View Report
-                </a>
-              ) : 'Not Uploaded'}</p>
+              <div className="col-span-2">
+                <strong>Medical Reports</strong>
+                {adminReportsLoading ? (
+                  <p className="text-gray-500">Loading…</p>
+                ) : adminReports.length === 0 ? (
+                  <p className="text-gray-500">No reports</p>
+                ) : (
+                  <ul className="list-disc list-inside mt-1 space-y-1">
+                    {adminReports.map((r) => (
+                      <li key={r._id} className="flex items-center gap-2 flex-wrap">
+                        <a href={getMedicalReportUrl(r.fileUrl)} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{r.title || 'Medical Report'}</a>
+                        {!isSectionReadOnly(user, 'patients') && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!confirm('Delete this report?')) return;
+                              try {
+                                await apiClient.delete(`/admin/patients/${selectedPatient.patient._id}/reports/${r._id}`);
+                                setAdminReports((prev) => prev.filter((x) => x._id !== r._id));
+                              } catch (e) {
+                                alert(e.response?.data?.message || 'Failed to delete report.');
+                              }
+                            }}
+                            className="text-red-600 hover:underline text-sm"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <p><strong>Last Login:</strong> {selectedPatient.patient.lastLogin ? new Date(selectedPatient.patient.lastLogin).toLocaleDateString() : 'Never'}</p>
               <p><strong>Profile Status:</strong> {selectedPatient.patient.isProfileComplete ? 'Complete' : 'Incomplete'}</p>
-              <p><strong>Address:</strong> {selectedPatient.patient.address ? 
-                (typeof selectedPatient.patient.address === 'object' && selectedPatient.patient.address !== null ? 
-                  `${selectedPatient.patient.address.city || 'N/A'}, ${selectedPatient.patient.address.state || 'N/A'}` : 
-                  selectedPatient.patient.address
-                ) : 'N/A'
-              }</p>
+              <p><strong>Address:</strong> {selectedPatient.patient.address || 'N/A'}</p>
+              <p><strong>City:</strong> {selectedPatient.patient.city || 'N/A'}</p>
+              <p><strong>State:</strong> {selectedPatient.patient.state || 'N/A'}</p>
+              <p><strong>Pincode:</strong> {selectedPatient.patient.pincode || 'N/A'}</p>
               <p><strong>Current Condition:</strong> {selectedPatient.patient.currentCondition || 'N/A'}</p>
               <p><strong>Assigned Physiotherapist:</strong> {selectedPatient.patient.assignedPhysiotherapist || 'N/A'}</p>
               <p><strong>Allergies:</strong> {selectedPatient.patient.allergies || 'N/A'}</p>
@@ -1552,14 +1624,16 @@ const PatientRecord = ({ user: userProp }) => {
               </label>
               <input
                 type="tel"
-                placeholder="10 digits only"
+                placeholder="10 digits (with or without +91)"
                 value={formData.mobileNumber}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  const raw = e.target.value.replace(/\D/g, '');
+                  const value = raw.length > 10 ? raw.slice(-10) : raw.slice(0, 10);
                   setFormData({ ...formData, mobileNumber: value });
                 }}
-                maxLength="10"
+                maxLength="13"
                 pattern="[0-9]{10}"
+                title="Enter 10-digit mobile number (e.g. 9236347274 or +919236347274)"
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -1661,20 +1735,21 @@ const PatientRecord = ({ user: userProp }) => {
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Emergency Contact Number <span className="text-red-500">*</span>
+                Emergency Contact Number <span className="text-gray-500 text-sm">(optional)</span>
               </label>
               <input
                 type="tel"
-                placeholder="10 digits only"
+                placeholder="10 digits (with or without +91)"
                 value={formData.emergencyContactNumber}
                 onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  const raw = e.target.value.replace(/\D/g, '');
+                  const value = raw.length > 10 ? raw.slice(-10) : raw.slice(0, 10);
                   setFormData({ ...formData, emergencyContactNumber: value });
                 }}
-                maxLength="10"
-                pattern="[0-9]{10}"
+                maxLength="13"
+                pattern="^([0-9]{10})?$"
+                title="Enter 10-digit number or leave blank"
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-                required
               />
             </div>
 
@@ -1683,25 +1758,54 @@ const PatientRecord = ({ user: userProp }) => {
                 Address
               </label>
               <textarea
-                placeholder="Enter full address"
+                placeholder="Street address, area, landmark"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 resize-y"
-                rows="3"
+                rows="2"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input
+                type="text"
+                placeholder="City"
+                value={formData.city || ''}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <input
+                type="text"
+                placeholder="State"
+                value={formData.state || ''}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pincode / Zipcode</label>
+              <input
+                type="text"
+                placeholder="Pincode"
+                value={formData.pincode || ''}
+                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
               />
             </div>
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Current Condition <span className="text-red-500">*</span>
+                Current Condition <span className="text-gray-500 text-sm">(optional)</span>
               </label>
               <input
                 type="text"
-                placeholder="Describe current condition"
+                placeholder="Describe current condition (optional)"
                 value={formData.currentCondition}
                 onChange={(e) => setFormData({ ...formData, currentCondition: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-                required
               />
             </div>
             <div className="mb-3">
@@ -1758,15 +1862,16 @@ const PatientRecord = ({ user: userProp }) => {
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Medical Insurance
+                Medical Insurance (Insured or Not)
               </label>
-              <input
-                type="text"
-                placeholder="Insurance provider or policy number (optional)"
-                value={formData.medicalInsurance}
+              <select
+                value={formData.medicalInsurance || 'No'}
                 onChange={(e) => setFormData({ ...formData, medicalInsurance: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-              />
+              >
+                <option value="Yes">Yes (Insured)</option>
+                <option value="No">No (Not Insured)</option>
+              </select>
             </div>
             {modalMode === 'add' && (
               <>

@@ -12,6 +12,7 @@ import { generateAccessAndRefreshTokens } from "../utils/auth.utils.js";
 import otpGenerator from "otp-generator";
 import twilio from "twilio";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const registerUser = asyncHandler(async (req, res) => {
     const { Fullname, username, email, password, userType, mobile_number } = req.body;
@@ -549,7 +550,11 @@ const getCurrentUser = asyncHandler(async (req, res) => {
                 userObj.bloodGroup = patient.bloodGroup || null;
                 userObj.medicalInsurance = patient.medicalInsurance || null;
                 userObj.emergencyContactNumber = patient.emergencyContactNumber || null;
-                
+                userObj.address = patient.address || userObj.address || null;
+                userObj.state = patient.state || userObj.state || null;
+                userObj.city = patient.city || userObj.city || null;
+                userObj.pincode = patient.pincode || userObj.pincode || null;
+
                 // Populate doctor and physio details for each session
                 const sessions = await Session.find({ patientId: patient._id })
                     .populate('doctorId', 'name')
@@ -839,7 +844,15 @@ const resetPassword = asyncHandler(async (req, res) => {
 const updateProfile = asyncHandler(async (req, res) => {
     // Extract data from FormData (req.body contains text fields, req.files contains uploaded files)
     const data = req.body;
-    const files = req.files;
+    // upload.any() gives req.files as an array; normalize to { fieldname: [file, ...] } for lookup
+    const rawFiles = req.files;
+    const files = Array.isArray(rawFiles)
+        ? (rawFiles || []).reduce((acc, f) => {
+            if (!acc[f.fieldname]) acc[f.fieldname] = [];
+            acc[f.fieldname].push(f);
+            return acc;
+          }, {})
+        : rawFiles || {};
 
     const {
         name,
@@ -847,6 +860,10 @@ const updateProfile = asyncHandler(async (req, res) => {
         dob,
         gender,
         address,
+        state,
+        city,
+        pincode,
+        areaCode,
         contact,
         surgeryType,
         surgeryDate,
@@ -1061,6 +1078,9 @@ const updateProfile = asyncHandler(async (req, res) => {
             mobileNumber: contact || user.mobile_number,
             email: email || user.email || '',
             address: address || user.address || '',
+            state: state || '',
+            city: city || '',
+            pincode: pincode || areaCode || '',
             surgeryType: surgeryType || '',
             surgeryDate: surgeryDate ? new Date(surgeryDate) : null,
             hospitalClinic: hospitalName || '',
@@ -1074,16 +1094,28 @@ const updateProfile = asyncHandler(async (req, res) => {
             medicalInsurance: medicalInsurance || ''
         };
 
-        // Handle medical report file upload
-        if (files?.medicalReport) {
-            patientData.medicalReport = files.medicalReport[0].path;
+        // Handle medical report file upload: append to medicalReports (patient → Self)
+        if (files?.medicalReport?.[0]) {
+            const updateDoc = {
+                $set: patientData,
+                $push: {
+                    medicalReports: {
+                        id: new mongoose.Types.ObjectId().toString(),
+                        fileUrl: `/uploads/${files.medicalReport[0].filename}`,
+                        uploadedByAdmin: false,
+                        createdAt: new Date(),
+                        title: 'Medical Report',
+                    },
+                },
+            };
+            await Patient.findOneAndUpdate({ userId: user._id }, updateDoc, { upsert: true, new: true });
+        } else {
+            await Patient.findOneAndUpdate(
+                { userId: user._id },
+                patientData,
+                { upsert: true, new: true }
+            );
         }
-
-        await Patient.findOneAndUpdate(
-            { userId: user._id },
-            patientData,
-            { upsert: true, new: true }
-        );
     }
 
     const updatedUser = await User.findById(user._id).select("-password -refreshToken");

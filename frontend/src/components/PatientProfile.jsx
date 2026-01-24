@@ -63,6 +63,20 @@ const PatientProfile = () => {
     fetchProfile();
   }, []);
 
+  // Refetch payments when switching to Payments tab (so admin-created registration payments show up)
+  useEffect(() => {
+    if (activeTab === 'payments') fetchPayments();
+  }, [activeTab]);
+
+  // Refetch payments when the page becomes visible again (e.g. patient returns to tab after admin changed non-insured→insured)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchPayments();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
   // Auto-refresh sessions every 30 seconds when on sessions tab
   useEffect(() => {
     if (activeTab !== 'sessions') return;
@@ -103,10 +117,12 @@ const PatientProfile = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        const list = Array.isArray(data?.data?.docs)
-          ? data.data.docs
-          : Array.isArray(data?.data)
-          ? data.data
+        // Handle paginated { data: { docs } }, plain { data: [] }, or array
+        const raw = data?.data;
+        const list = Array.isArray(raw?.docs)
+          ? raw.docs
+          : Array.isArray(raw)
+          ? raw
           : Array.isArray(data)
           ? data
           : [];
@@ -467,6 +483,10 @@ const PatientProfile = () => {
       dob: profile.dateOfBirth ? new Date(profile.dateOfBirth).toISOString().split('T')[0] : '',
       gender: profile.gender || '',
       contact: profile.mobile_number || '',
+      address: (typeof profile.address === 'string' ? profile.address : (profile.address?.address || '')) || '',
+      city: profile.city || '',
+      state: profile.state || '',
+      pincode: profile.pincode || '',
       surgeryType: profile.surgeryType || '',
       surgeryDate: profile.surgeryDate ? new Date(profile.surgeryDate).toISOString().split('T')[0] : '',
       hospitalName: profile.hospitalName || '',
@@ -478,8 +498,9 @@ const PatientProfile = () => {
   const handleSave = async () => {
     try {
       const formData = new FormData();
+      const addressFields = ['address', 'city', 'state', 'pincode'];
       Object.keys(editForm).forEach(key => {
-        if (editForm[key]) formData.append(key, editForm[key]);
+        if (editForm[key] || addressFields.includes(key)) formData.append(key, editForm[key] ?? '');
       });
       formData.append('role', 'patient');
 
@@ -591,6 +612,46 @@ const PatientProfile = () => {
                       className="w-full p-2 border rounded"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <input
+                      type="text"
+                      value={editForm.address || ''}
+                      onChange={(e) => setEditForm({...editForm, address: e.target.value})}
+                      placeholder="Street address, area, landmark"
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">City</label>
+                    <input
+                      type="text"
+                      value={editForm.city || ''}
+                      onChange={(e) => setEditForm({...editForm, city: e.target.value})}
+                      placeholder="City"
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">State</label>
+                    <input
+                      type="text"
+                      value={editForm.state || ''}
+                      onChange={(e) => setEditForm({...editForm, state: e.target.value})}
+                      placeholder="State"
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Pincode / Zipcode</label>
+                    <input
+                      type="text"
+                      value={editForm.pincode || ''}
+                      onChange={(e) => setEditForm({...editForm, pincode: e.target.value})}
+                      placeholder="Pincode"
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -640,6 +701,9 @@ const PatientProfile = () => {
           );
         }
 
+        // Find first pending payment
+        const firstPendingPayment = payments.find(p => p.status === 'pending' || p.isPending);
+
         return (
           <div className="space-y-6">
             <div className="flex justify-end">
@@ -652,56 +716,241 @@ const PatientProfile = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
-                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Personal Information</h3>
-                <div className="space-y-2 text-xs sm:text-sm">
-                  <div><strong>Patient ID:</strong> <span className="break-all">{profile._id}</span></div>
-                  <div><strong>Name:</strong> {profile.Fullname}</div>
-                  <div><strong>DOB:</strong> {profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : 'N/A'}</div>
-                  <div><strong>Gender:</strong> {profile.gender}</div>
-                  <div><strong>Contact:</strong> {profile.mobile_number}</div>
-                  <div><strong>Email:</strong> <span className="break-all">{profile.email}</span></div>
+            {/* Non-Insured Patient Message (if no pending payment) */}
+            {!firstPendingPayment && profile?.medicalInsurance !== 'Yes' && (
+              <div className="space-y-5 w-full">
+                {/* Informative Message for Non-Insured Patients */}
+                <div 
+                  className="relative overflow-hidden p-6 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.01]"
+                  style={{
+                    background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2f1 50%, #cffafe 100%)',
+                    boxShadow: '0 10px 25px rgba(59, 130, 246, 0.2), 0 4px 10px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-400 to-teal-400 rounded-full flex items-center justify-center shadow-md transition-transform duration-300 hover:rotate-12 hover:scale-110">
+                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-base text-gray-800 leading-relaxed font-medium mb-2">
+                        Our representative will reach you soon.
+                      </p>
+                      <p className="text-sm text-gray-600 font-medium">
+                        Thank you for registering with us!
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Pending Payment Display */}
+            {firstPendingPayment && (
+              <div className="space-y-5 w-full">
+                {/* Amount to Pay */}
+                <div 
+                  className="relative overflow-hidden p-8 rounded-2xl w-full transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 50%, #e0f2f1 100%)',
+                    boxShadow: '0 20px 40px rgba(13, 148, 136, 0.15), 0 8px 16px rgba(0, 0, 0, 0.1)',
+                    border: '2px solid transparent',
+                    backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #f0fdfa 50%, #e0f2f1 100%), linear-gradient(135deg, #0d9488, #14b8a6)',
+                    backgroundOrigin: 'border-box',
+                    backgroundClip: 'padding-box, border-box',
+                    width: '100%'
+                  }}
+                >
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-teal-100 rounded-full -mr-16 -mt-16 opacity-50"></div>
+                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-teal-200 rounded-full -ml-12 -mb-12 opacity-30"></div>
+                  
+                  <div className="relative text-center">
+                    <p className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wider">Amount to Pay</p>
+                    <p className="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-600 via-teal-500 to-teal-600">
+                      ₹{firstPendingPayment.amount?.toLocaleString('en-IN') || firstPendingPayment.amount}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Informative Message */}
+                <div 
+                  className="relative overflow-hidden p-6 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-[1.01]"
+                  style={{
+                    background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2f1 50%, #cffafe 100%)',
+                    boxShadow: '0 10px 25px rgba(59, 130, 246, 0.2), 0 4px 10px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-400 to-teal-400 rounded-full flex items-center justify-center shadow-md transition-transform duration-300 hover:rotate-12 hover:scale-110">
+                      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-base text-gray-800 leading-relaxed font-medium">
+                        Don't worry! Your Physiotherapist will be assigned and session will be allotted soon after the payment. And our representative will be in touch with you for any kind of help.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pay Now Button */}
+                <button
+                  onClick={() => {
+                    setActiveTab('payments');
+                    localStorage.setItem('patientProfileActiveTab', 'payments');
+                  }}
+                  className="w-full bg-gradient-to-r from-teal-600 via-teal-500 to-teal-600 text-white px-8 py-5 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-3xl transform hover:scale-[1.03] hover:-translate-y-1 active:scale-[0.97] transition-all duration-300 flex items-center justify-center space-x-3 group"
+                  style={{
+                    boxShadow: '0 15px 35px rgba(13, 148, 136, 0.4), 0 5px 15px rgba(0, 0, 0, 0.15)'
+                  }}
+                >
+                  <svg className="w-7 h-7 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  <span className="transition-transform duration-300 group-hover:translate-x-1">Pay Now</span>
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              <div 
+                className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <h3 className="font-bold text-base sm:text-lg text-gray-800 mb-4 pb-2 border-b-2 border-teal-200">Personal Information</h3>
+                <div className="space-y-3 text-sm sm:text-base">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Patient ID:</span>
+                    <span className="text-gray-800 break-all text-right">{profile._id.substring(0, 8)}...</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Name:</span>
+                    <span className="text-gray-800">{profile.Fullname}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">DOB:</span>
+                    <span className="text-gray-800">{profile.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Gender:</span>
+                    <span className="text-gray-800">{profile.gender}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Contact:</span>
+                    <span className="text-gray-800">{profile.mobile_number}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Email:</span>
+                    <span className="text-gray-800 break-all text-right text-xs">{profile.email}</span>
+                  </div>
+                  <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:items-start">
+                    <span className="font-semibold text-gray-600 shrink-0">Address:</span>
+                    <span className="text-gray-800 text-right break-words">{(typeof profile.address === 'object' && profile.address !== null) ? [profile.address.address, profile.address.city, profile.address.state, profile.address.pincode || profile.address.zipcode].filter(Boolean).join(', ') || 'N/A' : (profile.address || 'N/A')}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">City:</span>
+                    <span className="text-gray-800 text-right">{profile.city || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">State:</span>
+                    <span className="text-gray-800 text-right">{profile.state || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Pincode / Zipcode:</span>
+                    <span className="text-gray-800 text-right">{profile.pincode || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
-                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Medical Information</h3>
-                <div className="space-y-2 text-xs sm:text-sm">
-                  <div><strong>Surgery Type:</strong> {profile.surgeryType || 'N/A'}</div>
-                  <div><strong>Surgery Date:</strong> {profile.surgeryDate ? new Date(profile.surgeryDate).toLocaleDateString() : 'N/A'}</div>
-                  <div><strong>Hospital/Clinic:</strong> {profile.hospitalName || 'N/A'}</div>
-                  <div><strong>Recovery Stage:</strong> {profile.recoveryStage || 'Initial'}</div>
-                  <div><strong>Status:</strong> {profile.currentStatus || 'Active'}</div>
+              <div 
+                className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <h3 className="font-bold text-base sm:text-lg text-gray-800 mb-4 pb-2 border-b-2 border-blue-200">Medical Information</h3>
+                <div className="space-y-3 text-sm sm:text-base">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Surgery Type:</span>
+                    <span className="text-gray-800">{profile.surgeryType || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Surgery Date:</span>
+                    <span className="text-gray-800">{profile.surgeryDate ? new Date(profile.surgeryDate).toLocaleDateString() : 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Hospital/Clinic:</span>
+                    <span className="text-gray-800 text-right">{profile.hospitalName || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Recovery Stage:</span>
+                    <span className="text-gray-800">{profile.recoveryStage || 'Initial'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Status:</span>
+                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">{profile.currentStatus || 'Active'}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border">
-                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Assigned Healthcare Team</h3>
-                <div className="space-y-2 text-xs sm:text-sm">
-                  <div><strong>Doctor:</strong> {profile.sessions?.[0]?.doctorId?.name || profile.assignedDoctor || 'Not Assigned'}</div>
-                  <div><strong>Physiotherapist:</strong> {profile.sessions?.[0]?.physioId?.name || profile.assignedPhysio || 'Not Assigned'}</div>
+              <div 
+                className="bg-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                style={{
+                  background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                  boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.05)'
+                }}
+              >
+                <h3 className="font-bold text-base sm:text-lg text-gray-800 mb-4 pb-2 border-b-2 border-purple-200">Assigned Healthcare Team</h3>
+                <div className="space-y-3 text-sm sm:text-base">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Doctor:</span>
+                    <span className="text-gray-800 text-right">{profile.sessions?.[0]?.doctorId?.name || profile.assignedDoctor || 'Not Assigned'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-600">Physiotherapist:</span>
+                    <span className="text-gray-800 text-right">{profile.sessions?.[0]?.physioId?.name || profile.assignedPhysio || 'Not Assigned'}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white p-3 sm:p-4 rounded-lg shadow-sm border md:col-span-2 lg:col-span-3">
-                <h3 className="font-semibold text-sm sm:text-base text-gray-800 mb-2">Progress Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
-                  <div className="text-center">
-                    <div className="text-xl sm:text-2xl font-bold text-teal-600">{profile.sessionsCompleted || 0}</div>
-                    <div className="text-gray-600">Sessions Completed</div>
+              <div 
+                className="bg-gradient-to-br from-teal-50 via-blue-50 to-purple-50 p-6 sm:p-8 rounded-2xl shadow-xl md:col-span-2 lg:col-span-3"
+                style={{
+                  boxShadow: '0 15px 35px rgba(13, 148, 136, 0.15), 0 5px 15px rgba(0, 0, 0, 0.1)'
+                }}
+              >
+                <h3 className="font-bold text-lg sm:text-xl text-gray-800 mb-6 pb-3 border-b-2 border-teal-300">Progress Summary</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="text-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-teal-400 mb-2">
+                      {profile.sessionsCompleted || 0}
+                    </div>
+                    <div className="text-sm sm:text-base font-semibold text-gray-700">Sessions Completed</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xl sm:text-2xl font-bold text-orange-600">{profile.missedSessions || 0}</div>
-                    <div className="text-gray-600">Missed Sessions</div>
+                  <div className="text-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-orange-400 mb-2">
+                      {profile.missedSessions || 0}
+                    </div>
+                    <div className="text-sm sm:text-base font-semibold text-gray-700">Missed Sessions</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xl sm:text-2xl font-bold text-blue-600">{profile.recoveryProgress || 0}%</div>
-                    <div className="text-gray-600">Recovery Progress</div>
+                  <div className="text-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                    <div className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400 mb-2">
+                      {profile.recoveryProgress || 0}%
+                    </div>
+                    <div className="text-sm sm:text-base font-semibold text-gray-700">Recovery Progress</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xl sm:text-2xl font-bold text-green-600">{profile.lastLogin ? new Date(profile.lastLogin).toLocaleDateString() : 'N/A'}</div>
-                    <div className="text-gray-600">Last Login</div>
+                  <div className="text-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                    <div className="text-lg sm:text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-400 mb-2">
+                      {profile.lastLogin ? new Date(profile.lastLogin).toLocaleDateString() : 'N/A'}
+                    </div>
+                    <div className="text-sm sm:text-base font-semibold text-gray-700">Last Login</div>
                   </div>
                 </div>
               </div>
@@ -898,12 +1147,14 @@ const PatientProfile = () => {
                       <div className="flex-1">
                         <div className="font-medium">{report.title || 'Medical Report'}</div>                        
                         <div className="text-sm text-gray-500">
-                          Uploaded by: {report.uploadedBy?.Fullname || 'N/A'} on {new Date(report.createdAt).toLocaleDateString()}
+                          Uploaded by: {(report.isProfileReport || report.isRegistrationReport || report.isFromMedicalReports) ? (report.uploadedByAdmin ? 'Bonebuddy' : 'Self') : (report.uploadedBy?.userType === 'admin' ? 'Bonebuddy' : (report.uploadedBy?.Fullname || 'N/A'))} on {new Date(report.createdAt).toLocaleDateString()}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <a href={report.fileUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">Download</a>
-                        <button onClick={() => handleReportDelete(report._id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">Delete</button>
+                        {!report.isProfileReport && !report.isRegistrationReport && !report.isFromMedicalReports && (
+                          <button onClick={() => handleReportDelete(report._id)} className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">Delete</button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -941,10 +1192,12 @@ const PatientProfile = () => {
         );
 
       case 'payments':
+        const pendingPayment = payments.find(p => p.status === 'pending' || p.isPending);
+        
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Test Mode Notice */}
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg shadow-sm">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
@@ -963,90 +1216,192 @@ const PatientProfile = () => {
               </div>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border">
-              <h3 className="text-lg font-semibold mb-4">Payment Requests</h3>
-              
-              {paymentsLoading ? (
-                <div className="text-center py-8">Loading payments...</div>
-              ) : payments.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <p>No payment requests</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {payments.map((payment) => (
+            {paymentsLoading ? (
+              <div className="bg-white p-8 rounded-xl shadow-md text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+                <p className="mt-4 text-gray-600">Loading payments...</p>
+              </div>
+            ) : payments.length === 0 ? (
+              <div className="bg-white p-8 rounded-xl shadow-md text-center text-gray-500">
+                <p>No payment requests</p>
+                <button
+                  type="button"
+                  onClick={() => fetchPayments()}
+                  className="mt-4 px-4 py-2 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition-colors"
+                >
+                  Refresh
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {payments.map((payment) => {
+                  const isPending = payment.status === 'pending' || payment.isPending;
+                  
+                  return (
                     <div
                       key={payment._id}
-                      className={`p-4 border rounded-lg ${
-                        payment.status === 'pending' ? 'border-yellow-300 bg-yellow-50' :
-                        payment.status === 'completed' ? 'border-green-300 bg-green-50' :
-                        'border-gray-300 bg-gray-50'
+                      className={`rounded-xl shadow-lg overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${
+                        isPending 
+                          ? 'bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 hover:border-yellow-300' 
+                          : payment.status === 'completed' 
+                          ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 hover:border-green-300'
+                          : 'bg-white border-2 border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900">{payment.description}</h4>
-                          <p className="text-sm text-gray-600 mt-1">Amount: <span className="font-bold text-lg">₹{payment.amount}</span></p>
-                          <p className="text-xs text-gray-500 mt-1">Type: {payment.paymentType}</p>
-                          {payment.dueDate && (
-                            <p className="text-xs text-gray-500">Due: {new Date(payment.dueDate).toLocaleDateString()}</p>
-                          )}
-                          {payment.notes && (
-                            <p className="text-sm text-gray-600 mt-2 italic">{payment.notes}</p>
-                          )}
-                          {payment.paidAt && (
-                            <p className="text-xs text-green-600 mt-1">Paid on: {new Date(payment.paidAt).toLocaleDateString()}</p>
-                          )}
-                        </div>
-                        <div className="ml-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      {/* Payment Status Header */}
+                      <div className={`p-4 ${
+                        isPending 
+                          ? 'bg-gradient-to-r from-yellow-400 to-orange-400' 
+                          : payment.status === 'completed'
+                          ? 'bg-gradient-to-r from-green-400 to-emerald-400'
+                          : 'bg-gradient-to-r from-gray-400 to-gray-500'
+                      }`}>
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-bold text-white text-lg">{payment.description || 'Payment'}</h4>
+                          <span className={`px-4 py-1 rounded-full text-xs font-bold ${
                             payment.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            isPending ? 'bg-yellow-100 text-yellow-800' :
                             payment.status === 'failed' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {payment.status.toUpperCase()}
+                            {payment.status?.toUpperCase() || 'PENDING'}
                           </span>
                         </div>
                       </div>
-                      {payment.status === 'pending' && (
-                        <div className="mt-3 pt-3 border-t border-gray-300">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handlePayNow(payment)}
-                              disabled={processingPayment === payment._id}
-                              className="flex-1 bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold transition-colors"
+
+                      <div className="p-6">
+                        {isPending ? (
+                          <>
+                            {/* Amount Display for Pending */}
+                            <div 
+                              className="relative overflow-hidden p-8 rounded-2xl mb-5 w-full transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl cursor-pointer"
+                              style={{
+                                background: 'linear-gradient(135deg, #ffffff 0%, #fff7ed 50%, #ffedd5 100%)',
+                                boxShadow: '0 20px 40px rgba(251, 146, 60, 0.2), 0 8px 16px rgba(0, 0, 0, 0.1)',
+                                border: '2px solid transparent',
+                                backgroundImage: 'linear-gradient(135deg, #ffffff 0%, #fff7ed 50%, #ffedd5 100%), linear-gradient(135deg, #f59e0b, #f97316)',
+                                backgroundOrigin: 'border-box',
+                                backgroundClip: 'padding-box, border-box',
+                                width: '100%'
+                              }}
                             >
-                              {processingPayment === payment._id ? (
-                                <span className="flex items-center justify-center gap-2">
-                                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-200 rounded-full -mr-12 -mt-12 opacity-40"></div>
+                              <div className="absolute bottom-0 left-0 w-20 h-20 bg-orange-300 rounded-full -ml-10 -mb-10 opacity-30"></div>
+                              <div className="relative text-center">
+                                <p className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wider">Amount to Pay</p>
+                                <p className="text-5xl sm:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-orange-500 to-orange-600">
+                                  ₹{payment.amount?.toLocaleString('en-IN') || payment.amount}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Informative Message */}
+                            <div 
+                              className="relative overflow-hidden p-6 rounded-2xl shadow-lg mb-5 transition-all duration-300 hover:shadow-xl hover:scale-[1.01]"
+                              style={{
+                                background: 'linear-gradient(135deg, #dbeafe 0%, #e0f2f1 50%, #cffafe 100%)',
+                                boxShadow: '0 10px 25px rgba(59, 130, 246, 0.2), 0 4px 10px rgba(0, 0, 0, 0.1)'
+                              }}
+                            >
+                              <div className="flex items-start space-x-4">
+                                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-400 to-teal-400 rounded-full flex items-center justify-center shadow-md transition-transform duration-300 hover:rotate-12 hover:scale-110">
+                                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                  Processing...
-                                </span>
-                              ) : (
-                                '💳 Pay Now'
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-base text-gray-800 leading-relaxed font-medium">
+                                    Don't worry! Your Physiotherapist will be assigned and session will be allotted soon after the payment. And our representative will be in touch with you for any kind of help.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Payment Actions */}
+                            <div className="space-y-3">
+                              <button
+                                onClick={() => handlePayNow(payment)}
+                                disabled={processingPayment === payment._id}
+                                className="w-full bg-gradient-to-r from-teal-600 via-teal-500 to-teal-600 text-white px-8 py-5 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-3xl transform hover:scale-[1.03] hover:-translate-y-1 active:scale-[0.97] transition-all duration-300 flex items-center justify-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed group"
+                                style={{
+                                  boxShadow: '0 15px 35px rgba(13, 148, 136, 0.4), 0 5px 15px rgba(0, 0, 0, 0.15)'
+                                }}
+                              >
+                                {processingPayment === payment._id ? (
+                                  <>
+                                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                    <span>Processing payment...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <svg className="w-7 h-7 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                    </svg>
+                                    <span className="transition-transform duration-300 group-hover:translate-x-1">Pay Now</span>
+                                  </>
+                                )}
+                              </button>
+                              <a
+                                href={`tel:+918881119890`}
+                                className="block w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-xl text-center hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 font-semibold group"
+                                title="Contact Admin for help"
+                                style={{
+                                  boxShadow: '0 10px 25px rgba(37, 99, 235, 0.3), 0 4px 10px rgba(0, 0, 0, 0.15)'
+                                }}
+                              >
+                                <span className="inline-block transition-transform duration-300 group-hover:scale-110">📞</span> Contact Support
+                              </a>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {/* Full Payment Info for Completed/Failed */}
+                            <div className="space-y-3">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-600">Amount:</span>
+                                <span className="text-xl font-bold text-gray-900">₹{payment.amount?.toLocaleString('en-IN') || payment.amount}</span>
+                              </div>
+                              {payment.paymentType && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-600">Type:</span>
+                                  <span className="text-sm text-gray-800">{payment.paymentType}</span>
+                                </div>
                               )}
-                            </button>
-                            <a
-                              href={`tel:+918881119890`}
-                              className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center justify-center"
-                              title="Contact Admin for help"
-                            >
-                              📞
-                            </a>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-2 text-center">
-                            Pay securely with Razorpay or contact admin for assistance
-                          </p>
-                        </div>
-                      )}
+                              {payment.transactionId && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-600">Transaction ID:</span>
+                                  <span className="text-sm text-gray-800 font-mono">{payment.transactionId}</span>
+                                </div>
+                              )}
+                              {payment.paidAt && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-600">Paid On:</span>
+                                  <span className="text-sm text-gray-800">{new Date(payment.paidAt).toLocaleString()}</span>
+                                </div>
+                              )}
+                              {payment.dueDate && (
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-medium text-gray-600">Due Date:</span>
+                                  <span className="text-sm text-gray-800">{new Date(payment.dueDate).toLocaleDateString()}</span>
+                                </div>
+                              )}
+                              {payment.notes && (
+                                <div className="pt-3 border-t border-gray-200">
+                                  <p className="text-sm text-gray-600 italic">{payment.notes}</p>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="bg-white p-6 rounded-lg shadow-sm border">
               <h3 className="text-lg font-semibold mb-4">Subscription Status</h3>

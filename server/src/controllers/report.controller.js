@@ -58,7 +58,43 @@ const getReportsForUser = asyncHandler(async (req, res) => {
         .populate('uploadedBy', 'Fullname userType')
         .sort({ createdAt: -1 });
 
-    return res.status(200).json(new ApiResponse(200, reports, "Reports fetched successfully."));
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const list = reports.map((r) => r.toObject ? r.toObject() : r);
+
+    // Legacy: single medicalReport from profile (backward compat)
+    if (patient.medicalReport && typeof patient.medicalReport === 'string' && patient.medicalReport.trim()) {
+        const fileUrl = patient.medicalReport.startsWith('http') ? patient.medicalReport : `${baseUrl}${patient.medicalReport}`;
+        list.push({
+            _id: 'profile-report',
+            title: 'Medical Report',
+            fileUrl,
+            createdAt: patient.updatedAt || patient.createdAt,
+            uploadedBy: null,
+            isProfileReport: true,
+            uploadedByAdmin: !!patient.medicalReportUploadedByAdmin,
+        });
+    }
+
+    // medicalReports array (all medical reports from admin/patient uploads)
+    const medicalReports = (patient.medicalReports || [])
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    medicalReports.forEach((r, i) => {
+        const fileUrl = (r.fileUrl && r.fileUrl.startsWith('http')) ? r.fileUrl : `${baseUrl}${r.fileUrl || ''}`;
+        list.push({
+            _id: r.id || `medical-report-${i}-${r.fileUrl || ''}`,
+            title: r.title || 'Medical Report',
+            fileUrl,
+            createdAt: r.createdAt || new Date(),
+            uploadedBy: null,
+            isFromMedicalReports: true,
+            uploadedByAdmin: !!r.uploadedByAdmin,
+        });
+    });
+
+    // Sort all by createdAt desc
+    list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return res.status(200).json(new ApiResponse(200, list, "Reports fetched successfully."));
 });
 
 const deleteReport = asyncHandler(async (req, res) => {

@@ -37,6 +37,9 @@ const patientSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    state: { type: String, required: false },
+    city: { type: String, required: false },
+    pincode: { type: String, required: false },
     surgeryType: {
       type: String,
       enum: ['Fracture', 'Knee Replacement', 'Hip Replacement', 'Spine Surgery', 'Other'],
@@ -60,7 +63,7 @@ const patientSchema = new mongoose.Schema(
     },
     currentCondition: {
       type: String,
-      required: true,
+      required: false,
     },
     medicalHistory: {
       type: String,
@@ -75,7 +78,7 @@ const patientSchema = new mongoose.Schema(
     },
     emergencyContactNumber: {
       type: String,
-      required: true,
+      required: false,
     },
     medicalInsurance: {
       type: String,
@@ -86,7 +89,18 @@ const patientSchema = new mongoose.Schema(
     medicalReport: {
       type: String,
       required: false,
-    }
+    },
+    medicalReportUploadedByAdmin: {
+      type: Boolean,
+      default: false,
+    },
+    medicalReports: [{
+      id: { type: String },
+      fileUrl: { type: String, required: true },
+      uploadedByAdmin: { type: Boolean, default: false },
+      createdAt: { type: Date, default: Date.now },
+      title: { type: String, default: 'Medical Report' },
+    }],
   },
   { timestamps: true }
 );
