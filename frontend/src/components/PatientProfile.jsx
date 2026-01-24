@@ -613,22 +613,12 @@ const PatientProfile = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <label className="block text-sm font-medium mb-1">Area Code (Pincode)</label>
                     <input
                       type="text"
-                      value={editForm.address || ''}
-                      onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                      placeholder="Street address, area, landmark"
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">City</label>
-                    <input
-                      type="text"
-                      value={editForm.city || ''}
-                      onChange={(e) => setEditForm({...editForm, city: e.target.value})}
-                      placeholder="City"
+                      value={editForm.pincode || ''}
+                      onChange={(e) => setEditForm({...editForm, pincode: e.target.value})}
+                      placeholder="6-digit pincode"
                       className="w-full p-2 border rounded"
                     />
                   </div>
@@ -643,12 +633,22 @@ const PatientProfile = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Pincode / Zipcode</label>
+                    <label className="block text-sm font-medium mb-1">City</label>
                     <input
                       type="text"
-                      value={editForm.pincode || ''}
-                      onChange={(e) => setEditForm({...editForm, pincode: e.target.value})}
-                      placeholder="Pincode"
+                      value={editForm.city || ''}
+                      onChange={(e) => setEditForm({...editForm, city: e.target.value})}
+                      placeholder="City"
+                      className="w-full p-2 border rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Address</label>
+                    <input
+                      type="text"
+                      value={editForm.address || ''}
+                      onChange={(e) => setEditForm({...editForm, address: e.target.value})}
+                      placeholder="Street address, area, landmark"
                       className="w-full p-2 border rounded"
                     />
                   </div>

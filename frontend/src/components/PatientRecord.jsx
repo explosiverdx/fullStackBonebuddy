@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import apiClient from '../api/apiClient';
 import { useAuth } from '../hooks/useAuth';
+import { indianStates, getCitiesByState, getAddressFromPincode } from '../utils/locationHelper';
 
 // Helper function to construct medical report URL
 const getMedicalReportUrl = (reportPath) => {
@@ -24,6 +25,12 @@ const isSectionReadOnly = (user, sectionKey) => {
   
   const sectionPerm = user.adminPermissions.sectionPermissions?.[sectionKey];
   return sectionPerm?.readOnly === true;
+};
+
+const normalizeState = (raw) => {
+  if (!raw || typeof raw !== 'string') return '';
+  const t = raw.trim().toLowerCase();
+  return indianStates.find(s => s.toLowerCase() === t) || raw.trim();
 };
 
 const PatientRecord = ({ user: userProp }) => {
@@ -106,6 +113,8 @@ const PatientRecord = ({ user: userProp }) => {
   const [dobYear, setDobYear] = useState('');
   const [adminReports, setAdminReports] = useState([]);
   const [adminReportsLoading, setAdminReportsLoading] = useState(false);
+  const [dynamicCitiesByState, setDynamicCitiesByState] = useState({});
+  const [isFetchingPincode, setIsFetchingPincode] = useState(false);
 
   const { patientId } = useParams();
   const navigate = useNavigate();
@@ -468,9 +477,9 @@ const PatientRecord = ({ user: userProp }) => {
       userId: patient.userId,
       age: patient.age || '',
       address: (typeof patient.address === 'object' && patient.address != null) ? (patient.address.address || patient.address.street || '') : (patient.address || ''),
-      state: patient.state || '',
+      state: normalizeState(patient.state || '') || patient.state || '',
       city: patient.city || '',
-      pincode: patient.pincode || '',
+      pincode: patient.pincode || patient.areaCode || '',
       currentCondition: patient.currentCondition || '',
       assignedPhysiotherapist: patient.assignedPhysiotherapist || '',
       medicalHistory: patient.medicalHistory || '',
@@ -478,6 +487,14 @@ const PatientRecord = ({ user: userProp }) => {
       bloodGroup: patient.bloodGroup || '',
       medicalInsurance: patient.medicalInsurance || ''
     });
+    const st = normalizeState(patient.state || '') || patient.state || '';
+    const ct = patient.city || '';
+    if (st && ct && !(getCitiesByState()[st] || []).includes(ct)) {
+      setDynamicCitiesByState(prev => {
+        const arr = prev[st] || [];
+        return arr.includes(ct) ? prev : { ...prev, [st]: [...arr, ct] };
+      });
+    }
     setSelectedPatient(patient);
     setShowModal(true);
   };
@@ -1754,45 +1771,86 @@ const PatientRecord = ({ user: userProp }) => {
             </div>
 
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Area Code (Pincode)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="6-digit pincode"
+                  value={formData.pincode || ''}
+                  onChange={(e) => setFormData({ ...formData, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
+                  maxLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const p = (formData.pincode || '').replace(/\D/g, '').slice(0, 6);
+                    if (p.length !== 6) { alert('Enter 6-digit pincode'); return; }
+                    setIsFetchingPincode(true);
+                    try {
+                      const data = await getAddressFromPincode(p);
+                      if (data?.state || data?.city) {
+                        const st = normalizeState(data.state || '');
+                        if (st && data.city) {
+                          setDynamicCitiesByState(prev => {
+                            const arr = prev[st] || [];
+                            return arr.includes(data.city) ? prev : { ...prev, [st]: [...arr, data.city] };
+                          });
+                        }
+                        setFormData(prev => ({ ...prev, state: st || prev.state, city: data.city || prev.city }));
+                        alert('State and city fetched from pincode.');
+                      } else alert('Could not fetch state and city for this pincode.');
+                    } catch (e) { alert('Error fetching. Please try again.'); }
+                    finally { setIsFetchingPincode(false); }
+                  }}
+                  disabled={isFetchingPincode || (formData.pincode || '').replace(/\D/g, '').length !== 6}
+                  className="px-3 py-2 border border-gray-300 rounded bg-gray-100 hover:bg-gray-200 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isFetchingPincode ? '…' : 'Fetch'}
+                </button>
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <select
+                value={formData.state || ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData(prev => {
+                    const next = { ...prev, state: v };
+                    const cities = [...(getCitiesByState()[v] || []), ...(dynamicCitiesByState[v] || [])];
+                    if (prev.city && !cities.includes(prev.city)) next.city = '';
+                    return next;
+                  });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 bg-white"
+              >
+                <option value="">Select State</option>
+                {indianStates.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input
+                list="city-datalist-admin"
+                type="text"
+                placeholder="Select or type city name"
+                value={formData.city || ''}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value.trim() })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 bg-white"
+              />
+              <datalist id="city-datalist-admin">
+                {[...new Set([...(getCitiesByState()[formData.state] || []), ...(dynamicCitiesByState[formData.state] || [])])].sort().map(c => <option key={c} value={c} />)}
+              </datalist>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
               <textarea
                 placeholder="Street address, area, landmark"
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10 resize-y"
                 rows="2"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
-              <input
-                type="text"
-                placeholder="City"
-                value={formData.city || ''}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
-              <input
-                type="text"
-                placeholder="State"
-                value={formData.state || ''}
-                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
-              />
-            </div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pincode / Zipcode</label>
-              <input
-                type="text"
-                placeholder="Pincode"
-                value={formData.pincode || ''}
-                onChange={(e) => setFormData({ ...formData, pincode: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none relative z-10"
               />
             </div>
 

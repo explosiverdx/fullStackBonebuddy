@@ -319,10 +319,10 @@ const PatientSignup = () => {
             ...prev,
             state: state || prev.state,
             city: city || prev.city,
-            address: addressData.address || prev.address,
+            // Do not set address – only state and city from pincode
           }));
           
-          alert('Address fetched successfully!');
+          alert('State and city fetched from pincode.');
         } else {
           alert('Could not fetch address for this pincode');
         }
@@ -684,54 +684,6 @@ const PatientSignup = () => {
             </div>
 
             <div>
-              <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">State <span className="text-red-500">*</span></label>
-              <select
-                id="state"
-                name="state"
-                value={formData.state || ''}
-                onChange={(e) => {
-                  const newState = e.target.value;
-                  handleChange(e);
-                  // Reset city when state changes
-                  setFormData(prev => {
-                    const availableCities = getCitiesForSelectedState(newState);
-                    const cityInNewState = availableCities.includes(prev.city);
-                    return {
-                      ...prev,
-                      state: newState,
-                      city: cityInNewState ? prev.city : '',
-                    };
-                  });
-                }}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
-              >
-                <option value="">Select State</option>
-                {indianStates.map(state => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
-              <select
-                id="city"
-                name="city"
-                value={formData.city || ''}
-                onChange={handleChange}
-                required
-                disabled={!formData.state}
-                className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${!formData.state ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-              >
-                <option value="">Select City</option>
-                {getCitiesForSelectedState().map(city => (
-                  <option key={city} value={city}>{city}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label htmlFor="areaCode" className="block text-sm font-medium text-gray-700 mb-1">Area Code (Pincode) <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input
@@ -758,7 +710,7 @@ const PatientSignup = () => {
                       }
                     }}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-teal-600 hover:text-teal-700"
-                    title="Fetch address from pincode"
+                    title="Fetch state and city from pincode"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -766,6 +718,50 @@ const PatientSignup = () => {
                   </button>
                 )}
               </div>
+            </div>
+
+            <div>
+              <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">State <span className="text-red-500">*</span></label>
+              <select
+                id="state"
+                name="state"
+                value={formData.state || ''}
+                onChange={(e) => {
+                  const newState = e.target.value;
+                  handleChange(e);
+                  setFormData(prev => {
+                    const availableCities = getCitiesForSelectedState(newState);
+                    const cityInNewState = availableCities.includes(prev.city);
+                    return { ...prev, state: newState, city: cityInNewState ? prev.city : '' };
+                  });
+                }}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+              >
+                <option value="">Select State</option>
+                {indianStates.map(state => (
+                  <option key={state} value={state}>{state}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">City <span className="text-red-500">*</span></label>
+              <input
+                id="city"
+                name="city"
+                list="city-datalist-signup"
+                type="text"
+                placeholder="Select or type city name"
+                value={formData.city || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value.trim() }))}
+                required
+                disabled={!formData.state}
+                className={`w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all ${!formData.state ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              />
+              <datalist id="city-datalist-signup">
+                {getCitiesForSelectedState().map(city => <option key={city} value={city} />)}
+              </datalist>
             </div>
 
             <div>
