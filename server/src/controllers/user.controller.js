@@ -4,6 +4,7 @@ import { User } from "../models/user.models.js";
 import { Doctor } from "../models/doctor.models.js";
 import { Physio } from "../models/physio.models.js";
 import { Patient } from "../models/patient.models.js";
+import { Payment } from "../models/payments.models.js";
 import { Session } from "../models/sessions.models.js";
 import { Contact } from "../models/contact.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
@@ -1069,6 +1070,11 @@ const updateProfile = asyncHandler(async (req, res) => {
             { upsert: true, new: true }
         );
     } else if (role === 'patient') {
+        // Get existing patient to check if medicalInsurance changed from "Yes" to "No"
+        const existingPatient = await Patient.findOne({ userId: user._id });
+        const wasInsured = existingPatient?.medicalInsurance === 'Yes';
+        const isNowInsured = medicalInsurance === 'Yes';
+
         const patientData = {
             userId: user._id,
             name: name || user.Fullname,
@@ -1095,6 +1101,7 @@ const updateProfile = asyncHandler(async (req, res) => {
         };
 
         // Handle medical report file upload: append to medicalReports (patient → Self)
+        let updatedPatient;
         if (files?.medicalReport?.[0]) {
             const updateDoc = {
                 $set: patientData,
@@ -1108,13 +1115,35 @@ const updateProfile = asyncHandler(async (req, res) => {
                     },
                 },
             };
-            await Patient.findOneAndUpdate({ userId: user._id }, updateDoc, { upsert: true, new: true });
+            updatedPatient = await Patient.findOneAndUpdate({ userId: user._id }, updateDoc, { upsert: true, new: true });
         } else {
-            await Patient.findOneAndUpdate(
+            updatedPatient = await Patient.findOneAndUpdate(
                 { userId: user._id },
                 patientData,
                 { upsert: true, new: true }
             );
+        }
+
+        // If user changed from insured to non-insured, cancel pending registration payments
+        if (wasInsured && !isNowInsured && updatedPatient?._id) {
+            try {
+                const cancelledPayments = await Payment.updateMany(
+                    { 
+                        patientId: updatedPatient._id, 
+                        paymentType: 'registration', 
+                        status: 'pending' 
+                    },
+                    { 
+                        status: 'cancelled' 
+                    }
+                );
+                if (cancelledPayments.modifiedCount > 0) {
+                    console.log(`Cancelled ${cancelledPayments.modifiedCount} pending registration payment(s) for patient ${updatedPatient._id} (insured → non-insured)`);
+                }
+            } catch (err) {
+                console.error('Error cancelling registration payments for non-insured patient:', err);
+                // Don't fail the request if payment cancellation fails
+            }
         }
     }
 
@@ -1130,11 +1159,15 @@ const updateProfile = asyncHandler(async (req, res) => {
         secure: isProduction
     };
 
+    // Include tokens in body for mobile (doesn't use cookies) so payment API uses latest token
+    const u = updatedUser.toObject ? updatedUser.toObject() : updatedUser;
+    const dataToSend = { ...u, accessToken, refreshToken };
+
     return res
         .status(200)
         .cookie("accessToken", accessToken, options)
         .cookie("refreshToken", refreshToken, options)
-        .json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+        .json(new ApiResponse(200, dataToSend, "Profile updated successfully"));
 });
 
 const welcome = asyncHandler(async (req, res) => {

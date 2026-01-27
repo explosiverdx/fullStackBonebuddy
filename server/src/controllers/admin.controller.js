@@ -737,6 +737,30 @@ const updatePatientAdmin = asyncHandler(async (req, res) => {
         }
     }
 
+    // When admin changes patient from insured to non-insured, cancel pending registration payments
+    const wasInsured = (existing.medicalInsurance === 'Yes');
+    const isNowNonInsured = (updateData.medicalInsurance !== 'Yes' && updateData.medicalInsurance !== undefined);
+    if (wasInsured && isNowNonInsured && patient._id) {
+        try {
+            const cancelledPayments = await Payment.updateMany(
+                { 
+                    patientId: patient._id, 
+                    paymentType: 'registration', 
+                    status: 'pending' 
+                },
+                { 
+                    status: 'cancelled' 
+                }
+            );
+            if (cancelledPayments.modifiedCount > 0) {
+                console.log(`Cancelled ${cancelledPayments.modifiedCount} pending registration payment(s) for patient ${patient._id} (insured → non-insured)`);
+            }
+        } catch (err) {
+            console.error('Error cancelling registration payments for non-insured patient:', err);
+            // Don't fail the request if payment cancellation fails
+        }
+    }
+
     // Format dates to yyyy-MM-dd for frontend compatibility
     const formattedPatient = {
         ...patient.toObject(),
