@@ -7,6 +7,7 @@ import { Patient } from "../models/patient.models.js";
 import { Payment } from "../models/payments.models.js";
 import { Session } from "../models/sessions.models.js";
 import { Contact } from "../models/contact.model.js";
+import { Notification } from "../models/notification.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { generateAccessAndRefreshTokens } from "../utils/auth.utils.js";
@@ -1070,9 +1071,10 @@ const updateProfile = asyncHandler(async (req, res) => {
             { upsert: true, new: true }
         );
     } else if (role === 'patient') {
-        // Get existing patient to check if medicalInsurance changed from "Yes" to "No"
+        // Get existing patient to check if medicalInsurance changed
         const existingPatient = await Patient.findOne({ userId: user._id });
         const wasInsured = existingPatient?.medicalInsurance === 'Yes';
+        const wasNonInsured = existingPatient?.medicalInsurance !== 'Yes';
         const isNowInsured = medicalInsurance === 'Yes';
 
         const patientData = {
@@ -1122,6 +1124,58 @@ const updateProfile = asyncHandler(async (req, res) => {
                 patientData,
                 { upsert: true, new: true }
             );
+        }
+
+        // If user changed from non-insured to insured, create a pending registration payment
+        if (wasNonInsured && isNowInsured && updatedPatient?._id) {
+            try {
+                // Check if a pending registration payment already exists
+                const existingPayment = await Payment.findOne({ 
+                    patientId: updatedPatient._id, 
+                    paymentType: 'registration', 
+                    status: 'pending' 
+                });
+                
+                if (!existingPayment) {
+                    // Calculate amount based on state (UP = 18000, else 35000)
+                    const addr = [
+                        updatedPatient.address, 
+                        updatedPatient.city, 
+                        updatedPatient.state, 
+                        updatedPatient.pincode,
+                        user.address
+                    ].filter(Boolean).join(' ');
+                    const amount = /Uttar\s*Pradesh|U\.?P\.?\b/i.test(addr) ? 18000 : 35000;
+                    
+                    // Create registration payment
+                    const payment = await Payment.create({
+                        patientId: updatedPatient._id,
+                        userId: user._id,
+                        amount,
+                        description: 'Patient Registration Fee',
+                        paymentType: 'registration',
+                        status: 'pending',
+                        requestedBy: user._id, // User requested it themselves
+                    });
+                    
+                    // Create notification for the user
+                    await Notification.create({
+                        userId: user._id,
+                        type: 'payment',
+                        title: 'Payment Request',
+                        message: `New payment request of ₹${amount.toLocaleString('en-IN')} for Patient Registration Fee`,
+                        relatedId: payment._id,
+                        relatedModel: 'Payment',
+                        actionUrl: '/PatientProfile?tab=payments',
+                        read: false,
+                    });
+                    
+                    console.log(`Created registration payment of ₹${amount} for patient ${updatedPatient._id} (non-insured → insured via user update)`);
+                }
+            } catch (err) {
+                console.error('Error creating registration payment for newly insured patient:', err);
+                // Don't fail the request if payment creation fails
+            }
         }
 
         // If user changed from insured to non-insured, cancel pending registration payments
