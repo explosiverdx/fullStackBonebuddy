@@ -1224,6 +1224,17 @@ const updateProfile = asyncHandler(async (req, res) => {
     const u = updatedUser.toObject ? updatedUser.toObject() : updatedUser;
     const dataToSend = { ...u, accessToken, refreshToken };
 
+    // So the app doesn't overwrite auth state with hasPassword: false (updatedUser excludes password)
+    dataToSend.hasPassword = !!user.password;
+
+    // For patients, merge Patient document fields (e.g. medicalInsurance) so the app gets correct insured status
+    if (updatedUser.userType === 'patient') {
+        const patient = await Patient.findOne({ userId: updatedUser._id }).lean();
+        if (patient) {
+            dataToSend.medicalInsurance = patient.medicalInsurance ?? dataToSend.medicalInsurance;
+        }
+    }
+
     return res
         .status(200)
         .cookie("accessToken", accessToken, options)
