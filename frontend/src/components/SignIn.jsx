@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { sendAdminOtp, verifyAdminOtp } from '../api/auth.js';
 import apiClient from '../api/apiClient';
+import OtpInput from './OtpInput';
 
 const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
   const navigate = useNavigate();
@@ -628,21 +629,14 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
                   </div>
 
                   <div>
-                    <label htmlFor="otp-input" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="otp-input" className="block text-sm font-medium text-gray-700 mb-2">
                       Enter OTP
                     </label>
-                    <input
-                      type="text"
+                    <OtpInput
                       id="otp-input"
                       value={otp}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setOtp(value);
-                      }}
-                      maxLength="6"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all text-center text-2xl tracking-widest"
-                      placeholder="000000"
-                      required
+                      onChange={setOtp}
+                      disabled={isLoading}
                     />
                   </div>
 
@@ -718,21 +712,14 @@ const SignIn = ({ isOpen, onClose, initialMode = 'user' }) => {
               {step === 'forgot-password-reset' && (
                 <form onSubmit={handleResetPasswordSubmit} className="space-y-4">
                   <div>
-                    <label htmlFor="otp-reset" className="block text-sm font-medium text-gray-700 mb-1">
+                    <label htmlFor="otp-reset" className="block text-sm font-medium text-gray-700 mb-2">
                       Reset OTP
                     </label>
-                    <input
-                      type="text"
+                    <OtpInput
                       id="otp-reset"
                       value={otp}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        setOtp(value);
-                      }}
-                      maxLength="6"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-all"
-                      placeholder="Enter OTP from SMS"
-                      required
+                      onChange={setOtp}
+                      disabled={isLoading}
                     />
                   </div>
 

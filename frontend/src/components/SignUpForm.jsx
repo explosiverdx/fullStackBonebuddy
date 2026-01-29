@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import OtpInput from './OtpInput';
 
 const SignUpForm = () => {
   const navigate = useNavigate();
@@ -206,16 +207,8 @@ const SignUpForm = () => {
           <form className="mt-8 space-y-6" onSubmit={handleVerifyOtp}>
             <div className="rounded-md shadow-sm -space-y-px">
               <div>
-                <label htmlFor="otp" className="sr-only">One Time Password</label>
-                <input
-                  id="otp"
-                  name="otp"
-                  type="text"
-                  required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter OTP"
-                  value={otp}
-                                      onChange={(e) => setOtp(e.target.value)}                />
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">One Time Password</label>
+                <OtpInput id="otp" value={otp} onChange={setOtp} />
               </div>
             </div>
             <div className="text-center text-sm text-gray-600">

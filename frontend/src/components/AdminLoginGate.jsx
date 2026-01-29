@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { sendAdminOtp, verifyAdminOtp, loginAdmin } from '../api/auth.js';
+import OtpInput from './OtpInput';
 
 const AdminLoginGate = ({ children }) => {
   const { user, loading, login } = useAuth();
@@ -280,17 +281,13 @@ const AdminLoginGate = ({ children }) => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Enter OTP
                   </label>
-                  <input
-                    type="text"
-                    placeholder="Enter 6-digit OTP"
+                  <OtpInput
                     value={otp}
-                    onChange={(e) => {
-                      setOtp(e.target.value);
+                    onChange={(v) => {
+                      setOtp(v);
                       setError('');
                     }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center text-2xl tracking-widest"
-                    maxLength="6"
-                    required
+                    disabled={isLoading}
                   />
                   <p className="text-xs text-gray-500 mt-2">
                     OTP sent to +91{phoneNumber}
