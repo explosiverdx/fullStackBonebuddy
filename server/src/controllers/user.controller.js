@@ -133,7 +133,7 @@ const registerWithPassword = asyncHandler(async (req, res) => {
 
 const sendOTP = asyncHandler(async (req, res) => {
     console.log("sendOTP controller called with body:", req.body);
-    let { phoneNumber } = req.body;
+    let { phoneNumber, loginOnly } = req.body;
 
     if (!phoneNumber) {
         console.log("Phone number missing in request body");
@@ -151,6 +151,13 @@ const sendOTP = asyncHandler(async (req, res) => {
 
     // Query for existing in either format
     let user = await User.findOne({ mobile_number: { $in: [normalizedPhone, phoneDigits] } });
+
+    // When loginOnly is true (e.g. "Login with OTP" from login screen), only send OTP to existing users
+    if (loginOnly === true || loginOnly === 'true') {
+        if (!user) {
+            throw new ApiError(404, "Please register first");
+        }
+    }
 
     if (user) {
         if (user.mobile_number !== normalizedPhone) {
