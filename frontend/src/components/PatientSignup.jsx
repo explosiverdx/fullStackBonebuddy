@@ -174,7 +174,8 @@ const PatientSignup = () => {
       // Load Razorpay script
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
-        alert('Failed to load payment gateway. Please try again.');
+        alert('Failed to load payment gateway. Please try again. You can pay from your profile.');
+        navigate('/PatientProfile?tab=payments', { replace: true });
         return;
       }
 
@@ -232,8 +233,7 @@ const PatientSignup = () => {
             }
 
             alert('✅ Payment successful!');
-            // Navigate to patient profile after successful payment
-            navigate('/PatientProfile', { replace: true });
+            navigate('/PatientProfile?tab=payments', { replace: true });
           } catch (error) {
             console.error('Payment verification error:', error);
             alert('❌ Payment verification failed. Please contact support.');
@@ -249,8 +249,7 @@ const PatientSignup = () => {
         },
         modal: {
           ondismiss: function() {
-            // If payment is cancelled, still navigate to profile
-            navigate('/PatientProfile', { replace: true });
+            navigate('/PatientProfile?tab=payments', { replace: true });
           }
         }
       };
@@ -260,15 +259,14 @@ const PatientSignup = () => {
       razorpay.on('payment.failed', function (response) {
         console.error('Payment failed:', response.error);
         alert(`❌ Payment failed: ${response.error.description}`);
-        navigate('/PatientProfile', { replace: true });
+        navigate('/PatientProfile?tab=payments', { replace: true });
       });
       
       razorpay.open();
     } catch (error) {
       console.error('Payment initiation error:', error);
-      alert(`Failed to initiate payment: ${error.message}`);
-      // Navigate to profile even if payment fails
-      navigate('/PatientProfile', { replace: true });
+      alert(`Failed to initiate payment: ${error.message}. You can pay from your profile.`);
+      navigate('/PatientProfile?tab=payments', { replace: true });
     }
   };
 
@@ -515,6 +513,8 @@ const PatientSignup = () => {
           const registrationFee = calculateRegistrationFee();
           // Only initiate payment for insured patients
           if (registrationFee !== null && formData.medicalInsurance === 'Yes') {
+            // Redirect to payment page first so user lands there even if Razorpay doesn't open
+            navigate('/PatientProfile?tab=payments', { replace: true });
             await initiatePayment(registrationFee);
           } else {
             // Non-insured patient - show message modal

@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import * as fflate from 'fflate';
 
 const PatientProfile = () => {
+  const [searchParams] = useSearchParams();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
 
-  // Load active tab from localStorage or default to 'overview'
+  // Load active tab from URL (?tab=payments), then localStorage, then default 'overview'
   const [activeTab, setActiveTab] = useState(() => {
+    const tabFromUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab');
+    if (tabFromUrl === 'payments' || tabFromUrl === 'overview' || tabFromUrl === 'sessions' || tabFromUrl === 'reports') {
+      return tabFromUrl;
+    }
     const savedTab = localStorage.getItem('patientProfileActiveTab');
     return savedTab || 'overview';
   });
@@ -21,6 +27,15 @@ const PatientProfile = () => {
   const [payments, setPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(null);
+
+  // When landing with ?tab=payments (e.g. after insured signup), open Payments tab
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'payments' || tab === 'overview' || tab === 'sessions' || tab === 'reports') {
+      setActiveTab(tab);
+      localStorage.setItem('patientProfileActiveTab', tab);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchProfile = async () => {
