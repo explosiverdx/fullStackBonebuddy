@@ -72,6 +72,16 @@ const getPatientPaymentHistory = asyncHandler(async (req, res) => {
 
     const payments = await Payment.aggregatePaginate(aggregate, options);
 
+    // Deduplicate: only one pending registration payment per patient (legacy duplicates)
+    const docs = payments.docs || [];
+    const regPending = docs.filter(p => p.paymentType === 'registration' && (p.status === 'pending' || p.status === 'failed'));
+    const rest = docs.filter(p => !(p.paymentType === 'registration' && (p.status === 'pending' || p.status === 'failed')));
+    const keepOne = regPending.length > 0
+        ? [regPending.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]]
+        : [];
+    const deduped = [...rest, ...keepOne].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    payments.docs = deduped;
+
     return res.status(200).json(
         new ApiResponse(200, payments, "Payment history retrieved successfully.")
     );
