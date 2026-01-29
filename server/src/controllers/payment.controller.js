@@ -79,7 +79,9 @@ const getPatientPaymentHistory = asyncHandler(async (req, res) => {
     const keepOne = regPending.length > 0
         ? [regPending.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]]
         : [];
-    const deduped = [...rest, ...keepOne].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    let deduped = [...rest, ...keepOne].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    // Exclude cancelled registration payments so non-insured users don't see multiple cancelled entries
+    deduped = deduped.filter(p => !(p.paymentType === 'registration' && p.status === 'cancelled'));
     payments.docs = deduped;
 
     return res.status(200).json(
