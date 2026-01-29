@@ -119,11 +119,12 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
     }
 
     let payment;
+    let isNewlyCreatedPayment = false;
 
     // Check if this is a retry of an existing payment
     if (existingPaymentId) {
         payment = await Payment.findById(existingPaymentId);
-        
+
         if (!payment) {
             throw new ApiError(404, "Existing payment not found.");
         }
@@ -143,7 +144,27 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
         payment.razorpayOrderId = null; // Clear old order ID
         payment.razorpayPaymentId = null;
         payment.razorpaySignature = null;
-    } else {
+    } else if (paymentType === 'registration') {
+        // Registration: reuse payment created by profile update to avoid duplicates
+        payment = await Payment.findOne({
+            patientId: patient._id,
+            paymentType: 'registration',
+            status: 'pending',
+        });
+        if (payment) {
+            if (payment.userId.toString() !== userId.toString()) {
+                throw new ApiError(403, "Unauthorized to use this payment.");
+            }
+            payment.razorpayOrderId = null;
+            payment.razorpayPaymentId = null;
+            payment.razorpaySignature = null;
+            if (amount != null) payment.amount = amount;
+            if (description) payment.description = description;
+            await payment.save();
+        }
+    }
+
+    if (!payment) {
         // Create new payment record
         try {
             payment = await Payment.create({
@@ -157,6 +178,7 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
                 paymentType: paymentType || 'other',
                 paymentGateway: 'razorpay',
             });
+            isNewlyCreatedPayment = true;
         } catch (dbError) {
             console.error('Error creating payment record:', dbError);
             throw new ApiError(500, `Failed to create payment record: ${dbError.message}`);
@@ -212,8 +234,8 @@ const createRazorpayOrderController = asyncHandler(async (req, res) => {
         const errorMessage = error.message || 'Unknown error';
         const errorDescription = error.description || '';
         
-        // Only delete if it's a new payment, not a retry
-        if (!existingPaymentId && payment && payment._id) {
+        // Only delete if we created the payment in this request (not retry, not reused registration)
+        if (isNewlyCreatedPayment && payment && payment._id) {
             try {
                 await Payment.findByIdAndDelete(payment._id);
                 console.log('🗑️ Deleted payment record due to error:', payment._id);
